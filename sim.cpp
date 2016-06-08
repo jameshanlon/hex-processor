@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstdint>
+#include <cstdarg>
 #include <iostream>
 
 static void error(const char *message) {
@@ -87,24 +88,15 @@ public:
     }
   }
 
-  void trace1(const char *opc, uint32_t op1, uint32_t op2) {
+  void trace(unsigned count, const char *opc, ...) {
     if (tracing) {
-      std::cout << opc << " " << op1
-                << " @ " << cycles << '\n';
-    }
-  }
-
-  void trace2(const char *opc, uint32_t op1, uint32_t op2) {
-    if (tracing) {
-      std::cout << opc << " " << op1 << ", " << op2
-                << " @ " << cycles << '\n';
-    }
-  }
-
-  void trace3(const char *opc, uint32_t op1, uint32_t op2, uint32_t op3) {
-    if (tracing) {
-      std::cout << opc << " " << op1 << ", " << op2 << ", " << op3
-                << " @ " << cycles << '\n';
+      va_list args;
+      va_start(args, opc);
+      std::cout << opc << " ";
+      for (unsigned i = 0; i < count; ++i) {
+        std::cout << op1 << i+1 < count ? ", " : "";
+      }
+      std::cout << " @ " << cycles << '\n';
     }
   }
 
@@ -114,67 +106,67 @@ public:
       switch ((inst >> 4) & 0xF) {
       case LDAM:
         areg = mem[oreg];
-        trace2("LDAM", areg, oreg);
+        trace(2, "LDAM", areg, oreg);
         oreg = 0;
         break;
       case LDBM:
         breg = mem[oreg];
-        trace2("LDBM", areg, oreg);
+        trace(2, "LDBM", areg, oreg);
         oreg = 0;
         break;
       case STAM:
         mem[oreg] = areg;
-        trace2("STAM", areg, oreg);
+        trace(2, "STAM", areg, oreg);
         oreg = 0;
         break;
       case LDAC:
         areg = oreg;
-        trace1("LDAC", oreg);
+        trace(1, "LDAC", oreg);
         oreg = 0;
         break;
       case LDBC:
         breg = oreg;
-        trace1("LDBC", oreg);
+        trace(1, "LDBC", oreg);
         oreg = 0;
         break;
       case LDAP:
         areg = pc + oreg;
-        trace2("LDAP", areg, oreg);
+        trace(1, "LDAP", areg, oreg);
         oreg = 0;
         break;
       case LDAI:
         temp = areg
         areg = mem[areg + oreg];
-        trace3("LDAI", areg, temp, oreg);
+        trace(3, "LDAI", areg, temp, oreg);
         oreg = 0;
         break;
       case LDBI:
         breg = mem[breg + oreg];
-        trace3("LDBI", breg, areg, oreg);
+        trace(3, "LDBI", breg, areg, oreg);
         oreg = 0;
         break;
       case STAI:
         mem[breg + oreg] = areg;
-        trace3("STAI", breg, oreg, areg);
+        trace3(3, "STAI", breg, oreg, areg);
         oreg = 0;
         break;
       case BR:
         pc = pc + oreg;
-        trace1("BR", oreg);
+        trace(1, "BR", oreg);
         oreg = 0;
         break;
       case BRZ:
         if (areg == 0) {
           pc = pc + oreg;
         }
-        trace2("BRZ", areg, oreg);
+        trace(2, "BRZ", areg, oreg);
         oreg = 0;
         break;
       case BRN:
         if ((int) areg < 0) {
           pc = pc + oreg;
         }
-        trace2("BRN", areg, oreg);
+        trace(2, "BRN", areg, oreg);
         oreg = 0;
         break;
       case PFIX:
@@ -187,23 +179,23 @@ public:
         switch (oreg) {
         case BRB:
           pc = breg;
-          trace1("BRB", breg);
+          trace(1, "BRB", breg);
           oreg = 0;
           break;
         case ADD:
           temp = areg;
           areg = areg + breg;
-          trace1("ADD", areg, temp, breg);
+          trace(1, "ADD", areg, temp, breg);
           oreg = 0;
           break;
         case SUB:
           temp = areg;
           areg = areg - breg;
-          trace1("SUB", areg, temp, breg);
+          trace(1, "SUB", areg, temp, breg);
           oreg = 0;
           break;
         case SYS:
-          trace1("SYS", areg);
+          trace(1, "SYS", areg);
           syscall();
           break;
         };
