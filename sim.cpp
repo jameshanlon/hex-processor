@@ -221,7 +221,7 @@ int main(int argc, const char *argv[]) {
   for (unsigned i = 1; i < argc; ++i) {
     if (std::strcmp(argv[i], "-t") == 0) {
       trace = true;
-    if (std::strcmp(argv[i], "-h") == 0) {
+    } else if (std::strcmp(argv[i], "-h") == 0) {
       help(argv);
     } else {
       if (!filename) {
