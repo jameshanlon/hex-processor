@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.12.0)
+project(processor)
+set(Boost_USE_STATIC_LIBS ON)
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+include_directories(${Boost_INCLUDE_DIRS})
+add_executable(processor main.cpp)
+target_compile_options(processor PUBLIC -Wall -pedantic)
+target_link_libraries(processor
+  ${Boost_LIBRARIES})
