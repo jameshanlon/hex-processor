@@ -2,16 +2,16 @@
 #include <cstdint>
 #include <cstdarg>
 #include <iostream>
-
-static void error(const char *message) {
-  std::cout << "Error: " << message << '\n';
-  std::exit(1);
-}
+#include <fstream>
+#include <exception>
+#include <boost/format.hpp>
 
 class Processor {
 
-  enum Instr {
-    LDAM = 0,
+  static const size_t MEMORY_SIZE_BYTES = 1 << 16;
+
+  enum class Instr {
+    LDAM,
     LDBM,
     STAM,
     LDAC,
@@ -30,9 +30,12 @@ class Processor {
     MUL,
     REM,
     SYS,
+    PFIX,
+    NFIX,
+    OPR
   };
 
-  enum Syscall {
+  enum class Syscall {
     EXIT,
     WRITE,
     READ,
@@ -47,15 +50,19 @@ class Processor {
   uint32_t inst;
 
   // 256KB memory.
-  uint8_t mem[1<<16];
+  char memory[MEMORY_SIZE_BYTES];
 
   uint64_t cycles;
   bool running;
-  bool trace;
+  bool tracing;
 
 public:
 
-  Processor(bool trace) : cycles(0), trace(trace) {}
+  Processor() :
+    cycles(0),
+    tracing(false) {}
+
+  void setTracing(bool value) { tracing = value; }
 
   void load(const char *filename) {
     // Load the binary file.
@@ -66,176 +73,199 @@ public:
       int length = file.tellg();
       file.seekg(0, file.beg);
       // Read the contents.
-      file.read(mem, length);
+      file.read(static_cast<char*>(memory), length);
       if (!file) {
-        error("could not read all of the file");
+        throw std::runtime_error("could not read all of the file");
       }
     }
-    error("could not open the file");
+    throw std::runtime_error("could not open the file");
   }
 
   void syscall() {
-    switch (areg) {
-    case EXIT:
-      running = false;
-      break;
-    case WRITE:
-      std::putchar(mem[sp]);
-      break;
-    case READ:
-      mem[sp] = std::getchar(mem[sp]);
-      break;
+    switch (static_cast<Syscall>(areg)) {
+      case Syscall::EXIT:
+        running = false;
+        break;
+      case Syscall::WRITE:
+        std::putchar(memory[sp]);
+        break;
+      case Syscall::READ:
+        memory[sp] = std::getchar();
+        break;
     }
   }
 
-  void trace(unsigned count, const char *opc, ...) {
-    if (tracing) {
-      va_list args;
-      va_start(args, opc);
-      std::cout << opc << " ";
-      for (unsigned i = 0; i < count; ++i) {
-        std::cout << op1 << i+1 < count ? ", " : "";
-      }
-      std::cout << " @ " << cycles << '\n';
+  void trace(const char *opc, uint32_t op1) {
+    if (!tracing) {
+      return;
     }
+    std::cout << boost::format("%d %s %d\n") % cycles % opc % op1;
+  }
+
+  void trace(const char *opc, uint32_t op1, uint32_t op2) {
+    if (!tracing) {
+      return;
+    }
+    std::cout << boost::format("%d %s %d %d\n") % cycles % opc % op1 % op2;
+  }
+
+  void trace(const char *opc, uint32_t op1, uint32_t op2, uint32_t op3) {
+    if (!tracing) {
+      return;
+    }
+    std::cout << boost::format("%d %s %d %d\n") % cycles % opc % op1 % op2 % op3;
   }
 
   void run() {
     while (running) {
-      inst = mem[pc];
-      switch ((inst >> 4) & 0xF) {
-      case LDAM:
-        areg = mem[oreg];
-        trace(2, "LDAM", areg, oreg);
-        oreg = 0;
-        break;
-      case LDBM:
-        breg = mem[oreg];
-        trace(2, "LDBM", areg, oreg);
-        oreg = 0;
-        break;
-      case STAM:
-        mem[oreg] = areg;
-        trace(2, "STAM", areg, oreg);
-        oreg = 0;
-        break;
-      case LDAC:
-        areg = oreg;
-        trace(1, "LDAC", oreg);
-        oreg = 0;
-        break;
-      case LDBC:
-        breg = oreg;
-        trace(1, "LDBC", oreg);
-        oreg = 0;
-        break;
-      case LDAP:
-        areg = pc + oreg;
-        trace(1, "LDAP", areg, oreg);
-        oreg = 0;
-        break;
-      case LDAI:
-        temp = areg
-        areg = mem[areg + oreg];
-        trace(3, "LDAI", areg, temp, oreg);
-        oreg = 0;
-        break;
-      case LDBI:
-        breg = mem[breg + oreg];
-        trace(3, "LDBI", breg, areg, oreg);
-        oreg = 0;
-        break;
-      case STAI:
-        mem[breg + oreg] = areg;
-        trace3(3, "STAI", breg, oreg, areg);
-        oreg = 0;
-        break;
-      case BR:
-        pc = pc + oreg;
-        trace(1, "BR", oreg);
-        oreg = 0;
-        break;
-      case BRZ:
-        if (areg == 0) {
-          pc = pc + oreg;
-        }
-        trace(2, "BRZ", areg, oreg);
-        oreg = 0;
-        break;
-      case BRN:
-        if ((int) areg < 0) {
-          pc = pc + oreg;
-        }
-        trace(2, "BRN", areg, oreg);
-        oreg = 0;
-        break;
-      case PFIX:
-        oreg = oreg << 4;
-        break;
-      case NFIX:
-        oreg = 0xFFFFFF00 | (oreg << 4);
-        break;
-      case OPR:
-        switch (oreg) {
-        case BRB:
-          pc = breg;
-          trace(1, "BRB", breg);
+      inst = memory[pc];
+      switch (static_cast<Instr>((inst >> 4) & 0xF)) {
+        case Instr::LDAM:
+          areg = memory[oreg];
+          trace("LDAM", areg, oreg);
           oreg = 0;
           break;
-        case ADD:
+        case Instr::LDBM:
+          breg = memory[oreg];
+          trace("LDBM", areg, oreg);
+          oreg = 0;
+          break;
+        case Instr::STAM:
+          memory[oreg] = areg;
+          trace("STAM", areg, oreg);
+          oreg = 0;
+          break;
+        case Instr::LDAC:
+          areg = oreg;
+          trace("LDAC", oreg);
+          oreg = 0;
+          break;
+        case Instr::LDBC:
+          breg = oreg;
+          trace("LDBC", oreg);
+          oreg = 0;
+          break;
+        case Instr::LDAP:
+          areg = pc + oreg;
+          trace("LDAP", areg, oreg);
+          oreg = 0;
+          break;
+        case Instr::LDAI:
           temp = areg;
-          areg = areg + breg;
-          trace(1, "ADD", areg, temp, breg);
+          areg = memory[areg + oreg];
+          trace("LDAI", areg, temp, oreg);
           oreg = 0;
           break;
-        case SUB:
-          temp = areg;
-          areg = areg - breg;
-          trace(1, "SUB", areg, temp, breg);
+        case Instr::LDBI:
+          breg = memory[breg + oreg];
+          trace("LDBI", breg, areg, oreg);
           oreg = 0;
           break;
-        case SYS:
-          trace(1, "SYS", areg);
-          syscall();
+        case Instr::STAI:
+          memory[breg + oreg] = areg;
+          trace("STAI", breg, oreg, areg);
+          oreg = 0;
           break;
-        };
-        oreg = 0;
-        break;
+        case Instr::BR:
+          pc = pc + oreg;
+          trace("BR", oreg);
+          oreg = 0;
+          break;
+        case Instr::BRZ:
+          if (areg == 0) {
+            pc = pc + oreg;
+          }
+          trace("BRZ", areg, oreg);
+          oreg = 0;
+          break;
+        case Instr::BRN:
+          if ((int) areg < 0) {
+            pc = pc + oreg;
+          }
+          trace("BRN", areg, oreg);
+          oreg = 0;
+          break;
+        case Instr::PFIX:
+          oreg = oreg << 4;
+          break;
+        case Instr::NFIX:
+          oreg = 0xFFFFFF00 | (oreg << 4);
+          break;
+        case Instr::OPR:
+          switch (static_cast<Instr>(oreg)) {
+            case Instr::BRB:
+              pc = breg;
+              trace("BRB", breg);
+              oreg = 0;
+              break;
+            case Instr::ADD:
+              temp = areg;
+              areg = areg + breg;
+              trace("ADD", areg, temp, breg);
+              oreg = 0;
+              break;
+            case Instr::SUB:
+              temp = areg;
+              areg = areg - breg;
+              trace("SUB", areg, temp, breg);
+              oreg = 0;
+              break;
+            case Instr::SYS:
+              trace("SYS", areg);
+              syscall();
+              break;
+            default:
+              break;
+          };
+          oreg = 0;
+          break;
+        default:
+          break;
       }
     }
   }
 };
 
-static void help(int *argv[]) {
+static void help(const char *argv[]) {
   std::cout << "Hex processor simulator\n\n";
-  std::cout << "Usage: " << argv[0] << " <binary>\n\n";
-  std::cout << "Options:\n";
-  std::cout << "  -h display this message\n";
-  std::cout << "  -t enable tracing\n";
-  std::exit(1);
+  std::cout << "Usage: " << argv[0] << " file\n\n";
+  std::cout << "Optional arguments:\n";
+  std::cout << "  -h,--help  Display this message\n";
+  std::cout << "  -t,--trace Enable instruction tracing\n";
 }
 
 int main(int argc, const char *argv[]) {
-  const char *filename = nullptr;
-  bool trace = false;
-  for (unsigned i = 1; i < argc; ++i) {
-    if (std::strcmp(argv[i], "-t") == 0) {
-      trace = true;
-    } else if (std::strcmp(argv[i], "-h") == 0) {
-      help(argv);
-    } else {
-      if (!filename) {
-        filename = argv[i];
+  try {
+    const char *filename = nullptr;
+    bool trace = false;
+    for (unsigned i = 1; i < argc; ++i) {
+      if (std::strcmp(argv[i], "-t") == 0 ||
+          std::strcmp(argv[i], "--trace") == 0) {
+        trace = true;
+      } else if (std::strcmp(argv[i], "-h") == 0 ||
+                 std::strcmp(argv[i], "--help") == 0) {
+        help(argv);
+        std::exit(1);
       } else {
-        error("cannot specify more than one binary");
+        if (!filename) {
+          filename = argv[i];
+        } else {
+          throw std::runtime_error("cannot specify more than one file");
+        }
       }
     }
+    if (!filename) {
+      help(argv);
+      std::exit(1);
+    }
+    Processor p;
+    p.setTracing(trace);
+    p.load(filename);
+    p.run();
+  } catch (std::exception &e) {
+    std::cerr << "Error: " << e.what() << "\n";
+    std::exit(1);
   }
-  if (!filename) {
-    help(argv);
-  }
-  Processor p(trace);
-  p.load(filename);
-  return p.run();
+  return 0;
 }
 
