@@ -229,6 +229,8 @@ public:
 static void help(const char *argv[]) {
   std::cout << "Hex processor simulator\n\n";
   std::cout << "Usage: " << argv[0] << " file\n\n";
+  std::cout << "Positional arguments:\n";
+  std::cout << "  file A binary file to simulate\n\n";
   std::cout << "Optional arguments:\n";
   std::cout << "  -h,--help  Display this message\n";
   std::cout << "  -t,--trace Enable instruction tracing\n";
@@ -254,6 +256,7 @@ int main(int argc, const char *argv[]) {
         }
       }
     }
+    // A file must be specified.
     if (!filename) {
       help(argv);
       std::exit(1);

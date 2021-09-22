@@ -112,15 +112,18 @@ public:
   unsigned getNumber() const { return value; }
 };
 
+
+
 static void help(const char *argv[]) {
-  std::cout << "X assembler\n\n";
+  std::cout << "Hex assembler\n\n";
   std::cout << "Usage: " << argv[0] << " file\n\n";
+  std::cout << "Positional arguments:\n";
+  std::cout << "  file A source file to assemble\n\n";
   std::cout << "Optional arguments:\n";
   std::cout << "  -h,--help display this message\n";
 }
 
 int main(int argc, const char *argv[]) {
-
   try {
     const char *filename = nullptr;
     for (unsigned i = 1; i < argc; ++i) {
@@ -136,7 +139,7 @@ int main(int argc, const char *argv[]) {
         }
       }
     }
-
+    // A file must be specified.
     if (!filename) {
       help(argv);
       std::exit(1);
