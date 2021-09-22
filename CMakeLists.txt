@@ -13,5 +13,8 @@ include_directories(${Boost_INCLUDE_DIRS})
 
 add_executable(sim sim.cpp)
 target_compile_options(sim PUBLIC -Wall -pedantic)
-target_link_libraries(sim
-                      ${Boost_LIBRARIES})
+target_link_libraries(sim ${Boost_LIBRARIES})
+
+add_executable(asm asm.cpp)
+target_compile_options(asm PUBLIC -Wall -pedantic)
+target_link_libraries(asm ${Boost_LIBRARIES})
