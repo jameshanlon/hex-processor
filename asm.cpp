@@ -9,6 +9,7 @@
 #include <map>
 
 // With inspiration from the LLVM Kaleidoscope tutorial.
+// https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl02.html
 
 // EBNF grammar:
 //
@@ -31,6 +32,8 @@
 // digit          := '0' | <digit-not-zero>
 // natural-number := <digit-not-zero> { <digit> }
 // integer-number := '0' | [ '-' ] <natural-number>
+//
+// Comments start with '#' and continue to the end of the line.
 
 //===---------------------------------------------------------------------===//
 // Lexer
@@ -58,9 +61,40 @@ enum class Token {
   SVC,
   ADD,
   SUB,
+  OPR,
   IDENTIFIER,
-  UNKNOWN,
+  NONE,
   END_OF_FILE
+};
+
+const char *tokenEnumStr(Token token) {
+  switch (token) {
+  case Token::NUMBER:      return "NUMBER";
+  case Token::MINUS:       return "MINUS";
+  case Token::DATA:        return "DATA";
+  case Token::PROC:        return "PROC";
+  case Token::FUNC:        return "FUNC";
+  case Token::LDAM:        return "LDAM";
+  case Token::LDBM:        return "LDBM";
+  case Token::STAM:        return "STAM";
+  case Token::LDAC:        return "LDAC";
+  case Token::LDBC:        return "LDBC";
+  case Token::LDAP:        return "LDAP";
+  case Token::LDAI:        return "LDAI";
+  case Token::LDBI:        return "LDBI";
+  case Token::STAI:        return "STAI";
+  case Token::BR:          return "BR";
+  case Token::BZ:          return "BZ";
+  case Token::BN:          return "BN";
+  case Token::BRB:         return "BRB";
+  case Token::SVC:         return "SVC";
+  case Token::ADD:         return "ADD";
+  case Token::SUB:         return "SUB";
+  case Token::OPR:         return "OPR";
+  case Token::IDENTIFIER:  return "IDENTIFIER";
+  case Token::NONE:        return "NONE";
+  case Token::END_OF_FILE: return "END_OF_FILE";
+  }
 };
 
 class Table {
@@ -84,12 +118,13 @@ public:
 
 class Lexer {
 
-  Table         &table;
-  std::ifstream &file;
+  Table         table;
+  std::ifstream file;
   char          lastChar;
   std::string   identifier;
   unsigned      value;
   Token         lastToken;
+  size_t        currentLine;
 
   void declareKeywords() {
     table.insert("ADD",  Token::ADD);
@@ -106,6 +141,7 @@ class Lexer {
     table.insert("LDBC", Token::LDBC);
     table.insert("LDBI", Token::LDBI);
     table.insert("LDBM", Token::LDBM);
+    table.insert("OPR",  Token::OPR);
     table.insert("PROC", Token::PROC);
     table.insert("STAI", Token::STAI);
     table.insert("STAM", Token::STAM);
@@ -115,6 +151,7 @@ class Lexer {
 
   int readChar() {
     file.get(lastChar);
+    //std::cout << lastChar;
     if (file.eof()) {
       lastChar = EOF;
     }
@@ -124,7 +161,20 @@ class Lexer {
   Token readToken() {
     // Skip whitespace.
     while (std::isspace(lastChar)) {
+      if (lastChar == '\n') {
+        currentLine++;
+      }
       readChar();
+    }
+    // Comment.
+    if (lastChar == '#') {
+      do {
+        readChar();
+      } while (lastChar != EOF && lastChar != '\n');
+      if (lastChar == '\n') {
+        currentLine++;
+      }
+      return readToken();
     }
     // Identifier.
     if (std::isalpha(lastChar)) {
@@ -134,7 +184,7 @@ class Lexer {
       }
       return table.lookup(identifier);
     }
-    // Number
+    // Number.
     if (std::isdigit(lastChar)) {
       std::string number(1, lastChar);
       while (std::isdigit(readChar())) {
@@ -143,30 +193,42 @@ class Lexer {
       value = std::strtoul(number.c_str(), nullptr, 10);
       return Token::NUMBER;
     }
+    // Symbols.
+    if (lastChar == '-') {
+      readChar();
+      return Token::MINUS;
+    }
     // End of file.
     if (lastChar == EOF) {
       file.close();
       return Token::END_OF_FILE;
     }
     readChar();
-    return Token::UNKNOWN;
+    return Token::NONE;
   }
 
 public:
 
-  Lexer(Table &table, std::ifstream &file) :
-      table(table), file(file) {
+  Lexer() : currentLine(0) {
     declareKeywords();
-    readChar();
   }
 
   Token getNextToken() {
     return lastToken = readToken();
   }
 
+  void openFile(const char *filename) {
+    file.open(filename, std::ifstream::in);
+    if (!file.is_open()) {
+      throw std::runtime_error("could not open file");
+    }
+    readChar();
+  }
+
   const std::string &getIdentifier() const { return identifier; }
   unsigned getNumber() const { return value; }
   Token getLastToken() const { return lastToken; }
+  size_t getLine() const { return currentLine; }
 };
 
 //===---------------------------------------------------------------------===//
@@ -204,22 +266,58 @@ public:
 
 class Instruction : public Directive {
   Token opcode;
+  int value;
+  std::string label;
 public:
+  Instruction(int value) : opcode(Token::NONE) {}
   Instruction(Token opcode) : opcode(opcode) {}
+  Instruction(std::string label) : opcode(Token::NONE), label(label) {}
+};
+
+class OPR : public Directive {
+  Token opcode;
+public:
+  OPR(Token opcode) : opcode(opcode) {
+    if (opcode != Token::BRB &&
+        opcode != Token::ADD &&
+        opcode != Token::SUB &&
+        opcode != Token::SVC) {
+      throw std::runtime_error(std::string("unexpected operand to OPR ")+tokenEnumStr(opcode));
+    }
+  }
 };
 
 class Parser {
   Lexer &lexer;
+  std::vector<std::unique_ptr<Directive>> program;
 
 public:
   Parser(Lexer &lexer) : lexer(lexer) {}
 
+  void expectLast(Token token) const {
+    if (token != lexer.getLastToken()) {
+      throw std::runtime_error(std::string("expected ")+tokenEnumStr(token));
+    }
+  }
+
+  void expectNext(Token token) const {
+    lexer.getNextToken();
+    expectLast(token);
+  }
+
   int parseInteger() {
-    return -1;
+    auto currentToken = lexer.getNextToken();
+    if (currentToken == Token::MINUS) {
+       expectNext(Token::NUMBER);
+       return -lexer.getNumber();
+    }
+    expectLast(Token::NUMBER);
+    return lexer.getNumber();
   }
 
   std::string parseIdentifier() {
-    return "";
+    lexer.getNextToken();
+    return lexer.getIdentifier();
   }
 
   std::unique_ptr<Directive> parseDirective() {
@@ -230,15 +328,41 @@ public:
         return std::make_unique<Func>(parseIdentifier());
       case Token::PROC:
         return std::make_unique<Proc>(parseIdentifier());
+      case Token::IDENTIFIER:
+        return std::make_unique<Label>(lexer.getIdentifier());
+      case Token::OPR:
+        return std::make_unique<OPR>(lexer.getNextToken());
+      case Token::LDAM:
+      case Token::LDBM:
+      case Token::STAM:
+      case Token::LDAC:
+      case Token::LDBC:
+      case Token::LDAI:
+      case Token::LDBI:
+      case Token::STAI:
+      case Token::LDAP:
+      case Token::BN:
+      case Token::BR:
+      case Token::BZ:
+        if (lexer.getNextToken() == Token::IDENTIFIER) {
+          return std::make_unique<Instruction>(lexer.getIdentifier());
+        } else {
+          return std::make_unique<Instruction>(lexer.getNumber());
+        }
       default:
         return nullptr;
     }
   }
 
   void parseProgram() {
-    std::vector<std::unique_ptr<Directive>> program;
     while (lexer.getNextToken() != Token::END_OF_FILE) {
       program.push_back(parseDirective());
+    }
+  }
+
+  void printProgram() const {
+    for (auto &directive : program) {
+      std::cout << ".\n";
     }
   }
 };
@@ -259,6 +383,9 @@ static void help(const char *argv[]) {
 }
 
 int main(int argc, const char *argv[]) {
+  Lexer lexer;
+  Parser parser(lexer);
+
   try {
     bool tokensOnly = false;
     bool treeOnly = false;
@@ -282,41 +409,49 @@ int main(int argc, const char *argv[]) {
         }
       }
     }
+
     // A file must be specified.
     if (!filename) {
       help(argv);
       std::exit(1);
     }
 
-    Table table;
-    std::ifstream file(filename);
-    Lexer lexer(table, file);
+    // Open the file.
+    lexer.openFile(filename);
 
     if (tokensOnly && !treeOnly) {
       while (true) {
         switch (lexer.getNextToken()) {
-          case Token::LDAM: std::cout << "LDAM\n"; break;
-          case Token::LDBM: std::cout << "LDAM\n"; break;
-          case Token::STAM: std::cout << "LDAM\n"; break;
-          case Token::LDAC: std::cout << "LDAM\n"; break;
-          case Token::LDBC: std::cout << "LDAM\n"; break;
-          case Token::LDAP: std::cout << "LDAM\n"; break;
-          case Token::LDAI: std::cout << "LDAM\n"; break;
-          case Token::LDBI: std::cout << "LDAM\n"; break;
-          case Token::STAI: std::cout << "LDAM\n"; break;
-          case Token::BR: std::cout << "LDAM\n"; break;
-          case Token::BZ: std::cout << "LDAM\n"; break;
-          case Token::BN: std::cout << "LDAM\n"; break;
-          case Token::BRB: std::cout << "LDAM\n"; break;
-          case Token::SVC: std::cout << "LDAM\n"; break;
-          case Token::ADD: std::cout << "LDAM\n"; break;
-          case Token::SUB: std::cout << "LDAM\n"; break;
-          case Token::IDENTIFIER: std::cout << "IDENTIFIER " << lexer.getIdentifier() << "\n"; break;
-          case Token::MINUS: std::cout << "MINUS\n"; break;
-          case Token::NUMBER: std::cout << "NUMBER " << lexer.getNumber() << "\n"; break;
-          case Token::FUNC: std::cout << "FUNC\n"; break;
-          case Token::PROC: std::cout << "PROC\n"; break;
-          case Token::UNKNOWN: std::cout << "UNKNOWN\n"; break;
+          case Token::LDAM:
+          case Token::LDBM:
+          case Token::STAM:
+          case Token::LDAC:
+          case Token::LDBC:
+          case Token::LDAP:
+          case Token::LDAI:
+          case Token::LDBI:
+          case Token::STAI:
+          case Token::BR:
+          case Token::BZ:
+          case Token::BN:
+          case Token::BRB:
+          case Token::SVC:
+          case Token::ADD:
+          case Token::SUB:
+          case Token::MINUS:
+          case Token::FUNC:
+          case Token::PROC:
+          case Token::DATA:
+          case Token::OPR:
+          case Token::NONE:
+            std::cout << tokenEnumStr(lexer.getLastToken()) << "\n";
+            break;
+          case Token::IDENTIFIER:
+            std::cout << "IDENTIFIER " << lexer.getIdentifier() << "\n";
+            break;
+          case Token::NUMBER:
+            std::cout << "NUMBER " << lexer.getNumber() << "\n";
+            break;
           case Token::END_OF_FILE:
             std::cout << "EOF\n";
             std::exit(0);
@@ -326,12 +461,12 @@ int main(int argc, const char *argv[]) {
     }
 
     if (treeOnly) {
-      Parser parser(lexer);
       parser.parseProgram();
+      parser.printProgram();
     }
 
   } catch (std::exception &e) {
-    std::cerr << "Error: " << e.what() << "\n";
+    std::cerr << "Error: " << e.what() << " : " << lexer.getLine() << "\n";
     std::exit(1);
   }
   return 0;
