@@ -589,7 +589,7 @@ OPR ADD
 STAM 1
 LDBI 2
 OPR BRB
-FUNC mul step
+FUNC mul_step
 L7
 LDBM 1
 STAI 0
@@ -703,7 +703,7 @@ OPR ADD
 STAM 1
 LDBI 5
 OPR BRB
-FUNC div step
+FUNC div_step
 L9
 LDBM 1
 STAI 0
@@ -5829,7 +5829,7 @@ OPR ADD
 STAM 1
 LDBI 2
 OPR BRB
-FUNC ﬁndname
+FUNC findname
 L61
 LDBM 1
 STAI 0
@@ -12969,7 +12969,7 @@ OPR ADD
 STAM 1
 LDBI 5
 OPR BRB
-PROC initbuﬀer
+PROC initbuffer
 L117
 LDBM 1
 STAI 0
@@ -12990,7 +12990,7 @@ OPR ADD
 STAM 1
 LDBI 1
 OPR BRB
-PROC cb unpack
+PROC cb_unpack
 L118
 LDBM 1
 STAI 0
@@ -13065,7 +13065,7 @@ OPR ADD
 STAM 1
 LDBI 6
 OPR BRB
-PROC cb setlow
+PROC cb_setlow
 L119
 LDBM 1
 STAI 0
@@ -13266,7 +13266,7 @@ OPR ADD
 STAM 1
 LDBI 8
 OPR BRB
-FUNC cb laboﬀset
+FUNC cb_laboffset
 L121
 LDBM 1
 STAI 0
@@ -13299,7 +13299,7 @@ OPR ADD
 STAM 1
 LDBI 4
 OPR BRB
-FUNC cb reﬂength
+FUNC cb_reflength
 L122
 LDBM 1
 STAI 0
@@ -13360,7 +13360,7 @@ OPR ADD
 STAM 1
 LDBI 6
 OPR BRB
-FUNC cb stackoﬀset
+FUNC cb_stackoffset
 L123
 LDBM 1
 STAI 0
@@ -13780,7 +13780,7 @@ OPR ADD
 STAM 1
 LDBI 9
 OPR BRB
-PROC ﬂushbuﬀer
+PROC flushbuffer
 L125
 LDBM 1
 STAI 0

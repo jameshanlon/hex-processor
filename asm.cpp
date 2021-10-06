@@ -24,7 +24,7 @@
 // operand        := <number>
 //                 | <label>
 // opcode         := "LDAM" | "LDBM" | "STAM" | "LDAC" | "LDBC" | "LDAP"
-//                 | "LDAI" | "LDBI | "STAI" | "BR" | "BZ" | "BN" | "BRB"
+//                 | "LDAI" | "LDBI | "STAI" | "BR" | "BRZ" | "BRN" | "BRB"
 //                 | "SVC" | "ADD" | "SUB
 // identifier     := <alpha> { <aplha> | <digit> | '_' }
 // alpha          := 'a' | 'b' | ... | 'x' | 'A' | 'B' | ... | 'X'
@@ -55,8 +55,8 @@ enum class Token {
   LDBI,
   STAI,
   BR,
-  BZ,
-  BN,
+  BRZ,
+  BRN,
   BRB,
   SVC,
   ADD,
@@ -84,8 +84,8 @@ const char *tokenEnumStr(Token token) {
   case Token::LDBI:        return "LDBI";
   case Token::STAI:        return "STAI";
   case Token::BR:          return "BR";
-  case Token::BZ:          return "BZ";
-  case Token::BN:          return "BN";
+  case Token::BRZ:         return "BRZ";
+  case Token::BRN:         return "BRN";
   case Token::BRB:         return "BRB";
   case Token::SVC:         return "SVC";
   case Token::ADD:         return "ADD";
@@ -128,10 +128,10 @@ class Lexer {
 
   void declareKeywords() {
     table.insert("ADD",  Token::ADD);
-    table.insert("BN",   Token::BN);
+    table.insert("BRN",  Token::BRN);
     table.insert("BR",   Token::BR);
     table.insert("BRB",  Token::BRB);
-    table.insert("BZ",   Token::BZ);
+    table.insert("BRZ",  Token::BRZ);
     table.insert("DATA", Token::DATA);
     table.insert("FUNC", Token::FUNC);
     table.insert("LDAC", Token::LDAC);
@@ -151,7 +151,7 @@ class Lexer {
 
   int readChar() {
     file.get(lastChar);
-    //std::cout << lastChar;
+    std::cout << lastChar;
     if (file.eof()) {
       lastChar = EOF;
     }
@@ -232,46 +232,69 @@ public:
 };
 
 //===---------------------------------------------------------------------===//
-// Parser
+// Directive data types.
 //===---------------------------------------------------------------------===//
 
 // Base class for all directives.
 struct Directive {
   virtual ~Directive() = default;
+  virtual std::string toString() const = 0;
 };
 
 class Data : public Directive {
   int value;
 public:
   Data(int value) : value(value) {}
+  std::string toString() const {
+    return "DATA " + std::to_string(value);
+  }
 };
 
 class Func : public Directive {
   std::string identifier;
 public:
   Func(std::string identifier) : identifier(identifier) {}
+  std::string toString() const {
+    return "FUNC " + identifier;
+  }
 };
 
 class Proc : public Directive {
   std::string identifier;
 public:
   Proc(std::string identifier) : identifier(identifier) {}
+  std::string toString() const {
+    return "PROC " + identifier;
+  }
 };
 
 class Label : public Directive {
   std::string label;
 public:
   Label(std::string label) : label(label) {}
+  std::string toString() const {
+    return label;
+  }
 };
 
-class Instruction : public Directive {
+class InstrImm : public Directive {
   Token opcode;
   int value;
+public:
+  InstrImm(Token opcode, int value) : opcode(opcode), value(value) {}
+  std::string toString() const {
+    return std::string(tokenEnumStr(opcode)) + " " + std::to_string(value);
+  }
+};
+
+class InstrLabel : public Directive {
+  Token opcode;
   std::string label;
 public:
-  Instruction(int value) : opcode(Token::NONE) {}
-  Instruction(Token opcode) : opcode(opcode) {}
-  Instruction(std::string label) : opcode(Token::NONE), label(label) {}
+  InstrLabel(Token opcode, std::string label) : opcode(opcode), label(label) {}
+  std::string toString() const {
+    return std::string(tokenEnumStr(opcode)) + " " + label;
+  }
 };
 
 class OPR : public Directive {
@@ -285,14 +308,18 @@ public:
       throw std::runtime_error(std::string("unexpected operand to OPR ")+tokenEnumStr(opcode));
     }
   }
+  std::string toString() const {
+    return std::string("OPR ") + tokenEnumStr(opcode);
+  }
 };
+
+//===---------------------------------------------------------------------===//
+// Parser
+//===---------------------------------------------------------------------===//
 
 class Parser {
   Lexer &lexer;
   std::vector<std::unique_ptr<Directive>> program;
-
-public:
-  Parser(Lexer &lexer) : lexer(lexer) {}
 
   void expectLast(Token token) const {
     if (token != lexer.getLastToken()) {
@@ -306,8 +333,7 @@ public:
   }
 
   int parseInteger() {
-    auto currentToken = lexer.getNextToken();
-    if (currentToken == Token::MINUS) {
+    if (lexer.getLastToken() == Token::MINUS) {
        expectNext(Token::NUMBER);
        return -lexer.getNumber();
     }
@@ -323,10 +349,13 @@ public:
   std::unique_ptr<Directive> parseDirective() {
     switch (lexer.getLastToken()) {
       case Token::DATA:
+        lexer.getNextToken();
         return std::make_unique<Data>(parseInteger());
       case Token::FUNC:
+        lexer.getNextToken();
         return std::make_unique<Func>(parseIdentifier());
       case Token::PROC:
+        lexer.getNextToken();
         return std::make_unique<Proc>(parseIdentifier());
       case Token::IDENTIFIER:
         return std::make_unique<Label>(lexer.getIdentifier());
@@ -341,18 +370,23 @@ public:
       case Token::LDBI:
       case Token::STAI:
       case Token::LDAP:
-      case Token::BN:
+      case Token::BRN:
       case Token::BR:
-      case Token::BZ:
+      case Token::BRZ: {
+        auto opcode = lexer.getLastToken();
         if (lexer.getNextToken() == Token::IDENTIFIER) {
-          return std::make_unique<Instruction>(lexer.getIdentifier());
+          return std::make_unique<InstrLabel>(opcode, lexer.getIdentifier());
         } else {
-          return std::make_unique<Instruction>(lexer.getNumber());
+          return std::make_unique<InstrImm>(opcode, parseInteger());
         }
+      }
       default:
-        return nullptr;
+        throw std::runtime_error("unrecognised token");
     }
   }
+
+public:
+  Parser(Lexer &lexer) : lexer(lexer) {}
 
   void parseProgram() {
     while (lexer.getNextToken() != Token::END_OF_FILE) {
@@ -362,7 +396,7 @@ public:
 
   void printProgram() const {
     for (auto &directive : program) {
-      std::cout << ".\n";
+      std::cout << directive->toString() + '\n';
     }
   }
 };
@@ -387,6 +421,8 @@ int main(int argc, const char *argv[]) {
   Parser parser(lexer);
 
   try {
+
+    // Handle arguments.
     bool tokensOnly = false;
     bool treeOnly = false;
     const char *filename = nullptr;
@@ -419,6 +455,7 @@ int main(int argc, const char *argv[]) {
     // Open the file.
     lexer.openFile(filename);
 
+    // Tokenise only.
     if (tokensOnly && !treeOnly) {
       while (true) {
         switch (lexer.getNextToken()) {
@@ -432,8 +469,8 @@ int main(int argc, const char *argv[]) {
           case Token::LDBI:
           case Token::STAI:
           case Token::BR:
-          case Token::BZ:
-          case Token::BN:
+          case Token::BRZ:
+          case Token::BRN:
           case Token::BRB:
           case Token::SVC:
           case Token::ADD:
@@ -460,10 +497,17 @@ int main(int argc, const char *argv[]) {
       return 0;
     }
 
+    // Parse the program.
+    parser.parseProgram();
+
+    // Parse and print program only.
     if (treeOnly) {
-      parser.parseProgram();
       parser.printProgram();
+      return 0;
     }
+
+    // Expand immediates.
+    // Patch labels.
 
   } catch (std::exception &e) {
     std::cerr << "Error: " << e.what() << " : " << lexer.getLine() << "\n";
