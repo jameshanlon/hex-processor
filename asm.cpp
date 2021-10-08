@@ -8,6 +8,8 @@
 #include <vector>
 #include <map>
 
+#include "Instructions.hpp"
+
 // With inspiration from the LLVM Kaleidoscope tutorial.
 // https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl02.html
 
@@ -67,7 +69,7 @@ enum class Token {
   END_OF_FILE
 };
 
-const char *tokenEnumStr(Token token) {
+static const char *tokenEnumStr(Token token) {
   switch (token) {
   case Token::NUMBER:      return "NUMBER";
   case Token::MINUS:       return "MINUS";
@@ -96,6 +98,38 @@ const char *tokenEnumStr(Token token) {
   case Token::END_OF_FILE: return "END_OF_FILE";
   }
 };
+
+static Instr tokenToInstr(Token token) {
+  switch (token) {
+  case Token::LDAM: return Instr::LDAM;
+  case Token::LDBM: return Instr::LDBM;
+  case Token::STAM: return Instr::STAM;
+  case Token::LDAC: return Instr::LDAC;
+  case Token::LDBC: return Instr::LDBC;
+  case Token::LDAP: return Instr::LDAP;
+  case Token::LDAI: return Instr::LDAI;
+  case Token::LDBI: return Instr::LDBI;
+  case Token::STAI: return Instr::STAI;
+  case Token::BR:   return Instr::BR;
+  case Token::BRZ:  return Instr::BRZ;
+  case Token::BRN:  return Instr::BRN;
+  case Token::BRB:  return Instr::BRB;
+  case Token::SVC:  return Instr::SVC;
+  case Token::ADD:  return Instr::ADD;
+  case Token::SUB:  return Instr::SUB;
+  case Token::OPR:  return Instr::OPR;
+  default:
+    throw std::runtime_error(std::string("unexpected instrucion token: ")+tokenEnumStr(token));
+  }
+}
+
+static uint8_t instrToInstrOpc(Instr instr) {
+  return static_cast<uint8_t>(instr);
+}
+
+static uint8_t tokenToInstrOpc(Token token) {
+  return instrToInstrOpc(tokenToInstr(token));
+}
 
 class Table {
   std::map<std::string, Token> table;
@@ -258,6 +292,7 @@ struct Directive {
   Token getToken() const { return token; }
   virtual bool operandIsLabel() const = 0;
   virtual size_t getSize() const = 0;
+  virtual int getValue() const = 0;
   virtual std::string toString() const = 0;
 };
 
@@ -267,10 +302,10 @@ public:
   Data(Token token, int value) : Directive(token), value(value) {}
   bool operandIsLabel() const { return false; }
   size_t getSize() const { return numBytes(value); }
+  int getValue() const { return value; }
   std::string toString() const {
     return "DATA " + std::to_string(value);
   }
-  int getValue() const { return value; }
 };
 
 class Func : public Directive {
@@ -279,6 +314,7 @@ public:
   Func(Token token, std::string identifier) : Directive(token), identifier(identifier) {}
   bool operandIsLabel() const { return false; }
   size_t getSize() const { return 0; }
+  int getValue() const { return 0; }
   std::string toString() const {
     return "FUNC " + identifier;
   }
@@ -290,6 +326,7 @@ public:
   Proc(Token token, std::string identifier) : Directive(token), identifier(identifier) {}
   bool operandIsLabel() const { return false; }
   size_t getSize() const { return 0; }
+  int getValue() const { return 0; }
   std::string toString() const {
     return "PROC " + identifier;
   }
@@ -319,6 +356,7 @@ public:
   InstrImm(Token token, int value) : Directive(token), value(value) {}
   bool operandIsLabel() const { return false; }
   size_t getSize() const { return numBytes(value) * 2; }
+  int getValue() const { return value; }
   std::string toString() const {
     return std::string(tokenEnumStr(token)) + " " + std::to_string(value);
   }
@@ -332,6 +370,7 @@ public:
   void setLabelValue(int newValue) { labelValue = newValue; }
   bool operandIsLabel() const { return true; }
   size_t getSize() const { return numBytes(labelValue) * 2; }
+  int getValue() const { return labelValue; }
   std::string getLabel() const { return label; }
   std::string toString() const {
     return std::string(tokenEnumStr(token)) + " " + label + " (" + std::to_string(labelValue) + ")";
@@ -351,6 +390,7 @@ public:
   }
   bool operandIsLabel() const { return false; }
   size_t getSize() const { return 1; }
+  int getValue() const { return tokenToInstrOpc(opcode); }
   std::string toString() const {
     return std::string("OPR ") + tokenEnumStr(opcode);
   }
@@ -461,9 +501,9 @@ createLabelMap(std::vector<std::unique_ptr<Directive>> &program) {
 static void resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
                           std::map<std::string, Label*> &labelMap) {
   bool labelChanged = true;
-  size_t count = 0;
+  //size_t count = 0;
   while (labelChanged) {
-    std::cout << "Resolving labels iteration " << count++ << "\n";
+    //std::cout << "Resolving labels iteration " << count++ << "\n";
     size_t byteOffset = 0;
     labelChanged = false;
     for (auto &directive : program) {
@@ -486,7 +526,27 @@ static void resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
 static void emitProgramBin(std::vector<std::unique_ptr<Directive>> &program,
                            std::fstream &outputFile) {
   for (auto &directive : program) {
-
+    auto size = directive->getSize();
+    // Data
+    if (directive->getToken() == Token::DATA) {
+      auto dataDirective = dynamic_cast<Data*>(directive.get());
+      auto value = dataDirective->getValue();
+      outputFile.write(reinterpret_cast<const char*>(&value), size);
+    // Instruction
+    } else if (size > 0) {
+      if (size > 1) {
+        // Prefixes
+        for (size_t i=size; i>0; i--) {
+          char instr = instrToInstrOpc(Instr::PFIX) << 4 |
+                       ((directive->getValue() >> i) & 0xF);
+          outputFile.write(&instr, 1);
+        }
+      }
+      // Instrucion
+      char instr = tokenToInstrOpc(directive->getToken()) << 4 |
+                   (directive->getValue() & 0xF);
+      outputFile.write(&instr, 1);
+    }
   }
 }
 
@@ -528,7 +588,7 @@ int main(int argc, const char *argv[]) {
         treeOnly = true;
       } else if (std::strcmp(argv[i], "--output") == 0 ||
                  std::strcmp(argv[i], "-o") == 0) {
-        outputFilename = argv[i++];
+        outputFilename = argv[++i];
       } else if (argv[i][0] == '-') {
           throw std::runtime_error(std::string("unrecognised argument: ")+argv[i]);
       } else {
@@ -604,6 +664,7 @@ int main(int argc, const char *argv[]) {
     auto labelMap = createLabelMap(program);
     resolveLabels(program, labelMap);
 
+    // Emit the program binary.
     std::fstream outputFile(outputFilename, std::ios::out | std::ios::binary);
     emitProgramBin(program, outputFile);
     outputFile.close();

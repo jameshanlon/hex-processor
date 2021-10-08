@@ -6,34 +6,11 @@
 #include <exception>
 #include <boost/format.hpp>
 
+#include "Instructions.hpp"
+
 class Processor {
 
   static const size_t MEMORY_SIZE_BYTES = 1 << 16;
-
-  enum class Instr {
-    LDAM,
-    LDBM,
-    STAM,
-    LDAC,
-    LDBC,
-    LDAP,
-    LDAI,
-    LDBI,
-    STAI,
-    BR,
-    BRZ,
-    BRN,
-    BRB,
-    ADD,
-    SUB,
-    DIV,
-    MUL,
-    REM,
-    SYS,
-    PFIX,
-    NFIX,
-    OPR
-  };
 
   enum class Syscall {
     EXIT,
@@ -210,8 +187,8 @@ public:
               trace("SUB", areg, temp, breg);
               oreg = 0;
               break;
-            case Instr::SYS:
-              trace("SYS", areg);
+            case Instr::SVC:
+              trace("SVC", areg);
               syscall();
               break;
             default:
