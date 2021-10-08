@@ -151,7 +151,7 @@ class Lexer {
 
   int readChar() {
     file.get(lastChar);
-    std::cout << lastChar;
+    //std::cout << lastChar;
     if (file.eof()) {
       lastChar = EOF;
     }
@@ -179,7 +179,7 @@ class Lexer {
     // Identifier.
     if (std::isalpha(lastChar)) {
       identifier = std::string(1, lastChar);
-      while (std::isalnum(readChar())) {
+      while (std::isalnum(readChar()) || lastChar == '_') {
         identifier += lastChar;
       }
       return table.lookup(identifier);
@@ -235,25 +235,50 @@ public:
 // Directive data types.
 //===---------------------------------------------------------------------===//
 
+static size_t numBytes(int value) {
+  if (value == 0) {
+    return 1;
+  }
+  size_t n = 1;
+  if (value < 0) {
+    value = ~value;
+  }
+  while (value >= 128) {
+    value >>= 8;
+    n++;
+  }
+  return n;
+}
+
 // Base class for all directives.
 struct Directive {
+  Token token;
+  Directive(Token token) : token(token) {}
   virtual ~Directive() = default;
+  Token getToken() const { return token; }
+  virtual bool operandIsLabel() const = 0;
+  virtual size_t getSize() const = 0;
   virtual std::string toString() const = 0;
 };
 
 class Data : public Directive {
   int value;
 public:
-  Data(int value) : value(value) {}
+  Data(Token token, int value) : Directive(token), value(value) {}
+  bool operandIsLabel() const { return false; }
+  size_t getSize() const { return numBytes(value); }
   std::string toString() const {
     return "DATA " + std::to_string(value);
   }
+  int getValue() const { return value; }
 };
 
 class Func : public Directive {
   std::string identifier;
 public:
-  Func(std::string identifier) : identifier(identifier) {}
+  Func(Token token, std::string identifier) : Directive(token), identifier(identifier) {}
+  bool operandIsLabel() const { return false; }
+  size_t getSize() const { return 0; }
   std::string toString() const {
     return "FUNC " + identifier;
   }
@@ -262,7 +287,9 @@ public:
 class Proc : public Directive {
   std::string identifier;
 public:
-  Proc(std::string identifier) : identifier(identifier) {}
+  Proc(Token token, std::string identifier) : Directive(token), identifier(identifier) {}
+  bool operandIsLabel() const { return false; }
+  size_t getSize() const { return 0; }
   std::string toString() const {
     return "PROC " + identifier;
   }
@@ -270,37 +297,51 @@ public:
 
 class Label : public Directive {
   std::string label;
+  int labelValue;
 public:
-  Label(std::string label) : label(label) {}
-  std::string toString() const {
-    return label;
+  Label(Token token, std::string label) : Directive(token), label(label) {}
+  bool operandIsLabel() const { return false; }
+  size_t getSize() const { return 0; }
+  /// Update the label value and return true if it was changed.
+  bool setLabelValue(int newValue) {
+    auto oldValue = labelValue;
+    labelValue = newValue;
+    return oldValue != newValue;
   }
+  int getValue() const { return labelValue; }
+  std::string getLabel() const { return label; }
+  std::string toString() const { return label; }
 };
 
 class InstrImm : public Directive {
-  Token opcode;
   int value;
 public:
-  InstrImm(Token opcode, int value) : opcode(opcode), value(value) {}
+  InstrImm(Token token, int value) : Directive(token), value(value) {}
+  bool operandIsLabel() const { return false; }
+  size_t getSize() const { return numBytes(value) * 2; }
   std::string toString() const {
-    return std::string(tokenEnumStr(opcode)) + " " + std::to_string(value);
+    return std::string(tokenEnumStr(token)) + " " + std::to_string(value);
   }
 };
 
 class InstrLabel : public Directive {
-  Token opcode;
   std::string label;
+  int labelValue;
 public:
-  InstrLabel(Token opcode, std::string label) : opcode(opcode), label(label) {}
+  InstrLabel(Token token, std::string label) : Directive(token), label(label) {}
+  void setLabelValue(int newValue) { labelValue = newValue; }
+  bool operandIsLabel() const { return true; }
+  size_t getSize() const { return numBytes(labelValue) * 2; }
+  std::string getLabel() const { return label; }
   std::string toString() const {
-    return std::string(tokenEnumStr(opcode)) + " " + label;
+    return std::string(tokenEnumStr(token)) + " " + label + " (" + std::to_string(labelValue) + ")";
   }
 };
 
 class OPR : public Directive {
   Token opcode;
 public:
-  OPR(Token opcode) : opcode(opcode) {
+  OPR(Token token, Token opcode) : Directive(token), opcode(opcode) {
     if (opcode != Token::BRB &&
         opcode != Token::ADD &&
         opcode != Token::SUB &&
@@ -308,6 +349,8 @@ public:
       throw std::runtime_error(std::string("unexpected operand to OPR ")+tokenEnumStr(opcode));
     }
   }
+  bool operandIsLabel() const { return false; }
+  size_t getSize() const { return 1; }
   std::string toString() const {
     return std::string("OPR ") + tokenEnumStr(opcode);
   }
@@ -319,7 +362,6 @@ public:
 
 class Parser {
   Lexer &lexer;
-  std::vector<std::unique_ptr<Directive>> program;
 
   void expectLast(Token token) const {
     if (token != lexer.getLastToken()) {
@@ -350,17 +392,15 @@ class Parser {
     switch (lexer.getLastToken()) {
       case Token::DATA:
         lexer.getNextToken();
-        return std::make_unique<Data>(parseInteger());
+        return std::make_unique<Data>(Token::DATA, parseInteger());
       case Token::FUNC:
-        lexer.getNextToken();
-        return std::make_unique<Func>(parseIdentifier());
+        return std::make_unique<Func>(Token::FUNC, parseIdentifier());
       case Token::PROC:
-        lexer.getNextToken();
-        return std::make_unique<Proc>(parseIdentifier());
+        return std::make_unique<Proc>(Token::PROC, parseIdentifier());
       case Token::IDENTIFIER:
-        return std::make_unique<Label>(lexer.getIdentifier());
+        return std::make_unique<Label>(Token::IDENTIFIER, lexer.getIdentifier());
       case Token::OPR:
-        return std::make_unique<OPR>(lexer.getNextToken());
+        return std::make_unique<OPR>(Token::OPR, lexer.getNextToken());
       case Token::LDAM:
       case Token::LDBM:
       case Token::STAM:
@@ -381,25 +421,74 @@ class Parser {
         }
       }
       default:
-        throw std::runtime_error("unrecognised token");
+        throw std::runtime_error(std::string("unrecognised token ")+tokenEnumStr(lexer.getLastToken()));
     }
   }
 
 public:
   Parser(Lexer &lexer) : lexer(lexer) {}
 
-  void parseProgram() {
+  std::vector<std::unique_ptr<Directive>> parseProgram() {
+    std::vector<std::unique_ptr<Directive>> program;
     while (lexer.getNextToken() != Token::END_OF_FILE) {
       program.push_back(parseDirective());
     }
-  }
-
-  void printProgram() const {
-    for (auto &directive : program) {
-      std::cout << directive->toString() + '\n';
-    }
+    return program;
   }
 };
+
+/// Print the program data structure.
+static void printProgram(std::vector<std::unique_ptr<Directive>> &program) {
+  for (auto &directive : program) {
+    std::cout << directive->toString() + '\n';
+  }
+}
+
+/// Create a map of label strings to label Directives.
+static std::map<std::string, Label*>
+createLabelMap(std::vector<std::unique_ptr<Directive>> &program) {
+  std::map<std::string, Label*> labelMap;
+  for (auto &directive : program) {
+    if (directive->getToken() == Token::IDENTIFIER) {
+      auto label = dynamic_cast<Label*>(directive.get());
+      labelMap[label->getLabel()] = label;
+    }
+  }
+  return labelMap;
+}
+
+/// Iteratively update label values until there are no changes.
+static void resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
+                          std::map<std::string, Label*> &labelMap) {
+  bool labelChanged = true;
+  size_t count = 0;
+  while (labelChanged) {
+    std::cout << "Resolving labels iteration " << count++ << "\n";
+    size_t byteOffset = 0;
+    labelChanged = false;
+    for (auto &directive : program) {
+      byteOffset += directive->getSize();
+      // Update the label value.
+      if (directive->getToken() == Token::IDENTIFIER) {
+        labelChanged = dynamic_cast<Label*>(directive.get())->setLabelValue(byteOffset);
+      }
+      // Update the label operand value of an instruction.
+      if (directive->operandIsLabel()) {
+        auto instrLabel = dynamic_cast<InstrLabel*>(directive.get());
+        auto labelValue = labelMap[instrLabel->getLabel()]->getValue();
+        instrLabel->setLabelValue(labelValue);
+      }
+    }
+  }
+}
+
+/// Emit the program.
+static void emitProgramBin(std::vector<std::unique_ptr<Directive>> &program,
+                           std::fstream &outputFile) {
+  for (auto &directive : program) {
+
+  }
+}
 
 //===---------------------------------------------------------------------===//
 // Driver
@@ -409,11 +498,12 @@ static void help(const char *argv[]) {
   std::cout << "Hex assembler\n\n";
   std::cout << "Usage: " << argv[0] << " file\n\n";
   std::cout << "Positional arguments:\n";
-  std::cout << "  file        A source file to assemble\n\n";
+  std::cout << "  file              A source file to assemble\n\n";
   std::cout << "Optional arguments:\n";
-  std::cout << "  -h,--help   Display this message\n";
-  std::cout << "  --tokens    Tokenise the input only\n";
-  std::cout << "  --tree      Display the syntax tree only\n";
+  std::cout << "  -h,--help         Display this message\n";
+  std::cout << "  --tokens          Tokenise the input only\n";
+  std::cout << "  --tree            Display the syntax tree only\n";
+  std::cout << "  -o,--output file  Specify a file for binary output (default a.out)\n";
 }
 
 int main(int argc, const char *argv[]) {
@@ -426,6 +516,7 @@ int main(int argc, const char *argv[]) {
     bool tokensOnly = false;
     bool treeOnly = false;
     const char *filename = nullptr;
+    const char *outputFilename = "a.out";
     for (unsigned i = 1; i < argc; ++i) {
       if (std::strcmp(argv[i], "-h") == 0 ||
           std::strcmp(argv[i], "--help") == 0) {
@@ -435,6 +526,9 @@ int main(int argc, const char *argv[]) {
         tokensOnly = true;
       } else if (std::strcmp(argv[i], "--tree") == 0) {
         treeOnly = true;
+      } else if (std::strcmp(argv[i], "--output") == 0 ||
+                 std::strcmp(argv[i], "-o") == 0) {
+        outputFilename = argv[i++];
       } else if (argv[i][0] == '-') {
           throw std::runtime_error(std::string("unrecognised argument: ")+argv[i]);
       } else {
@@ -498,16 +592,21 @@ int main(int argc, const char *argv[]) {
     }
 
     // Parse the program.
-    parser.parseProgram();
+    auto program = parser.parseProgram();
 
     // Parse and print program only.
     if (treeOnly) {
-      parser.printProgram();
+      printProgram(program);
       return 0;
     }
 
-    // Expand immediates.
-    // Patch labels.
+    // Iteratively resolve label values.
+    auto labelMap = createLabelMap(program);
+    resolveLabels(program, labelMap);
+
+    std::fstream outputFile(outputFilename, std::ios::out | std::ios::binary);
+    emitProgramBin(program, outputFile);
+    outputFile.close();
 
   } catch (std::exception &e) {
     std::cerr << "Error: " << e.what() << " : " << lexer.getLine() << "\n";
