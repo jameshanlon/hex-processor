@@ -356,8 +356,9 @@ public:
   size_t getSize() const { return 0; }
   /// Update the label value and return true if it was changed.
   bool setLabelValue(int newValue) {
-    auto oldValue = labelValue;
+    int oldValue = labelValue;
     labelValue = newValue;
+    if (oldValue != newValue) std::cout << label << " " << oldValue << " " << newValue <<"\n";
     return oldValue != newValue;
   }
   int getValue() const { return labelValue; }
@@ -366,14 +367,16 @@ public:
 };
 
 class InstrImm : public Directive {
-  int value;
+  int immValue;
 public:
-  InstrImm(Token token, int value) : Directive(token), value(value) {}
+  InstrImm(Token token, int immValue) : Directive(token), immValue(immValue) {}
   bool operandIsLabel() const { return false; }
-  size_t getSize() const { return numNibbles(value); }
-  int getValue() const { return value; }
+  size_t getSize() const {
+    return (immValue < 0 && numNibbles(immValue) == 1) ? 2 : numNibbles(immValue);
+  }
+  int getValue() const { return immValue; }
   std::string toString() const {
-    return std::string(tokenEnumStr(token)) + " " + std::to_string(value);
+    return std::string(tokenEnumStr(token)) + " " + std::to_string(immValue);
   }
 };
 
@@ -384,7 +387,9 @@ public:
   InstrLabel(Token token, std::string label) : Directive(token), label(label) {}
   void setLabelValue(int newValue) { labelValue = newValue; }
   bool operandIsLabel() const { return true; }
-  size_t getSize() const { return numNibbles(labelValue); }
+  size_t getSize() const {
+    return (labelValue < 0 && numNibbles(labelValue) == 1) ? 2 : numNibbles(labelValue);
+  }
   int getValue() const { return labelValue; }
   std::string getLabel() const { return label; }
   std::string toString() const {
@@ -516,10 +521,10 @@ createLabelMap(std::vector<std::unique_ptr<Directive>> &program) {
 static void resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
                           std::map<std::string, Label*> &labelMap) {
   bool labelChanged = true;
-  //size_t count = 0;
+  size_t count = 0;
   while (labelChanged) {
-    //std::cout << "Resolving labels iteration " << count++ << "\n";
-    size_t byteOffset = 0;
+    std::cout << "Resolving labels iteration " << count++ << "\n";
+    int byteOffset = 0;
     labelChanged = false;
     for (auto &directive : program) {
       byteOffset += directive->getSize();
@@ -530,8 +535,9 @@ static void resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
       // Update the label operand value of an instruction.
       if (directive->operandIsLabel()) {
         auto instrLabel = dynamic_cast<InstrLabel*>(directive.get());
-        auto labelValue = labelMap[instrLabel->getLabel()]->getValue();
-        instrLabel->setLabelValue(labelValue);
+        int labelValue = labelMap[instrLabel->getLabel()]->getValue();
+        instrLabel->setLabelValue(labelValue - byteOffset);
+        //std::cout << (labelValue - byteOffset) << "\n";
       }
     }
   }
@@ -550,18 +556,20 @@ static void emitProgramBin(std::vector<std::unique_ptr<Directive>> &program,
     // Instruction
     } else if (size > 0) {
       if (size > 1) {
-        // Prefixes
-        for (size_t i=size; i>0; i--) {
-          char instr = instrToInstrOpc(Instr::PFIX) << 4 |
-                       ((directive->getValue() >> i) & 0xF);
-          outputFile.write(&instr, 1);
+        Instr instr = (directive->getValue() < 0) ? Instr::NFIX : Instr::PFIX;
+        // Output PFIX/NFIX to extend the immediate value.
+        for (size_t i=size-1; i>0; i--) {
+          char instrValue = instrToInstrOpc(instr) << 4 |
+                            ((directive->getValue() >> (i * 4)) & 0xF);
+          //std::cout << boost::format("%02X") % (int)instrValue << "\n";
+          outputFile.put(instrValue);
         }
       }
       // Instrucion
-      char instr = (tokenToInstrOpc(directive->getToken()) & 0xF) << 4 |
-                   (directive->getValue() & 0xF);
-      std::cout << boost::format("%02X") % (int)instr << "\n";
-      outputFile.put(instr);
+      char instrValue = (tokenToInstrOpc(directive->getToken()) & 0xF) << 4 |
+                        (directive->getValue() & 0xF);
+      //std::cout << boost::format("%02X") % (uint32_t)instrValue << "\n";
+      outputFile.put(instrValue);
     }
   }
 }

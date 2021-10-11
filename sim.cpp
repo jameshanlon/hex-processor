@@ -27,6 +27,8 @@ class Processor {
   bool running;
   bool tracing;
 
+  std::vector<std::fstream> fileIO;
+
   // State for tracing.
   uint64_t cycles;
   Instr instrEnum;
@@ -35,8 +37,7 @@ class Processor {
 public:
 
   Processor() :
-    cycles(0),
-    tracing(false) {}
+    tracing(false), cycles(0) {}
 
   void setTracing(bool value) { tracing = value; }
 
@@ -70,16 +71,45 @@ public:
     }
   }
 
+  /// Output a character to stdout or a file.
+  void output(char value, int stream) {
+    if (stream < 256) {
+      std::cout << value;
+    } else {
+      size_t index = (stream >> 8) & 7;
+      if (!fileIO[index].is_open()) {
+        fileIO[index].open(std::string("sim")+std::to_string(index),
+                           std::fstream::in);
+      }
+      fileIO[index].put(value);
+    }
+  }
+
+  /// Input a character from stdin or a file.
+  char input(int stream) {
+    if (stream < 256) {
+      return std::getchar();
+    } else {
+      size_t index = (stream >> 8) & 7;
+      if (!fileIO[index].is_open()) {
+        fileIO[index].open(std::string("sim")+std::to_string(index),
+                           std::fstream::out);
+      }
+      return fileIO[index].get();
+    }
+  }
+
   void syscall() {
+    sp = memory[1];
     switch (static_cast<Syscall>(areg)) {
       case Syscall::EXIT:
         running = false;
         break;
       case Syscall::WRITE:
-        std::putchar(memory[sp]);
+        output(memory[sp+2], memory[sp+3]);
         break;
       case Syscall::READ:
-        memory[sp] = std::getchar();
+        memory[sp+1] = input(memory[sp+2]);
         break;
     }
   }
@@ -129,7 +159,7 @@ public:
           oreg = 0;
           break;
         case Instr::BR:
-          pc = pc + oreg;
+          pc = (int)pc + (int)oreg;
           oreg = 0;
           break;
         case Instr::BRZ:
@@ -139,7 +169,7 @@ public:
           oreg = 0;
           break;
         case Instr::BRN:
-          if ((int) areg < 0) {
+          if (static_cast<int>(areg) < 0) {
             pc = pc + oreg;
           }
           oreg = 0;
@@ -181,10 +211,10 @@ public:
       if (tracing) {
         trace();
       }
-      cycles++;
       if (cycles == 100) {
         running = false;
       }
+      cycles++;
     }
   }
 };
