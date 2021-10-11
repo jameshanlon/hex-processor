@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <boost/format.hpp>
 
 #include "Instructions.hpp"
 
@@ -96,6 +97,8 @@ static const char *tokenEnumStr(Token token) {
   case Token::IDENTIFIER:  return "IDENTIFIER";
   case Token::NONE:        return "NONE";
   case Token::END_OF_FILE: return "END_OF_FILE";
+  default:
+    throw std::runtime_error(std::string("unexpected token: ")+std::to_string(static_cast<int>(token)));
   }
 };
 
@@ -113,22 +116,33 @@ static Instr tokenToInstr(Token token) {
   case Token::BR:   return Instr::BR;
   case Token::BRZ:  return Instr::BRZ;
   case Token::BRN:  return Instr::BRN;
-  case Token::BRB:  return Instr::BRB;
-  case Token::SVC:  return Instr::SVC;
-  case Token::ADD:  return Instr::ADD;
-  case Token::SUB:  return Instr::SUB;
   case Token::OPR:  return Instr::OPR;
   default:
     throw std::runtime_error(std::string("unexpected instrucion token: ")+tokenEnumStr(token));
   }
 }
 
-static uint8_t instrToInstrOpc(Instr instr) {
-  return static_cast<uint8_t>(instr);
+static OprInstr tokenToOprInstr(Token token) {
+  switch (token) {
+  case Token::BRB: return OprInstr::BRB;
+  case Token::SVC: return OprInstr::SVC;
+  case Token::ADD: return OprInstr::ADD;
+  case Token::SUB: return OprInstr::SUB;
+  default:
+    throw std::runtime_error(std::string("unexpected operand instrucion token: ")+tokenEnumStr(token));
+  }
 }
 
-static uint8_t tokenToInstrOpc(Token token) {
-  return instrToInstrOpc(tokenToInstr(token));
+static int instrToInstrOpc(Instr instr) {
+  return static_cast<int>(instr);
+}
+
+static int tokenToInstrOpc(Token token) {
+  return static_cast<int>(tokenToInstr(token));
+}
+
+static int tokenToOprInstrOpc(Token token) {
+  return static_cast<int>(tokenToOprInstr(token));
 }
 
 class Table {
@@ -269,7 +283,8 @@ public:
 // Directive data types.
 //===---------------------------------------------------------------------===//
 
-static size_t numBytes(int value) {
+/// Return the number of 4-bit immediates required to represent the value.
+static size_t numNibbles(int value) {
   if (value == 0) {
     return 1;
   }
@@ -277,8 +292,8 @@ static size_t numBytes(int value) {
   if (value < 0) {
     value = ~value;
   }
-  while (value >= 128) {
-    value >>= 8;
+  while (value >= 64) {
+    value >>= 4;
     n++;
   }
   return n;
@@ -301,7 +316,7 @@ class Data : public Directive {
 public:
   Data(Token token, int value) : Directive(token), value(value) {}
   bool operandIsLabel() const { return false; }
-  size_t getSize() const { return numBytes(value); }
+  size_t getSize() const { return numNibbles(value); }
   int getValue() const { return value; }
   std::string toString() const {
     return "DATA " + std::to_string(value);
@@ -355,7 +370,7 @@ class InstrImm : public Directive {
 public:
   InstrImm(Token token, int value) : Directive(token), value(value) {}
   bool operandIsLabel() const { return false; }
-  size_t getSize() const { return numBytes(value) * 2; }
+  size_t getSize() const { return numNibbles(value); }
   int getValue() const { return value; }
   std::string toString() const {
     return std::string(tokenEnumStr(token)) + " " + std::to_string(value);
@@ -369,7 +384,7 @@ public:
   InstrLabel(Token token, std::string label) : Directive(token), label(label) {}
   void setLabelValue(int newValue) { labelValue = newValue; }
   bool operandIsLabel() const { return true; }
-  size_t getSize() const { return numBytes(labelValue) * 2; }
+  size_t getSize() const { return numNibbles(labelValue); }
   int getValue() const { return labelValue; }
   std::string getLabel() const { return label; }
   std::string toString() const {
@@ -377,10 +392,10 @@ public:
   }
 };
 
-class OPR : public Directive {
+class InstrOp : public Directive {
   Token opcode;
 public:
-  OPR(Token token, Token opcode) : Directive(token), opcode(opcode) {
+  InstrOp(Token token, Token opcode) : Directive(token), opcode(opcode) {
     if (opcode != Token::BRB &&
         opcode != Token::ADD &&
         opcode != Token::SUB &&
@@ -390,7 +405,7 @@ public:
   }
   bool operandIsLabel() const { return false; }
   size_t getSize() const { return 1; }
-  int getValue() const { return tokenToInstrOpc(opcode); }
+  int getValue() const { return tokenToOprInstrOpc(opcode); }
   std::string toString() const {
     return std::string("OPR ") + tokenEnumStr(opcode);
   }
@@ -440,7 +455,7 @@ class Parser {
       case Token::IDENTIFIER:
         return std::make_unique<Label>(Token::IDENTIFIER, lexer.getIdentifier());
       case Token::OPR:
-        return std::make_unique<OPR>(Token::OPR, lexer.getNextToken());
+        return std::make_unique<InstrOp>(Token::OPR, lexer.getNextToken());
       case Token::LDAM:
       case Token::LDBM:
       case Token::STAM:
@@ -543,9 +558,10 @@ static void emitProgramBin(std::vector<std::unique_ptr<Directive>> &program,
         }
       }
       // Instrucion
-      char instr = tokenToInstrOpc(directive->getToken()) << 4 |
+      char instr = (tokenToInstrOpc(directive->getToken()) & 0xF) << 4 |
                    (directive->getValue() & 0xF);
-      outputFile.write(&instr, 1);
+      std::cout << boost::format("%02X") % (int)instr << "\n";
+      outputFile.put(instr);
     }
   }
 }

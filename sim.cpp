@@ -1,3 +1,4 @@
+#include <array>
 #include <cstdio>
 #include <cstdint>
 #include <cstdarg>
@@ -12,26 +13,24 @@ class Processor {
 
   static const size_t MEMORY_SIZE_BYTES = 1 << 16;
 
-  enum class Syscall {
-    EXIT,
-    WRITE,
-    READ,
-  };
-
   uint32_t pc;
   uint32_t sp;
   uint32_t areg;
   uint32_t breg;
   uint32_t oreg;
   uint32_t temp;
-  uint32_t inst;
+  uint32_t instr;
 
-  // 256KB memory.
-  char memory[MEMORY_SIZE_BYTES];
+  // Memory.
+  std::array<uint32_t, MEMORY_SIZE_BYTES> memory;
 
-  uint64_t cycles;
   bool running;
   bool tracing;
+
+  // State for tracing.
+  uint64_t cycles;
+  Instr instrEnum;
+  OprInstr oprInstrEnum;
 
 public:
 
@@ -43,19 +42,32 @@ public:
 
   void load(const char *filename) {
     // Load the binary file.
+    std::streampos fileSize;
     std::ifstream file(filename, std::ios::binary);
-    if (file) {
-      // Get length of file.
-      file.seekg(0, file.end);
-      int length = file.tellg();
-      file.seekg(0, file.beg);
-      // Read the contents.
-      file.read(static_cast<char*>(memory), length);
-      if (!file) {
-        throw std::runtime_error("could not read all of the file");
-      }
+
+    // Get length of file.
+    file.seekg(0, std::ios::end);
+    fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    // Read the contents.
+    file.read(reinterpret_cast<char*>(memory.data()), fileSize);
+    //std::cout << "Read " << std::to_string(fileSize) << " bytes\n";
+    //for (size_t i=0; i<(fileSize / 4) + 1; i++) {
+    //  std::cout << boost::format("%08x\n") % memory[i];
+    //}
+  }
+
+  void trace() {
+    if (instrEnum == Instr::OPR) {
+      auto oprInstrOpc = oprInstrEnumToStr(oprInstrEnum);
+      std::cout << boost::format("@%-6d %8d %#8x %6s %8s %8x %8x\n")
+                   % cycles % pc % instr % "OPR" % oprInstrOpc % areg % breg;
+    } else {
+      auto instrOpc = instrEnumToStr(instrEnum);
+      std::cout << boost::format("@%-6d %8d %#8x %6s %8x %8x %8x\n")
+                     % cycles % pc % instr % instrOpc % oreg % areg % breg;
     }
-    throw std::runtime_error("could not open the file");
   }
 
   void syscall() {
@@ -72,94 +84,64 @@ public:
     }
   }
 
-  void trace(const char *opc, uint32_t op1) {
-    if (!tracing) {
-      return;
-    }
-    std::cout << boost::format("%d %s %d\n") % cycles % opc % op1;
-  }
-
-  void trace(const char *opc, uint32_t op1, uint32_t op2) {
-    if (!tracing) {
-      return;
-    }
-    std::cout << boost::format("%d %s %d %d\n") % cycles % opc % op1 % op2;
-  }
-
-  void trace(const char *opc, uint32_t op1, uint32_t op2, uint32_t op3) {
-    if (!tracing) {
-      return;
-    }
-    std::cout << boost::format("%d %s %d %d\n") % cycles % opc % op1 % op2 % op3;
-  }
-
   void run() {
     while (running) {
-      inst = memory[pc];
-      switch (static_cast<Instr>((inst >> 4) & 0xF)) {
+      instr = (memory[pc >> 2] >> ((pc & 0x3) << 3)) & 0xFF;
+      pc = pc + 1;
+      oreg = oreg | (instr & 0xF);
+      instrEnum = static_cast<Instr>((instr >> 4) & 0xF);
+      switch (instrEnum) {
         case Instr::LDAM:
           areg = memory[oreg];
-          trace("LDAM", areg, oreg);
           oreg = 0;
           break;
         case Instr::LDBM:
           breg = memory[oreg];
-          trace("LDBM", areg, oreg);
           oreg = 0;
           break;
         case Instr::STAM:
           memory[oreg] = areg;
-          trace("STAM", areg, oreg);
           oreg = 0;
           break;
         case Instr::LDAC:
           areg = oreg;
-          trace("LDAC", oreg);
           oreg = 0;
           break;
         case Instr::LDBC:
           breg = oreg;
-          trace("LDBC", oreg);
           oreg = 0;
           break;
         case Instr::LDAP:
           areg = pc + oreg;
-          trace("LDAP", areg, oreg);
           oreg = 0;
           break;
         case Instr::LDAI:
           temp = areg;
           areg = memory[areg + oreg];
-          trace("LDAI", areg, temp, oreg);
           oreg = 0;
           break;
         case Instr::LDBI:
           breg = memory[breg + oreg];
-          trace("LDBI", breg, areg, oreg);
           oreg = 0;
           break;
         case Instr::STAI:
           memory[breg + oreg] = areg;
-          trace("STAI", breg, oreg, areg);
           oreg = 0;
           break;
         case Instr::BR:
           pc = pc + oreg;
-          trace("BR", oreg);
           oreg = 0;
           break;
         case Instr::BRZ:
           if (areg == 0) {
             pc = pc + oreg;
           }
-          trace("BRZ", areg, oreg);
           oreg = 0;
           break;
         case Instr::BRN:
           if ((int) areg < 0) {
             pc = pc + oreg;
           }
-          trace("BRN", areg, oreg);
           oreg = 0;
           break;
         case Instr::PFIX:
@@ -169,35 +151,39 @@ public:
           oreg = 0xFFFFFF00 | (oreg << 4);
           break;
         case Instr::OPR:
-          switch (static_cast<Instr>(oreg)) {
-            case Instr::BRB:
+          oprInstrEnum = static_cast<OprInstr>(oreg);
+          switch (oprInstrEnum) {
+            case OprInstr::BRB:
               pc = breg;
-              trace("BRB", breg);
               oreg = 0;
               break;
-            case Instr::ADD:
+            case OprInstr::ADD:
               temp = areg;
               areg = areg + breg;
-              trace("ADD", areg, temp, breg);
               oreg = 0;
               break;
-            case Instr::SUB:
+            case OprInstr::SUB:
               temp = areg;
               areg = areg - breg;
-              trace("SUB", areg, temp, breg);
               oreg = 0;
               break;
-            case Instr::SVC:
-              trace("SVC", areg);
+            case OprInstr::SVC:
               syscall();
               break;
             default:
-              break;
+              throw std::runtime_error("invalid syscall");
           };
           oreg = 0;
           break;
         default:
-          break;
+          throw std::runtime_error("invalid instruction");
+      }
+      if (tracing) {
+        trace();
+      }
+      cycles++;
+      if (cycles == 100) {
+        running = false;
       }
     }
   }
@@ -224,7 +210,7 @@ int main(int argc, const char *argv[]) {
       } else if (std::strcmp(argv[i], "-h") == 0 ||
                  std::strcmp(argv[i], "--help") == 0) {
         help(argv);
-        std::exit(1);
+        return 1;
       } else {
         if (!filename) {
           filename = argv[i];
@@ -236,7 +222,7 @@ int main(int argc, const char *argv[]) {
     // A file must be specified.
     if (!filename) {
       help(argv);
-      std::exit(1);
+      return 1;
     }
     Processor p;
     p.setTracing(trace);
@@ -244,7 +230,7 @@ int main(int argc, const char *argv[]) {
     p.run();
   } catch (std::exception &e) {
     std::cerr << "Error: " << e.what() << "\n";
-    std::exit(1);
+    return 1;
   }
   return 0;
 }
