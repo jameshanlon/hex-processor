@@ -288,15 +288,27 @@ static size_t numNibbles(int value) {
   if (value == 0) {
     return 1;
   }
-  size_t n = 1;
   if (value < 0) {
     value = ~value;
   }
-  while (value >= 64) {
+  size_t n = 1;
+  while (value >= 16) {
     value >>= 4;
     n++;
   }
   return n;
+}
+
+/// Return the length of an instruction that has a relative label reference.
+/// The length of the encoding depends on the distance to the label, which in
+/// turn depends on the length of the instruction. Calculate the value by
+/// increasing the length until they match.
+static int instrLen(int labelOffset, int byteOffset) {
+  int length = 1;
+  while (length < numNibbles(labelOffset - byteOffset - length)) {
+    length++;
+  }
+  return length;
 }
 
 // Base class for all directives.
@@ -358,7 +370,6 @@ public:
   bool setLabelValue(int newValue) {
     int oldValue = labelValue;
     labelValue = newValue;
-    if (oldValue != newValue) std::cout << label << " " << oldValue << " " << newValue <<"\n";
     return oldValue != newValue;
   }
   int getValue() const { return labelValue; }
@@ -517,29 +528,30 @@ createLabelMap(std::vector<std::unique_ptr<Directive>> &program) {
   return labelMap;
 }
 
-/// Iteratively update label values until there are no changes.
+/// Iteratively update label values until the program size does not change.
 static void resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
                           std::map<std::string, Label*> &labelMap) {
-  bool labelChanged = true;
-  size_t count = 0;
-  while (labelChanged) {
+  int lastSize = -1;
+  int byteOffset = 0;
+  int count = 0;
+  while (lastSize != byteOffset) {
     std::cout << "Resolving labels iteration " << count++ << "\n";
-    int byteOffset = 0;
-    labelChanged = false;
+    lastSize = byteOffset;
+    byteOffset = 0;
     for (auto &directive : program) {
-      byteOffset += directive->getSize();
       // Update the label value.
       if (directive->getToken() == Token::IDENTIFIER) {
-        labelChanged = dynamic_cast<Label*>(directive.get())->setLabelValue(byteOffset);
+        dynamic_cast<Label*>(directive.get())->setLabelValue(byteOffset);
       }
       // Update the label operand value of an instruction.
       if (directive->operandIsLabel()) {
         auto instrLabel = dynamic_cast<InstrLabel*>(directive.get());
         int labelValue = labelMap[instrLabel->getLabel()]->getValue();
-        instrLabel->setLabelValue(labelValue - byteOffset);
-        //std::cout << (labelValue - byteOffset) << "\n";
+        instrLabel->setLabelValue(labelValue - byteOffset - instrLen(labelValue, byteOffset));
       }
+      byteOffset += directive->getSize();
     }
+    std::cout << "size: " << byteOffset << "\n";
   }
 }
 
