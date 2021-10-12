@@ -11,8 +11,10 @@
 
 class Processor {
 
+  // Constants.
   static const size_t MEMORY_SIZE_BYTES = 1 << 16;
 
+  // State.
   uint32_t pc;
   uint32_t sp;
   uint32_t areg;
@@ -24,15 +26,18 @@ class Processor {
   // Memory.
   std::array<uint32_t, MEMORY_SIZE_BYTES> memory;
 
+  // IO
+  std::vector<std::fstream> fileIO;
+
+  // Control.
   bool running;
   bool tracing;
-
-  std::vector<std::fstream> fileIO;
 
   // State for tracing.
   uint64_t cycles;
   Instr instrEnum;
   OprInstr oprInstrEnum;
+  uint32_t lastPC;
 
 public:
 
@@ -63,11 +68,11 @@ public:
     if (instrEnum == Instr::OPR) {
       auto oprInstrOpc = oprInstrEnumToStr(oprInstrEnum);
       std::cout << boost::format("@%-6d %8d %#8x %6s %8s %8x %8x\n")
-                   % cycles % pc % instr % "OPR" % oprInstrOpc % areg % breg;
+                   % cycles % lastPC % instr % "OPR" % oprInstrOpc % areg % breg;
     } else {
       auto instrOpc = instrEnumToStr(instrEnum);
       std::cout << boost::format("@%-6d %8d %#8x %6s %8x %8x %8x\n")
-                     % cycles % pc % instr % instrOpc % oreg % areg % breg;
+                     % cycles % lastPC % instr % instrOpc % oreg % areg % breg;
     }
   }
 
@@ -78,7 +83,7 @@ public:
     } else {
       size_t index = (stream >> 8) & 7;
       if (!fileIO[index].is_open()) {
-        fileIO[index].open(std::string("sim")+std::to_string(index),
+        fileIO[index].open(std::string("simin")+std::to_string(index),
                            std::fstream::in);
       }
       fileIO[index].put(value);
@@ -92,7 +97,7 @@ public:
     } else {
       size_t index = (stream >> 8) & 7;
       if (!fileIO[index].is_open()) {
-        fileIO[index].open(std::string("sim")+std::to_string(index),
+        fileIO[index].open(std::string("simin")+std::to_string(index),
                            std::fstream::out);
       }
       return fileIO[index].get();
@@ -117,6 +122,7 @@ public:
   void run() {
     while (running) {
       instr = (memory[pc >> 2] >> ((pc & 0x3) << 3)) & 0xFF;
+      lastPC = pc;
       pc = pc + 1;
       oreg = oreg | (instr & 0xF);
       instrEnum = static_cast<Instr>((instr >> 4) & 0xF);
@@ -138,24 +144,24 @@ public:
           oreg = 0;
           break;
         case Instr::LDBC:
-          breg = oreg;
+          breg = (int)oreg;
           oreg = 0;
           break;
         case Instr::LDAP:
-          areg = pc + oreg;
+          areg = (int)pc + (int)oreg;
           oreg = 0;
           break;
         case Instr::LDAI:
           temp = areg;
-          areg = memory[areg + oreg];
+          areg = memory[(int)areg + (int)oreg];
           oreg = 0;
           break;
         case Instr::LDBI:
-          breg = memory[breg + oreg];
+          breg = memory[(int)breg + (int)oreg];
           oreg = 0;
           break;
         case Instr::STAI:
-          memory[breg + oreg] = areg;
+          memory[(int)breg + (int)oreg] = areg;
           oreg = 0;
           break;
         case Instr::BR:
@@ -164,13 +170,13 @@ public:
           break;
         case Instr::BRZ:
           if (areg == 0) {
-            pc = pc + oreg;
+            pc = (int)pc + (int)oreg;
           }
           oreg = 0;
           break;
         case Instr::BRN:
-          if (static_cast<int>(areg) < 0) {
-            pc = pc + oreg;
+          if ((int)areg < 0) {
+            pc = (int)pc + (int)oreg;
           }
           oreg = 0;
           break;
@@ -189,12 +195,12 @@ public:
               break;
             case OprInstr::ADD:
               temp = areg;
-              areg = areg + breg;
+              areg = (int)areg + (int)breg;
               oreg = 0;
               break;
             case OprInstr::SUB:
               temp = areg;
-              areg = areg - breg;
+              areg = (int)areg - (int)breg;
               oreg = 0;
               break;
             case OprInstr::SVC:
