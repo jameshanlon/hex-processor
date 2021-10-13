@@ -280,7 +280,7 @@ public:
 };
 
 //===---------------------------------------------------------------------===//
-// Directive data types.
+// Functions for determining instruction encoding sizes.
 //===---------------------------------------------------------------------===//
 
 /// Return the number of 4-bit immediates required to represent the value.
@@ -310,6 +310,10 @@ static int instrLen(int labelOffset, int byteOffset) {
   }
   return length;
 }
+
+//===---------------------------------------------------------------------===//
+// Directive data types.
+//===---------------------------------------------------------------------===//
 
 // Base class for all directives.
 struct Directive {
@@ -526,9 +530,9 @@ static void resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
                           std::map<std::string, Label*> &labelMap) {
   int lastSize = -1;
   int byteOffset = 0;
-  int count = 0;
+  //int count = 0;
   while (lastSize != byteOffset) {
-    std::cout << "Resolving labels iteration " << count++ << "\n";
+    //std::cout << "Resolving labels iteration " << count++ << "\n";
     lastSize = byteOffset;
     byteOffset = 0;
     for (auto &directive : program) {
@@ -558,23 +562,28 @@ static void resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
   }
 }
 
-/// Print the program data structure.
+/// Emit the program to stdout.
 static void emitProgramText(std::vector<std::unique_ptr<Directive>> &program) {
   int byteOffset = 0;
   for (auto &directive : program) {
-    std::cout << boost::format("%06d %s (%d bytes)\n") % byteOffset % directive->toString() % directive->getSize();
+    // Data at 4-byte alignment.
+    if (directive->getToken() == Token::DATA && (byteOffset & 0x3)) {
+      byteOffset += 4 - (byteOffset & 0x3);
+    }
+    std::cout << boost::format("%06d %10s (%d bytes)\n") % byteOffset % directive->toString() % directive->getSize();
     byteOffset += directive->getSize();
   }
 }
 
-/// Emit the program.
+/// Emit the program in binary.
 static void emitProgramBin(std::vector<std::unique_ptr<Directive>> &program,
                            std::fstream &outputFile) {
   int byteOffset = 0;
   for (auto &directive : program) {
     auto size = directive->getSize();
+    // Data
     if (directive->getToken() == Token::DATA) {
-      // Data at 4-byte alignment.
+      // Add padding for 4-byte data alignment.
       if (byteOffset & 0x3) {
         int paddingBytes = 4 - (byteOffset & 0x3);
         int paddingValue = 0;
@@ -593,15 +602,13 @@ static void emitProgramBin(std::vector<std::unique_ptr<Directive>> &program,
         for (size_t i=size-1; i>0; i--) {
           char instrValue = instrToInstrOpc(instr) << 4 |
                             ((directive->getValue() >> (i * 4)) & 0xF);
-          //std::cout << boost::format("%02X") % (int)instrValue << "\n";
           outputFile.put(instrValue);
           byteOffset++;
         }
       }
-      // Instrucion
+      // Output the instruction
       char instrValue = (tokenToInstrOpc(directive->getToken()) & 0xF) << 4 |
                         (directive->getValue() & 0xF);
-      //std::cout << boost::format("%02X") % (uint32_t)instrValue << "\n";
       outputFile.put(instrValue);
       byteOffset++;
     }
