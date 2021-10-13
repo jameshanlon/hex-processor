@@ -508,13 +508,6 @@ public:
   }
 };
 
-/// Print the program data structure.
-static void printProgram(std::vector<std::unique_ptr<Directive>> &program) {
-  for (auto &directive : program) {
-    std::cout << directive->toString() + '\n';
-  }
-}
-
 /// Create a map of label strings to label Directives.
 static std::map<std::string, Label*>
 createLabelMap(std::vector<std::unique_ptr<Directive>> &program) {
@@ -539,6 +532,12 @@ static void resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
     lastSize = byteOffset;
     byteOffset = 0;
     for (auto &directive : program) {
+      if (directive->getToken() == Token::DATA) {
+        // Data must be on 4-byte boundaries.
+        if (byteOffset & 0x3) {
+          byteOffset += 4 - (byteOffset & 0x3);
+        }
+      }
       // Update the label value.
       if (directive->getToken() == Token::IDENTIFIER) {
         dynamic_cast<Label*>(directive.get())->setLabelValue(byteOffset);
@@ -547,24 +546,45 @@ static void resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
       if (directive->operandIsLabel()) {
         auto instrLabel = dynamic_cast<InstrLabel*>(directive.get());
         int labelValue = labelMap[instrLabel->getLabel()]->getValue();
-        instrLabel->setLabelValue(labelValue - byteOffset - instrLen(labelValue, byteOffset));
+        int offset = labelValue - byteOffset;
+        if (offset >= 0) {
+          instrLabel->setLabelValue(offset - instrLen(labelValue, byteOffset));
+        } else {
+          instrLabel->setLabelValue(offset - instrLen(labelValue, byteOffset));
+        }
       }
       byteOffset += directive->getSize();
     }
-    std::cout << "size: " << byteOffset << "\n";
+  }
+}
+
+/// Print the program data structure.
+static void emitProgramText(std::vector<std::unique_ptr<Directive>> &program) {
+  int byteOffset = 0;
+  for (auto &directive : program) {
+    std::cout << boost::format("%06d %s (%d bytes)\n") % byteOffset % directive->toString() % directive->getSize();
+    byteOffset += directive->getSize();
   }
 }
 
 /// Emit the program.
 static void emitProgramBin(std::vector<std::unique_ptr<Directive>> &program,
                            std::fstream &outputFile) {
+  int byteOffset = 0;
   for (auto &directive : program) {
     auto size = directive->getSize();
-    // Data
     if (directive->getToken() == Token::DATA) {
+      // Data at 4-byte alignment.
+      if (byteOffset & 0x3) {
+        int paddingBytes = 4 - (byteOffset & 0x3);
+        int paddingValue = 0;
+        outputFile.write(reinterpret_cast<const char*>(&paddingValue), paddingBytes);
+        byteOffset += paddingBytes;
+      }
       auto dataDirective = dynamic_cast<Data*>(directive.get());
       auto value = dataDirective->getValue();
       outputFile.write(reinterpret_cast<const char*>(&value), size);
+      byteOffset += size;
     // Instruction
     } else if (size > 0) {
       if (size > 1) {
@@ -575,6 +595,7 @@ static void emitProgramBin(std::vector<std::unique_ptr<Directive>> &program,
                             ((directive->getValue() >> (i * 4)) & 0xF);
           //std::cout << boost::format("%02X") % (int)instrValue << "\n";
           outputFile.put(instrValue);
+          byteOffset++;
         }
       }
       // Instrucion
@@ -582,6 +603,7 @@ static void emitProgramBin(std::vector<std::unique_ptr<Directive>> &program,
                         (directive->getValue() & 0xF);
       //std::cout << boost::format("%02X") % (uint32_t)instrValue << "\n";
       outputFile.put(instrValue);
+      byteOffset++;
     }
   }
 }
@@ -649,30 +671,6 @@ int main(int argc, const char *argv[]) {
     if (tokensOnly && !treeOnly) {
       while (true) {
         switch (lexer.getNextToken()) {
-          case Token::LDAM:
-          case Token::LDBM:
-          case Token::STAM:
-          case Token::LDAC:
-          case Token::LDBC:
-          case Token::LDAP:
-          case Token::LDAI:
-          case Token::LDBI:
-          case Token::STAI:
-          case Token::BR:
-          case Token::BRZ:
-          case Token::BRN:
-          case Token::BRB:
-          case Token::SVC:
-          case Token::ADD:
-          case Token::SUB:
-          case Token::MINUS:
-          case Token::FUNC:
-          case Token::PROC:
-          case Token::DATA:
-          case Token::OPR:
-          case Token::NONE:
-            std::cout << tokenEnumStr(lexer.getLastToken()) << "\n";
-            break;
           case Token::IDENTIFIER:
             std::cout << "IDENTIFIER " << lexer.getIdentifier() << "\n";
             break;
@@ -682,6 +680,9 @@ int main(int argc, const char *argv[]) {
           case Token::END_OF_FILE:
             std::cout << "EOF\n";
             std::exit(0);
+          default:
+            std::cout << tokenEnumStr(lexer.getLastToken()) << "\n";
+            break;
         }
       }
       return 0;
@@ -690,15 +691,15 @@ int main(int argc, const char *argv[]) {
     // Parse the program.
     auto program = parser.parseProgram();
 
-    // Parse and print program only.
-    if (treeOnly) {
-      printProgram(program);
-      return 0;
-    }
-
     // Iteratively resolve label values.
     auto labelMap = createLabelMap(program);
     resolveLabels(program, labelMap);
+
+    // Parse and print program only.
+    if (treeOnly) {
+      emitProgramText(program);
+      return 0;
+    }
 
     // Emit the program binary.
     std::fstream outputFile(outputFilename, std::ios::out | std::ios::binary);

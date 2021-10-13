@@ -12,7 +12,7 @@
 class Processor {
 
   // Constants.
-  static const size_t MEMORY_SIZE_BYTES = 1 << 16;
+  static const size_t MEMORY_SIZE_WORDS = 200000;
 
   // State.
   uint32_t pc;
@@ -24,7 +24,7 @@ class Processor {
   uint32_t instr;
 
   // Memory.
-  std::array<uint32_t, MEMORY_SIZE_BYTES> memory;
+  std::array<uint32_t, MEMORY_SIZE_WORDS> memory;
 
   // IO
   std::vector<std::fstream> fileIO;
@@ -58,10 +58,10 @@ public:
 
     // Read the contents.
     file.read(reinterpret_cast<char*>(memory.data()), fileSize);
-    //std::cout << "Read " << std::to_string(fileSize) << " bytes\n";
-    //for (size_t i=0; i<(fileSize / 4) + 1; i++) {
-    //  std::cout << boost::format("%08x\n") % memory[i];
-    //}
+    std::cout << "Read " << std::to_string(fileSize) << " bytes\n";
+    for (size_t i=0; i<(fileSize / 4) + 1; i++) {
+      std::cout << boost::format("%08d %08x\n") % i % memory[i];
+    }
   }
 
   void trace() {
@@ -126,6 +126,9 @@ public:
       pc = pc + 1;
       oreg = oreg | (instr & 0xF);
       instrEnum = static_cast<Instr>((instr >> 4) & 0xF);
+      if (tracing) {
+        trace();
+      }
       switch (instrEnum) {
         case Instr::LDAM:
           areg = memory[oreg];
@@ -144,39 +147,39 @@ public:
           oreg = 0;
           break;
         case Instr::LDBC:
-          breg = (int)oreg;
+          breg = oreg;
           oreg = 0;
           break;
         case Instr::LDAP:
-          areg = (int)pc + (int)oreg;
+          areg = pc + oreg;
           oreg = 0;
           break;
         case Instr::LDAI:
           temp = areg;
-          areg = memory[(int)areg + (int)oreg];
+          areg = memory[areg + oreg];
           oreg = 0;
           break;
         case Instr::LDBI:
-          breg = memory[(int)breg + (int)oreg];
+          breg = memory[breg + oreg];
           oreg = 0;
           break;
         case Instr::STAI:
-          memory[(int)breg + (int)oreg] = areg;
+          memory[breg + oreg] = areg;
           oreg = 0;
           break;
         case Instr::BR:
-          pc = (int)pc + (int)oreg;
+          pc = pc + oreg;
           oreg = 0;
           break;
         case Instr::BRZ:
           if (areg == 0) {
-            pc = (int)pc + (int)oreg;
+            pc = pc + oreg;
           }
           oreg = 0;
           break;
         case Instr::BRN:
           if ((int)areg < 0) {
-            pc = (int)pc + (int)oreg;
+            pc = pc + oreg;
           }
           oreg = 0;
           break;
@@ -195,12 +198,12 @@ public:
               break;
             case OprInstr::ADD:
               temp = areg;
-              areg = (int)areg + (int)breg;
+              areg = areg + breg;
               oreg = 0;
               break;
             case OprInstr::SUB:
               temp = areg;
-              areg = (int)areg - (int)breg;
+              areg = areg - breg;
               oreg = 0;
               break;
             case OprInstr::SVC:
@@ -213,12 +216,6 @@ public:
           break;
         default:
           throw std::runtime_error("invalid instruction");
-      }
-      if (tracing) {
-        trace();
-      }
-      if (cycles == 100) {
-        running = false;
       }
       cycles++;
     }
