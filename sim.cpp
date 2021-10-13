@@ -59,9 +59,9 @@ public:
     // Read the contents.
     file.read(reinterpret_cast<char*>(memory.data()), fileSize);
     std::cout << "Read " << std::to_string(fileSize) << " bytes\n";
-    for (size_t i=0; i<(fileSize / 4) + 1; i++) {
-      std::cout << boost::format("%08d %08x\n") % i % memory[i];
-    }
+    //for (size_t i=0; i<(fileSize / 4) + 1; i++) {
+    //  std::cout << boost::format("%08d %08x\n") % i % memory[i];
+    //}
   }
 
   void trace() {
@@ -210,7 +210,7 @@ public:
               syscall();
               break;
             default:
-              throw std::runtime_error("invalid syscall");
+              throw std::runtime_error("invalid syscall: " + std::to_string(oreg));
           };
           oreg = 0;
           break;

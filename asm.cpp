@@ -332,7 +332,7 @@ class Data : public Directive {
 public:
   Data(Token token, int value) : Directive(token), value(value) {}
   bool operandIsLabel() const { return false; }
-  size_t getSize() const { return numNibbles(value); }
+  size_t getSize() const { return 4; } // Data entries are always one word.
   int getValue() const { return value; }
   std::string toString() const {
     return "DATA " + std::to_string(value);
@@ -570,7 +570,7 @@ static void emitProgramText(std::vector<std::unique_ptr<Directive>> &program) {
     if (directive->getToken() == Token::DATA && (byteOffset & 0x3)) {
       byteOffset += 4 - (byteOffset & 0x3);
     }
-    std::cout << boost::format("%06d %10s (%d bytes)\n") % byteOffset % directive->toString() % directive->getSize();
+    std::cout << boost::format("%#08x %-20s (%d bytes)\n") % byteOffset % directive->toString() % directive->getSize();
     byteOffset += directive->getSize();
   }
 }
@@ -580,7 +580,7 @@ static void emitProgramBin(std::vector<std::unique_ptr<Directive>> &program,
                            std::fstream &outputFile) {
   int byteOffset = 0;
   for (auto &directive : program) {
-    auto size = directive->getSize();
+    size_t size = directive->getSize();
     // Data
     if (directive->getToken() == Token::DATA) {
       // Add padding for 4-byte data alignment.
