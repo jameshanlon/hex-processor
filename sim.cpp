@@ -16,11 +16,9 @@ class Processor {
 
   // State.
   uint32_t pc;
-  uint32_t sp;
   uint32_t areg;
   uint32_t breg;
   uint32_t oreg;
-  uint32_t temp;
   uint32_t instr;
 
   // Memory.
@@ -58,7 +56,7 @@ public:
 
     // Read the contents.
     file.read(reinterpret_cast<char*>(memory.data()), fileSize);
-    std::cout << "Read " << std::to_string(fileSize) << " bytes\n";
+    //std::cout << "Read " << std::to_string(fileSize) << " bytes\n";
     //for (size_t i=0; i<(fileSize / 4) + 1; i++) {
     //  std::cout << boost::format("%08d %08x\n") % i % memory[i];
     //}
@@ -78,6 +76,7 @@ public:
 
   /// Output a character to stdout or a file.
   void output(char value, int stream) {
+    //std::cout << "output stream " << stream << ", value " << (int)value << "\n";
     if (stream < 256) {
       std::cout << value;
     } else {
@@ -92,6 +91,7 @@ public:
 
   /// Input a character from stdin or a file.
   char input(int stream) {
+    //std::cout << "input\n";
     if (stream < 256) {
       return std::getchar();
     } else {
@@ -105,17 +105,19 @@ public:
   }
 
   void syscall() {
-    sp = memory[1];
+    unsigned spWordIndex = memory[1] >> 2;
     switch (static_cast<Syscall>(areg)) {
       case Syscall::EXIT:
         running = false;
         break;
       case Syscall::WRITE:
-        output(memory[sp+2], memory[sp+3]);
+        output(memory[spWordIndex+2], memory[spWordIndex+3]);
         break;
       case Syscall::READ:
-        memory[sp+1] = input(memory[sp+2]);
+        memory[spWordIndex+1] = input(memory[spWordIndex+2]);
         break;
+      default:
+        throw std::runtime_error("invalid syscall: " + std::to_string(areg));
     }
   }
 
@@ -126,19 +128,19 @@ public:
       pc = pc + 1;
       oreg = oreg | (instr & 0xF);
       instrEnum = static_cast<Instr>((instr >> 4) & 0xF);
-      if (tracing) {
-        trace();
-      }
       switch (instrEnum) {
         case Instr::LDAM:
+          //std::cout << boost::format("areg = memory[%08x] (%d)\n") % oreg % memory[oreg];
           areg = memory[oreg];
           oreg = 0;
           break;
         case Instr::LDBM:
+          //std::cout << boost::format("breg = memory[%08x] (%d)\n") % oreg % memory[oreg];
           breg = memory[oreg];
           oreg = 0;
           break;
         case Instr::STAM:
+          //std::cout << boost::format("memory[%08x] = areg (%d)\n") % (oreg) % areg;
           memory[oreg] = areg;
           oreg = 0;
           break;
@@ -151,20 +153,23 @@ public:
           oreg = 0;
           break;
         case Instr::LDAP:
+          //std::cout << "LDAP pc="<<pc<<" oreg="<<(int)oreg<<" areg="<<pc+oreg<<"\n";
           areg = pc + oreg;
           oreg = 0;
           break;
         case Instr::LDAI:
-          temp = areg;
-          areg = memory[areg + oreg];
+          //std::cout << boost::format("areg = memory[%08x] (%d)\n") % (((areg>>2)+oreg)<<2) % memory[(areg>>2)+oreg];
+          areg = memory[(areg >> 2) + oreg];
           oreg = 0;
           break;
         case Instr::LDBI:
-          breg = memory[breg + oreg];
+          //std::cout << boost::format("breg = memory[%08x] (%d)\n") % (((breg>>2)+oreg)<<2) % memory[(breg>>2)+oreg];
+          breg = memory[(breg >> 2) + oreg];
           oreg = 0;
           break;
         case Instr::STAI:
-          memory[breg + oreg] = areg;
+          //std::cout << boost::format("memory[%08x] = areg (%d)\n") % (((breg>>2)+oreg)<<2) % areg;
+          memory[(breg >> 2) + oreg] = areg;
           oreg = 0;
           break;
         case Instr::BR:
@@ -197,12 +202,10 @@ public:
               oreg = 0;
               break;
             case OprInstr::ADD:
-              temp = areg;
               areg = areg + breg;
               oreg = 0;
               break;
             case OprInstr::SUB:
-              temp = areg;
               areg = areg - breg;
               oreg = 0;
               break;
@@ -210,12 +213,15 @@ public:
               syscall();
               break;
             default:
-              throw std::runtime_error("invalid syscall: " + std::to_string(oreg));
+              throw std::runtime_error("invalid OPR: " + std::to_string(oreg));
           };
           oreg = 0;
           break;
         default:
           throw std::runtime_error("invalid instruction");
+      }
+      if (tracing) {
+        trace();
       }
       cycles++;
     }

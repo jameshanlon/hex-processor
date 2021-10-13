@@ -551,6 +551,7 @@ static void resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
         auto instrLabel = dynamic_cast<InstrLabel*>(directive.get());
         int labelValue = labelMap[instrLabel->getLabel()]->getValue();
         int offset = labelValue - byteOffset;
+        //std::cout << "label value " << labelValue << " byteOffset " << byteOffset << " instrlen " << instrLen(labelValue, byteOffset) << "\n";
         if (offset >= 0) {
           instrLabel->setLabelValue(offset - instrLen(labelValue, byteOffset));
         } else {
