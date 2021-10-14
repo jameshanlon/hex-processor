@@ -40,7 +40,7 @@ class Processor {
 public:
 
   Processor() :
-    tracing(false), cycles(0) {}
+    running(true), tracing(false), cycles(0) {}
 
   void setTracing(bool value) { tracing = value; }
 
