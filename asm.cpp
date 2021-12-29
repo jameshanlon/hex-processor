@@ -221,6 +221,7 @@ class Lexer {
       } while (lastChar != EOF && lastChar != '\n');
       if (lastChar == '\n') {
         currentLine++;
+        readChar();
       }
       return readToken();
     }
@@ -715,7 +716,7 @@ int main(int argc, const char *argv[]) {
     outputFile.close();
 
   } catch (std::exception &e) {
-    std::cerr << "Error: " << e.what() << " : " << lexer.getLine() << "\n";
+    std::cerr << "Error: " << lexer.getLine() << ": " << e.what() << "\n";
     std::exit(1);
   }
   return 0;

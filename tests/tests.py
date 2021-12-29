@@ -12,7 +12,7 @@ class Tests(unittest.TestCase):
         pass
 
     def test_hello(self):
-        test_path = os.path.join(defs.TEST_SRC_PREFIX, 'hello.S')
+        test_path = os.path.join(defs.TEST_SRC_PREFIX, 'hello.old.S')
         subprocess.run([ASM_BINARY, test_path, '-o', 'a.bin'])
         output = subprocess.check_output([SIM_BINARY, 'a.bin'])
         self.assertTrue(output.decode('utf-8') == 'hello\n')
