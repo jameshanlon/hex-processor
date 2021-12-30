@@ -172,7 +172,8 @@ class Lexer {
   std::string   identifier;
   unsigned      value;
   Token         lastToken;
-  size_t        currentLine;
+  size_t        currentLineNumber;
+  std::string   currentLine;
 
   void declareKeywords() {
     table.insert("ADD",  Token::ADD);
@@ -199,7 +200,7 @@ class Lexer {
 
   int readChar() {
     file.get(lastChar);
-    //std::cout << lastChar;
+    currentLine += lastChar;
     if (file.eof()) {
       lastChar = EOF;
     }
@@ -210,7 +211,8 @@ class Lexer {
     // Skip whitespace.
     while (std::isspace(lastChar)) {
       if (lastChar == '\n') {
-        currentLine++;
+        currentLineNumber++;
+        currentLine.clear();
       }
       readChar();
     }
@@ -220,7 +222,8 @@ class Lexer {
         readChar();
       } while (lastChar != EOF && lastChar != '\n');
       if (lastChar == '\n') {
-        currentLine++;
+        currentLineNumber++;
+        currentLine.clear();
         readChar();
       }
       return readToken();
@@ -258,7 +261,7 @@ class Lexer {
 
 public:
 
-  Lexer() : currentLine(0) {
+  Lexer() : currentLineNumber(0) {
     declareKeywords();
   }
 
@@ -277,7 +280,8 @@ public:
   const std::string &getIdentifier() const { return identifier; }
   unsigned getNumber() const { return value; }
   Token getLastToken() const { return lastToken; }
-  size_t getLine() const { return currentLine; }
+  size_t getLineNumber() const { return currentLineNumber; }
+  const std::string &getLine() const { return currentLine; }
 };
 
 //===---------------------------------------------------------------------===//
@@ -716,7 +720,8 @@ int main(int argc, const char *argv[]) {
     outputFile.close();
 
   } catch (std::exception &e) {
-    std::cerr << "Error: " << lexer.getLine() << ": " << e.what() << "\n";
+    std::cerr << "Error: " << e.what() << "\n";
+    std::cerr << "  " << lexer.getLineNumber() << ": " << lexer.getLine() << "\n";
     std::exit(1);
   }
   return 0;
