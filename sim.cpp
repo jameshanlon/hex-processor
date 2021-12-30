@@ -104,8 +104,8 @@ public:
     }
   }
 
-  void trace(Instr instrEnum) {
-    std::cout << boost::format("%-6s") % instrEnumToStr(instrEnum);
+  void trace(uint32_t instr, Instr instrEnum) {
+    std::cout << boost::format("%-6d %-6s %-4d") % pc % instrEnumToStr(instrEnum) % (instr & 0xF);
     switch (instrEnum) {
       case Instr::LDAM:
         std::cout << boost::format("areg = mem[oreg (%#08x)] (%d)\n") % oreg % memory[oreg];
@@ -132,7 +132,7 @@ public:
         std::cout << boost::format("breg = mem[breg (%d) + oreg (%d) = %#08x] (%d)\n") % breg % oreg % (((breg>>2)+oreg)<<2) % memory[(breg>>2)+oreg];
         break;
       case Instr::STAI:
-        std::cout << boost::format("mem[berg (%d) + oreg (%d) = %#08x] = areg (%d)\n") % breg % oreg % (((breg>>2)+oreg)<<2) % areg;
+        std::cout << boost::format("mem[breg (%d) + oreg (%d) = %#08x] = areg (%d)\n") % breg % oreg % (((breg>>2)+oreg)<<2) % areg;
         break;
       case Instr::BR:
         std::cout << boost::format("pc = pc + oreg (%d) (%#08x)\n") % oreg % (pc + (oreg<<2));
@@ -193,7 +193,7 @@ public:
       oreg = oreg | (instr & 0xF);
       instrEnum = static_cast<Instr>((instr >> 4) & 0xF);
       if (tracing) {
-        trace(instrEnum);
+        trace(instr, instrEnum);
       }
       switch (instrEnum) {
         case Instr::LDAM:
