@@ -43,7 +43,7 @@ public:
 
   void setTracing(bool value) { tracing = value; }
 
-  void load(const char *filename) {
+  void load(const char *filename, bool dumpContents) {
     // Load the binary file.
     std::streampos fileSize;
     std::ifstream file(filename, std::ios::binary);
@@ -55,10 +55,17 @@ public:
 
     // Read the contents.
     file.read(reinterpret_cast<char*>(memory.data()), fileSize);
-    //std::cout << "Read " << std::to_string(fileSize) << " bytes\n";
-    //for (size_t i=0; i<(fileSize / 4) + 1; i++) {
-    //  std::cout << boost::format("%08d %08x\n") % i % memory[i];
-    //}
+
+    // Print the contents of the binary.
+    if (dumpContents) {
+      std::cout << "Read " << std::to_string(fileSize) << " bytes\n";
+      for (size_t i=0; i<(fileSize / 4) + 1; i++) {
+        std::cout << boost::format("%08d %08x\n") % i % memory[i];
+      }
+    }
+  }
+
+  void dumpBinaryFile() {
   }
 
   /// Output a character to stdout or a file.
@@ -291,15 +298,20 @@ static void help(const char *argv[]) {
   std::cout << "  file A binary file to simulate\n\n";
   std::cout << "Optional arguments:\n";
   std::cout << "  -h,--help  Display this message\n";
+  std::cout << "  -d,--dump  Dump the binary file contents\n";
   std::cout << "  -t,--trace Enable instruction tracing\n";
 }
 
 int main(int argc, const char *argv[]) {
   try {
     const char *filename = nullptr;
+    bool dumpBinary = true;
     bool trace = false;
     for (unsigned i = 1; i < argc; ++i) {
-      if (std::strcmp(argv[i], "-t") == 0 ||
+      if (std::strcmp(argv[i], "-d") == 0 ||
+          std::strcmp(argv[i], "--dump") == 0) {
+        dumpBinary = true;
+      } else if (std::strcmp(argv[i], "-t") == 0 ||
           std::strcmp(argv[i], "--trace") == 0) {
         trace = true;
       } else if (std::strcmp(argv[i], "-h") == 0 ||
@@ -321,7 +333,10 @@ int main(int argc, const char *argv[]) {
     }
     Processor p;
     p.setTracing(trace);
-    p.load(filename);
+    p.load(filename, dumpBinary);
+    if (dumpBinary) {
+      return 0;
+    }
     p.run();
   } catch (std::exception &e) {
     std::cerr << "Error: " << e.what() << "\n";
