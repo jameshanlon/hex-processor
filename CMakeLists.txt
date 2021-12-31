@@ -14,9 +14,16 @@ find_package(Python3 REQUIRED COMPONENTS
 # Verilator
 find_package(verilator HINTS $ENV{VERILATOR_ROOT} ${VERILATOR_ROOT})
 if (NOT verilator_FOUND)
-  message(FATAL_ERROR "Verilator was not found. Either install it, or set the VERILATOR_ROOT environment variable")
+  message(FATAL_ERROR "Verilator was not found.")
 endif()
 message(STATUS "Found Verilator binary = ${VERILATOR_BIN}")
+
+# Yosys
+find_program(YOSYS_BIN yosys HINTS $ENV{YOSYS_ROOT} ${YOSYS_ROOT})
+if (NOT YOSYS_BIN)
+  message(FATAL_ERROR "Yosys was not found.")
+endif()
+message(STATUS "Found Yosys binary = ${YOSYS_BIN}")
 
 # Compiler
 set(CMAKE_CXX_STANDARD 17)
