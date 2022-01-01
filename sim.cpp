@@ -34,7 +34,6 @@ class Processor {
   // State for tracing.
   uint64_t cycles;
   Instr instrEnum;
-  uint32_t lastPC;
 
 public:
 
@@ -195,7 +194,6 @@ public:
   void run() {
     while (running) {
       instr = (memory[pc >> 2] >> ((pc & 0x3) << 3)) & 0xFF;
-      lastPC = pc;
       pc = pc + 1;
       oreg = oreg | (instr & 0xF);
       instrEnum = static_cast<Instr>((instr >> 4) & 0xF);
@@ -305,7 +303,7 @@ static void help(const char *argv[]) {
 int main(int argc, const char *argv[]) {
   try {
     const char *filename = nullptr;
-    bool dumpBinary = true;
+    bool dumpBinary = false;
     bool trace = false;
     for (unsigned i = 1; i < argc; ++i) {
       if (std::strcmp(argv[i], "-d") == 0 ||

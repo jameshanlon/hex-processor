@@ -11,21 +11,28 @@ find_package(Boost 1.68.0 REQUIRED COMPONENTS
 find_package(Python3 REQUIRED COMPONENTS
              Interpreter)
 
+option(USE_VERILATOR "Use Verilator for simulation" ON)
+option(USE_YOSYS     "Use Yosys for synthesis" ON)
+
 # Verilator
-find_package(verilator HINTS $ENV{VERILATOR_ROOT} ${VERILATOR_ROOT})
-if (NOT verilator_FOUND)
-  message(FATAL_ERROR "Verilator was not found.")
+if (USE_VERILATOR)
+  find_package(verilator HINTS $ENV{VERILATOR_ROOT} ${VERILATOR_ROOT})
+  if (NOT verilator_FOUND)
+    message(FATAL_ERROR "Verilator was not found.")
+  endif()
+  message(STATUS "Found Verilator binary = ${VERILATOR_BIN}")
 endif()
-message(STATUS "Found Verilator binary = ${VERILATOR_BIN}")
 
 # Yosys
-find_program(YOSYS_BIN yosys HINTS $ENV{YOSYS_ROOT} ${YOSYS_ROOT})
-if (NOT YOSYS_BIN)
-  message(FATAL_ERROR "Yosys was not found.")
+if (USE_YOSYS)
+  find_program(YOSYS_BIN yosys HINTS $ENV{YOSYS_ROOT} ${YOSYS_ROOT})
+  if (NOT YOSYS_BIN)
+    message(FATAL_ERROR "Yosys was not found.")
+  endif()
+  message(STATUS "Found Yosys binary = ${YOSYS_BIN}")
 endif()
-message(STATUS "Found Yosys binary = ${YOSYS_BIN}")
 
-# Compiler
+# Compiler config
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -39,7 +46,8 @@ target_link_libraries(sim ${Boost_LIBRARIES})
 add_executable(asm asm.cpp)
 target_link_libraries(asm ${Boost_LIBRARIES})
 
-install(TARGETS asm sim DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS asm sim
+        DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_subdirectory(verilog)
 
