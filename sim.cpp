@@ -7,7 +7,8 @@
 #include <exception>
 #include <boost/format.hpp>
 
-#include "Instructions.hpp"
+#include "Hex.hpp"
+#include "Util.hpp"
 
 class Processor {
 
@@ -65,34 +66,6 @@ public:
   }
 
   void dumpBinaryFile() {
-  }
-
-  /// Output a character to stdout or a file.
-  void output(char value, int stream) {
-    if (stream < 256) {
-      std::cout << value;
-    } else {
-      size_t index = (stream >> 8) & 7;
-      if (!fileIO[index].is_open()) {
-        fileIO[index].open(std::string("simin")+std::to_string(index),
-                           std::fstream::in);
-      }
-      fileIO[index].put(value);
-    }
-  }
-
-  /// Input a character from stdin or a file.
-  char input(int stream) {
-    if (stream < 256) {
-      return std::getchar();
-    } else {
-      size_t index = (stream >> 8) & 7;
-      if (!fileIO[index].is_open()) {
-        fileIO[index].open(std::string("simin")+std::to_string(index),
-                           std::fstream::out);
-      }
-      return fileIO[index].get();
-    }
   }
 
   void traceSyscall() {
@@ -181,10 +154,10 @@ public:
         running = false;
         break;
       case Syscall::WRITE:
-        output(memory[spWordIndex+2], memory[spWordIndex+3]);
+        output(fileIO, memory[spWordIndex+2], memory[spWordIndex+3]);
         break;
       case Syscall::READ:
-        memory[spWordIndex+1] = input(memory[spWordIndex+2]);
+        memory[spWordIndex+1] = input(fileIO, memory[spWordIndex+2]);
         break;
       default:
         throw std::runtime_error("invalid syscall: " + std::to_string(areg));

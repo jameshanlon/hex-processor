@@ -9,7 +9,7 @@
 #include <map>
 #include <boost/format.hpp>
 
-#include "Instructions.hpp"
+#include "Hex.hpp"
 
 // With inspiration from the LLVM Kaleidoscope tutorial.
 // https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl02.html

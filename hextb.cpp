@@ -8,8 +8,13 @@
 #include "Vhex_pkg.h"
 #include "Vhex_pkg_hex.h"
 #include "Vhex_pkg_memory.h"
+#include "Hex.hpp"
+#include "Util.hpp"
 
 double sc_time_stamp() { return 0; }
+
+std::vector<std::fstream> fileIO;
+
 
 void load(const char *filename,
           const std::unique_ptr<Vhex_pkg> &top) {
@@ -30,6 +35,25 @@ void load(const char *filename,
   std::memcpy(top->hex->u_memory->memory_q.data(), buffer.data(), buffer.size());
 
   std::cout << "Wrote " << fileSize << " bytes to memory\n";
+}
+
+void handleSyscall(Syscall syscall, const std::unique_ptr<Vhex_pkg> &top) {
+  unsigned spWordIndex = top->hex->u_memory->memory_q[1] >> 2;
+  switch (syscall) {
+    case Syscall::EXIT:
+      break;
+    case Syscall::WRITE:
+      output(fileIO,
+             top->hex->u_memory->memory_q[spWordIndex+2],
+             top->hex->u_memory->memory_q[spWordIndex+3]);
+      break;
+    case Syscall::READ:
+      top->hex->u_memory->memory_q[spWordIndex+1] =
+          input(fileIO, top->hex->u_memory->memory_q[spWordIndex+2]);
+      break;
+    default:
+      throw std::runtime_error("invalid syscall");
+  }
 }
 
 void run(const std::unique_ptr<VerilatedContext> &contextp,
@@ -57,6 +81,14 @@ void run(const std::unique_ptr<VerilatedContext> &contextp,
     // Evaluate the design.
     top->eval();
     cycle_count++;
+    // Handle syscalls
+    if (top->o_syscall_valid) {
+      auto syscall = static_cast<Syscall>(top->o_syscall);
+      if (syscall == Syscall::EXIT) {
+        break;
+      }
+      handleSyscall(syscall, top);
+    }
     // Report state.
     VL_PRINTF("[%lld] clk=%x rst=%x\n",
               contextp->time(), top->i_clk, top->i_rst);

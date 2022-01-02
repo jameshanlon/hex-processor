@@ -1,17 +1,20 @@
 module processor
   (
-    input logic             i_rst,
-    input logic             i_clk,
+    input logic               i_rst,
+    input logic               i_clk,
     // Fetch memory port
-    output logic            o_f_valid,
-    output hex_pkg::addr_t  o_f_addr,
-    input  hex_pkg::instr_t i_f_data,
+    output logic              o_f_valid,
+    output hex_pkg::addr_t    o_f_addr,
+    input  hex_pkg::instr_t   i_f_data,
     // Data memory port
-    output logic            o_d_valid,
-    output logic            o_d_we,
-    output hex_pkg::addr_t  o_d_addr,
-    output hex_pkg::data_t  o_d_data,
-    input  hex_pkg::data_t  i_d_data
+    output logic              o_d_valid,
+    output logic              o_d_we,
+    output hex_pkg::addr_t    o_d_addr,
+    output hex_pkg::data_t    o_d_data,
+    input  hex_pkg::data_t    i_d_data,
+    // Syscall interface
+    output logic              o_syscall_valid,
+    output hex_pkg::syscall_t o_syscall
   );
 
   // State
@@ -113,17 +116,15 @@ module processor
     endcase
   end
 
-  // Memory access
-
-  // Valid
+  // Memory valid
   assign o_d_valid = instr.opc inside {hex_pkg::LDAM, hex_pkg::LDBM, hex_pkg::STAM,
                                        hex_pkg::LDAI, hex_pkg::LDBI, hex_pkg::STAI} /*||
                                       instr_svc*/;
 
-  // Write enable
-  assign o_d_we    = instr.opc inside {hex_pkg::STAM, hex_pkg::STAI};
+  // Memory write enable
+  assign o_d_we = instr.opc inside {hex_pkg::STAM, hex_pkg::STAI};
 
-  // Address generation
+  // Memory address generation
   always_comb begin
     o_d_addr = '0;
     unique case (instr.opc)
@@ -142,15 +143,7 @@ module processor
   assign o_d_data = areg_q;
 
   // Syscalls
-  always_comb begin
-    if (instr_svc) begin
-      unique case (hex_pkg::syscall_t'(areg_q))
-        hex_pkg::EXIT: $finish();
-        hex_pkg::READ:;
-        hex_pkg::WRITE:;
-        default:;
-      endcase
-    end
-  end
+  assign o_syscall_valid = instr_svc;
+  assign o_syscall = hex_pkg::syscall_t'(areg_q);
 
 endmodule
