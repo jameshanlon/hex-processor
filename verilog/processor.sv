@@ -64,7 +64,6 @@ module processor
   assign opr_d = oreg_q | {28'b0, instr.opr};
 
   // PC update
-
   always_comb begin
     pc_d = {pc_q + 18'b1};
     unique case (instr.opc)
@@ -116,11 +115,15 @@ module processor
 
   // Memory access
 
+  // Valid
   assign o_d_valid = instr.opc inside {hex_pkg::LDAM, hex_pkg::LDBM, hex_pkg::STAM,
                                        hex_pkg::LDAI, hex_pkg::LDBI, hex_pkg::STAI} /*||
                                       instr_svc*/;
+
+  // Write enable
   assign o_d_we    = instr.opc inside {hex_pkg::STAM, hex_pkg::STAI};
 
+  // Address generation
   always_comb begin
     o_d_addr = '0;
     unique case (instr.opc)
@@ -135,6 +138,7 @@ module processor
     endcase
   end
 
+  // Data is always driven by the areg.
   assign o_d_data = areg_q;
 
   // Syscalls

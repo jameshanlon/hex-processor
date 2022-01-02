@@ -40,16 +40,43 @@ add_compile_options(-Wall -pedantic)
 
 include_directories(${Boost_INCLUDE_DIRS})
 
+# Simulator
 add_executable(sim sim.cpp)
 target_link_libraries(sim ${Boost_LIBRARIES})
 
+# Assembler
 add_executable(asm asm.cpp)
 target_link_libraries(asm ${Boost_LIBRARIES})
 
 install(TARGETS asm sim
         DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-add_subdirectory(verilog)
+# Verilator
+if (USE_VERILATOR)
+  add_executable(hextb hextb.cpp)
+
+  verilate(hextb TRACE
+           VERILATOR_ARGS --top-module hex
+           SOURCES verilog/hex_pkg.sv
+                   verilog/hex.sv
+                   verilog/processor.sv
+                   verilog/memory.sv)
+
+  install(TARGETS hextb
+          DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
+# Yosys
+if (USE_YOSYS)
+  configure_file(synth.in.ys
+                 synth.ys)
+
+  add_custom_target(netlist.v ALL
+                    COMMAND ${YOSYS_BIN} synth.ys
+                    COMMENT "Running Yosys"
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                    SOURCES verilog/processor.sv)
+endif()
 
 enable_testing()
 add_subdirectory(tests)
