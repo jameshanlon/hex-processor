@@ -3,15 +3,20 @@
 #include <fstream>
 #include <iostream>
 #include <exception>
+#include <boost/format.hpp>
 #include <verilated.h>
 
 #include "Vhex_pkg.h"
 #include "Vhex_pkg_hex.h"
 #include "Vhex_pkg_memory.h"
+#include "Vhex_pkg_processor.h"
 #include "Hex.hpp"
 #include "Util.hpp"
 
 double sc_time_stamp() { return 0; }
+
+constexpr size_t RESET_BEGIN = 1;
+constexpr size_t RESET_END = 10;
 
 std::vector<std::fstream> fileIO;
 
@@ -37,20 +42,33 @@ void load(const char *filename,
   std::cout << "Wrote " << fileSize << " bytes to memory\n";
 }
 
-void handleSyscall(Syscall syscall, const std::unique_ptr<Vhex_pkg> &top) {
+void handleSyscall(hex::Syscall syscall,
+                   const std::unique_ptr<Vhex_pkg> &top,
+                   bool trace) {
   unsigned spWordIndex = top->hex->u_memory->memory_q[1] >> 2;
   switch (syscall) {
-    case Syscall::EXIT:
+    case hex::Syscall::EXIT:
+      if (trace) {
+        std::cout << "exit\n";
+      }
       break;
-    case Syscall::WRITE:
-      output(fileIO,
-             top->hex->u_memory->memory_q[spWordIndex+2],
-             top->hex->u_memory->memory_q[spWordIndex+3]);
+    case hex::Syscall::WRITE: {
+      char value = top->hex->u_memory->memory_q[spWordIndex+2];
+      int stream = top->hex->u_memory->memory_q[spWordIndex+3];
+      if (trace) {
+        std::cout << boost::format("output(%c, %d)\n") % value % stream;
+      }
+      hex::output(fileIO, value, stream);
       break;
-    case Syscall::READ:
-      top->hex->u_memory->memory_q[spWordIndex+1] =
-          input(fileIO, top->hex->u_memory->memory_q[spWordIndex+2]);
+    }
+    case hex::Syscall::READ: {
+      int stream = top->hex->u_memory->memory_q[spWordIndex+2];
+      if (trace) {
+        std::cout << boost::format("input(%d)\n") % stream;
+      }
+      top->hex->u_memory->memory_q[spWordIndex+1] = hex::input(fileIO, stream);
       break;
+    }
     default:
       throw std::runtime_error("invalid syscall");
   }
@@ -58,6 +76,7 @@ void handleSyscall(Syscall syscall, const std::unique_ptr<Vhex_pkg> &top) {
 
 void run(const std::unique_ptr<VerilatedContext> &contextp,
          const std::unique_ptr<Vhex_pkg> &top,
+         bool trace,
          size_t maxCycles) {
   uint64_t cycle_count = 0;
 
@@ -71,27 +90,35 @@ void run(const std::unique_ptr<VerilatedContext> &contextp,
     // Toggle the clock.
     top->i_clk = !top->i_clk;
     // Assert reset initially.
-    if (!top->i_clk) {
-      if (contextp->time() > 1 && contextp->time() < 10) {
-        top->i_rst = !0; // Assert reset
+    if (top->i_clk) {
+      if (contextp->time() > RESET_BEGIN && contextp->time() < RESET_END) {
+        top->i_rst = 1; // Assert reset
       } else {
-        top->i_rst = !1; // Deassert reset
+        top->i_rst = 0; // Deassert reset
       }
     }
     // Evaluate the design.
     top->eval();
-    cycle_count++;
+    if (top->i_clk) {
+      cycle_count++;
+    }
+    // Trace
+    if (trace && top->i_clk && contextp->time() > RESET_END) {
+      auto instr = instrEnumToStr(static_cast<hex::Instr>((top->hex->u_processor->instr >> 4) & 0xF));
+      std::cout << boost::format("[%-6d] %-6d 0x%02x %-6s\n")
+                     % contextp->time()
+                     % top->hex->u_processor->pc_q
+                     % static_cast<unsigned>(top->hex->u_processor->instr)
+                     % instr;
+    }
     // Handle syscalls
-    if (top->o_syscall_valid) {
-      auto syscall = static_cast<Syscall>(top->o_syscall);
-      if (syscall == Syscall::EXIT) {
+    if (top->i_clk && top->o_syscall_valid) {
+      auto syscall = static_cast<hex::Syscall>(top->o_syscall);
+      if (syscall == hex::Syscall::EXIT) {
         break;
       }
-      handleSyscall(syscall, top);
+      handleSyscall(syscall, top, trace);
     }
-    // Report state.
-    VL_PRINTF("[%lld] clk=%x rst=%x\n",
-              contextp->time(), top->i_clk, top->i_rst);
   }
 
   top->final();
@@ -104,6 +131,7 @@ static void help(const char **argv) {
   std::cout << "  file A binary file to execute\n\n";
   std::cout << "Optional arguments:\n";
   std::cout << "  -h,--help       Display this message\n";
+  std::cout << "  -t,--trace      Enable instruction tracing\n";
   std::cout << "  --max-cycles N  Limit the number of simulation cycles (default: 0)\n";
 }
 
@@ -111,12 +139,16 @@ int main(int argc, const char** argv) {
   try {
     // Handle arguments.
     const char *filename = nullptr;
+    bool trace = false;
     size_t maxCycles = 0;
     for (unsigned i = 1; i < argc; ++i) {
       if (std::strcmp(argv[i], "-h") == 0 ||
           std::strcmp(argv[i], "--help") == 0) {
         help(argv);
         return 1;
+      } else if (std::strcmp(argv[i], "-t") == 0 ||
+                 std::strcmp(argv[i], "--trace") == 0) {
+        trace = true;
       } else if (std::strcmp(argv[i], "--max-cycles") == 0) {
         maxCycles = std::stoull(argv[++i]);
       } else if (argv[i][0] == '+') {
@@ -141,7 +173,7 @@ int main(int argc, const char** argv) {
     const std::unique_ptr<Vhex_pkg> top{new Vhex_pkg{contextp.get(), "TOP"}};
     // Run.
     load(filename, top);
-    run(contextp, top, maxCycles);
+    run(contextp, top, trace, maxCycles);
   } catch (std::exception &e) {
     std::cerr << "Error: " << e.what() << "\n";
     return 1;

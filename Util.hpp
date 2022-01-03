@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+namespace hex {
+
 /// Output a character to stdout or a file.
 void output(std::vector<std::fstream> &fileIO, char value, int stream) {
   if (stream < 256) {
@@ -33,5 +35,6 @@ char input(std::vector<std::fstream> &fileIO, int stream) {
   }
 }
 
-#endif // UTIL_HPP
+}; // End namespace hex.
 
+#endif // UTIL_HPP

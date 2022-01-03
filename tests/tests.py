@@ -16,9 +16,9 @@ class Tests(unittest.TestCase):
         output = subprocess.check_output([SIM_BINARY, 'a.bin'])
         self.assertTrue(output.decode('utf-8') == expected_output)
         # Verilator
-        #if (defs.USE_VERILATOR):
-        #  output = subprocess.check_output([VTB_BINARY, 'a.bin'])
-        #  self.assertTrue(output.decode('utf-8') == expected_output)
+        if (defs.USE_VERILATOR):
+          output = subprocess.check_output([VTB_BINARY, 'a.bin'])
+          self.assertTrue(output.decode('utf-8').endswith(expected_output))
 
     def setUp(self):
         pass

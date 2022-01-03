@@ -102,38 +102,38 @@ static const char *tokenEnumStr(Token token) {
   }
 };
 
-static Instr tokenToInstr(Token token) {
+static hex::Instr tokenToInstr(Token token) {
   switch (token) {
-  case Token::LDAM: return Instr::LDAM;
-  case Token::LDBM: return Instr::LDBM;
-  case Token::STAM: return Instr::STAM;
-  case Token::LDAC: return Instr::LDAC;
-  case Token::LDBC: return Instr::LDBC;
-  case Token::LDAP: return Instr::LDAP;
-  case Token::LDAI: return Instr::LDAI;
-  case Token::LDBI: return Instr::LDBI;
-  case Token::STAI: return Instr::STAI;
-  case Token::BR:   return Instr::BR;
-  case Token::BRZ:  return Instr::BRZ;
-  case Token::BRN:  return Instr::BRN;
-  case Token::OPR:  return Instr::OPR;
+  case Token::LDAM: return hex::Instr::LDAM;
+  case Token::LDBM: return hex::Instr::LDBM;
+  case Token::STAM: return hex::Instr::STAM;
+  case Token::LDAC: return hex::Instr::LDAC;
+  case Token::LDBC: return hex::Instr::LDBC;
+  case Token::LDAP: return hex::Instr::LDAP;
+  case Token::LDAI: return hex::Instr::LDAI;
+  case Token::LDBI: return hex::Instr::LDBI;
+  case Token::STAI: return hex::Instr::STAI;
+  case Token::BR:   return hex::Instr::BR;
+  case Token::BRZ:  return hex::Instr::BRZ;
+  case Token::BRN:  return hex::Instr::BRN;
+  case Token::OPR:  return hex::Instr::OPR;
   default:
     throw std::runtime_error(std::string("unexpected instrucion token: ")+tokenEnumStr(token));
   }
 }
 
-static OprInstr tokenToOprInstr(Token token) {
+static hex::OprInstr tokenToOprInstr(Token token) {
   switch (token) {
-  case Token::BRB: return OprInstr::BRB;
-  case Token::SVC: return OprInstr::SVC;
-  case Token::ADD: return OprInstr::ADD;
-  case Token::SUB: return OprInstr::SUB;
+  case Token::BRB: return hex::OprInstr::BRB;
+  case Token::SVC: return hex::OprInstr::SVC;
+  case Token::ADD: return hex::OprInstr::ADD;
+  case Token::SUB: return hex::OprInstr::SUB;
   default:
     throw std::runtime_error(std::string("unexpected operand instrucion token: ")+tokenEnumStr(token));
   }
 }
 
-static int instrToInstrOpc(Instr instr) {
+static int instrToInstrOpc(hex::Instr instr) {
   return static_cast<int>(instr);
 }
 
@@ -603,7 +603,7 @@ static void emitProgramBin(std::vector<std::unique_ptr<Directive>> &program,
     // Instruction
     } else if (size > 0) {
       if (size > 1) {
-        Instr instr = (directive->getValue() < 0) ? Instr::NFIX : Instr::PFIX;
+        hex::Instr instr = (directive->getValue() < 0) ? hex::Instr::NFIX : hex::Instr::PFIX;
         // Output PFIX/NFIX to extend the immediate value.
         for (size_t i=size-1; i>0; i--) {
           char instrValue = instrToInstrOpc(instr) << 4 |

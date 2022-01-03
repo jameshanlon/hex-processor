@@ -34,7 +34,7 @@ class Processor {
 
   // State for tracing.
   uint64_t cycles;
-  Instr instrEnum;
+  hex::Instr instrEnum;
 
 public:
 
@@ -70,76 +70,76 @@ public:
 
   void traceSyscall() {
     unsigned spWordIndex = memory[1] >> 2;
-    switch (static_cast<Syscall>(areg)) {
-      case Syscall::EXIT:
+    switch (static_cast<hex::Syscall>(areg)) {
+      case hex::Syscall::EXIT:
         std::cout << "exit\n";
         break;
-      case Syscall::WRITE:
+      case hex::Syscall::WRITE:
         std::cout << boost::format("write %d to simin(%d))\n") % memory[spWordIndex+2] % memory[spWordIndex+3];
         break;
-      case Syscall::READ:
+      case hex::Syscall::READ:
         std::cout << boost::format("read to mem[%08x]\n") % (spWordIndex+1);
         break;
     }
   }
 
-  void trace(uint32_t instr, Instr instrEnum) {
+  void trace(uint32_t instr, hex::Instr instrEnum) {
     std::cout << boost::format("%-6d %-6s %-4d") % pc % instrEnumToStr(instrEnum) % (instr & 0xF);
     switch (instrEnum) {
-      case Instr::LDAM:
+      case hex::Instr::LDAM:
         std::cout << boost::format("areg = mem[oreg (%#08x)] (%d)\n") % oreg % memory[oreg];
         break;
-      case Instr::LDBM:
+      case hex::Instr::LDBM:
         std::cout << boost::format("breg = mem[oreg (%#08x)] (%d)\n") % oreg % memory[oreg];
         break;
-      case Instr::STAM:
+      case hex::Instr::STAM:
         std::cout << boost::format("mem[oreg (%#08x)] = areg %d\n") % oreg % areg;
         break;
-      case Instr::LDAC:
+      case hex::Instr::LDAC:
         std::cout << boost::format("areg = oreg %d\n") % oreg;
         break;
-      case Instr::LDBC:
+      case hex::Instr::LDBC:
         std::cout << boost::format("breg = oreg %d\n") % oreg;
         break;
-      case Instr::LDAP:
+      case hex::Instr::LDAP:
         std::cout << boost::format("areg = pc (%d) + oreg (%d) %d\n") % pc % oreg % (pc + (oreg<<2));
         break;
-      case Instr::LDAI:
+      case hex::Instr::LDAI:
         std::cout << boost::format("areg = mem[areg (%d) + oreg (%d) = %#08x] (%d)\n") % areg % oreg % (((areg>>2)+oreg)<<2) % memory[(areg>>2)+oreg];
         break;
-      case Instr::LDBI:
+      case hex::Instr::LDBI:
         std::cout << boost::format("breg = mem[breg (%d) + oreg (%d) = %#08x] (%d)\n") % breg % oreg % (((breg>>2)+oreg)<<2) % memory[(breg>>2)+oreg];
         break;
-      case Instr::STAI:
+      case hex::Instr::STAI:
         std::cout << boost::format("mem[breg (%d) + oreg (%d) = %#08x] = areg (%d)\n") % breg % oreg % (((breg>>2)+oreg)<<2) % areg;
         break;
-      case Instr::BR:
+      case hex::Instr::BR:
         std::cout << boost::format("pc = pc + oreg (%d) (%#08x)\n") % oreg % (pc + (oreg<<2));
         break;
-      case Instr::BRZ:
+      case hex::Instr::BRZ:
         std::cout << boost::format("pc = areg == zero ? pc + oreg (%d) (%#08x) : pc\n") % oreg % (pc + (oreg<<2));
         break;
-      case Instr::BRN:
+      case hex::Instr::BRN:
         std::cout << boost::format("pc = areg < zero ? pc + oreg (%d) (%#08x) : pc\n") % oreg % (pc + (oreg<<2));
         break;
-      case Instr::PFIX:
+      case hex::Instr::PFIX:
         std::cout << boost::format("oreg = oreg (%d) << 4 (%#08x)\n") % oreg % (oreg << 4);
         break;
-      case Instr::NFIX:
+      case hex::Instr::NFIX:
         std::cout << boost::format("oreg = 0xFFFFFF00 | oreg (%d) << 4 (%#08x)\n") % oreg % (0xFFFFFF00 | (oreg << 4));
         break;
-      case Instr::OPR:
-        switch (static_cast<OprInstr>(oreg)) {
-          case OprInstr::BRB:
+      case hex::Instr::OPR:
+        switch (static_cast<hex::OprInstr>(oreg)) {
+          case hex::OprInstr::BRB:
             std::cout << boost::format("pc = breg (%#08x)\n") % breg;
             break;
-          case OprInstr::ADD:
+          case hex::OprInstr::ADD:
            std::cout << boost::format("areg = areg (%d) + breg (%d) (%d)\n") % areg % breg % (areg + breg);
             break;
-          case OprInstr::SUB:
+          case hex::OprInstr::SUB:
            std::cout << boost::format("areg = areg (%d) - breg (%d) (%d)\n") % areg % breg % (areg - breg);
             break;
-          case OprInstr::SVC:
+          case hex::OprInstr::SVC:
             traceSyscall();
             break;
         };
@@ -149,15 +149,15 @@ public:
 
   void syscall() {
     unsigned spWordIndex = memory[1] >> 2;
-    switch (static_cast<Syscall>(areg)) {
-      case Syscall::EXIT:
+    switch (static_cast<hex::Syscall>(areg)) {
+      case hex::Syscall::EXIT:
         running = false;
         break;
-      case Syscall::WRITE:
-        output(fileIO, memory[spWordIndex+2], memory[spWordIndex+3]);
+      case hex::Syscall::WRITE:
+        hex::output(fileIO, memory[spWordIndex+2], memory[spWordIndex+3]);
         break;
-      case Syscall::READ:
-        memory[spWordIndex+1] = input(fileIO, memory[spWordIndex+2]);
+      case hex::Syscall::READ:
+        memory[spWordIndex+1] = hex::input(fileIO, memory[spWordIndex+2]);
         break;
       default:
         throw std::runtime_error("invalid syscall: " + std::to_string(areg));
@@ -169,84 +169,84 @@ public:
       instr = (memory[pc >> 2] >> ((pc & 0x3) << 3)) & 0xFF;
       pc = pc + 1;
       oreg = oreg | (instr & 0xF);
-      instrEnum = static_cast<Instr>((instr >> 4) & 0xF);
+      instrEnum = static_cast<hex::Instr>((instr >> 4) & 0xF);
       if (tracing) {
         trace(instr, instrEnum);
       }
       switch (instrEnum) {
-        case Instr::LDAM:
+        case hex::Instr::LDAM:
           areg = memory[oreg];
           oreg = 0;
           break;
-        case Instr::LDBM:
+        case hex::Instr::LDBM:
           breg = memory[oreg];
           oreg = 0;
           break;
-        case Instr::STAM:
+        case hex::Instr::STAM:
           memory[oreg] = areg;
           oreg = 0;
           break;
-        case Instr::LDAC:
+        case hex::Instr::LDAC:
           areg = oreg;
           oreg = 0;
           break;
-        case Instr::LDBC:
+        case hex::Instr::LDBC:
           breg = oreg;
           oreg = 0;
           break;
-        case Instr::LDAP:
+        case hex::Instr::LDAP:
           areg = pc + oreg;
           oreg = 0;
           break;
-        case Instr::LDAI:
+        case hex::Instr::LDAI:
           areg = memory[(areg >> 2) + oreg];
           oreg = 0;
           break;
-        case Instr::LDBI:
+        case hex::Instr::LDBI:
           breg = memory[(breg >> 2) + oreg];
           oreg = 0;
           break;
-        case Instr::STAI:
+        case hex::Instr::STAI:
           memory[(breg >> 2) + oreg] = areg;
           oreg = 0;
           break;
-        case Instr::BR:
+        case hex::Instr::BR:
           pc = pc + oreg;
           oreg = 0;
           break;
-        case Instr::BRZ:
+        case hex::Instr::BRZ:
           if (areg == 0) {
             pc = pc + oreg;
           }
           oreg = 0;
           break;
-        case Instr::BRN:
+        case hex::Instr::BRN:
           if ((int)areg < 0) {
             pc = pc + oreg;
           }
           oreg = 0;
           break;
-        case Instr::PFIX:
+        case hex::Instr::PFIX:
           oreg = oreg << 4;
           break;
-        case Instr::NFIX:
+        case hex::Instr::NFIX:
           oreg = 0xFFFFFF00 | (oreg << 4);
           break;
-        case Instr::OPR:
-          switch (static_cast<OprInstr>(oreg)) {
-            case OprInstr::BRB:
+        case hex::Instr::OPR:
+          switch (static_cast<hex::OprInstr>(oreg)) {
+            case hex::OprInstr::BRB:
               pc = breg;
               oreg = 0;
               break;
-            case OprInstr::ADD:
+            case hex::OprInstr::ADD:
               areg = areg + breg;
               oreg = 0;
               break;
-            case OprInstr::SUB:
+            case hex::OprInstr::SUB:
               areg = areg - breg;
               oreg = 0;
               break;
-            case OprInstr::SVC:
+            case hex::OprInstr::SVC:
               syscall();
               break;
             default:
@@ -283,7 +283,7 @@ int main(int argc, const char *argv[]) {
           std::strcmp(argv[i], "--dump") == 0) {
         dumpBinary = true;
       } else if (std::strcmp(argv[i], "-t") == 0 ||
-          std::strcmp(argv[i], "--trace") == 0) {
+                 std::strcmp(argv[i], "--trace") == 0) {
         trace = true;
       } else if (std::strcmp(argv[i], "-h") == 0 ||
                  std::strcmp(argv[i], "--help") == 0) {

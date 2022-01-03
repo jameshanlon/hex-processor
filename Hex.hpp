@@ -1,6 +1,8 @@
 #ifndef HEX_HPP
 #define HEX_HPP
 
+namespace hex {
+
 enum Instr {
   LDAM = 0,
   LDBM,
@@ -71,6 +73,8 @@ const char *syscallEnumToStr(Syscall syscall) {
     default:             return "UNKNOWN";
   }
 }
+
+}; // End namespace hex.
 
 #endif // HEX_HPP
 
