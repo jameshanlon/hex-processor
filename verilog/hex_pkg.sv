@@ -15,7 +15,7 @@ package hex_pkg;
   typedef logic [MEM_ADDR_WIDTH-1:0]  iaddr_t; // Byte/instruction address
   typedef logic [MEM_ADDR_WIDTH-1:2]  waddr_t; // Word address
   typedef logic [MEM_WIDTH-1:0]       data_t;
-  typedef logic [INSTR_OPR_WIDTH-1:0] opr_t;
+  typedef logic [INSTR_OPR_WIDTH-1:0] operand_t;
 
   typedef enum logic [INSTR_OPC_WIDTH-1:0] {
     LDAM = 0,
@@ -33,14 +33,14 @@ package hex_pkg;
     OPR,
     PFIX,
     NFIX
-  } opc_t;
+  } opcode_t;
 
   typedef enum logic [INSTR_OPR_WIDTH-1:0] {
     ADD = 0,
     SUB,
     BRB,
     SVC
-  } opr_opc_t;
+  } opr_opcode_t;
 
   typedef enum logic [SYSCALL_OPC_WIDTH-1:0] {
     EXIT = 0,
@@ -49,8 +49,8 @@ package hex_pkg;
   } syscall_t;
 
   typedef struct packed {
-    opr_t opc;
-    opc_t opr;
+    opcode_t  opcode;
+    operand_t operand;
   } instr_t;
 
 endpackage

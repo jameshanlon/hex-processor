@@ -403,10 +403,12 @@ public:
 class InstrLabel : public Directive {
   std::string label;
   int labelValue;
+  bool relative;
 public:
-  InstrLabel(Token token, std::string label) : Directive(token), label(label) {}
+  InstrLabel(Token token, std::string label, bool relative) : Directive(token), label(label), relative(relative) {}
   void setLabelValue(int newValue) { labelValue = newValue; }
   bool operandIsLabel() const { return true; }
+  bool isRelative() const { return relative; }
   size_t getSize() const {
     return (labelValue < 0 && numNibbles(labelValue) == 1) ? 2 : numNibbles(labelValue);
   }
@@ -485,19 +487,26 @@ class Parser {
       case Token::LDBM:
       case Token::STAM:
       case Token::LDAC:
-      case Token::LDBC:
+      case Token::LDBC: {
+        auto opcode = lexer.getLastToken();
+        if (lexer.getNextToken() == Token::IDENTIFIER) {
+          return std::make_unique<InstrLabel>(opcode, lexer.getIdentifier(), false);
+        } else {
+          return std::make_unique<InstrImm>(opcode, parseInteger());
+        }
+      }
+      case Token::LDAP:
       case Token::LDAI:
       case Token::LDBI:
       case Token::STAI:
-      case Token::LDAP:
-      case Token::BRN:
       case Token::BR:
+      case Token::BRN:
       case Token::BRZ: {
         auto opcode = lexer.getLastToken();
         if (lexer.getNextToken() == Token::IDENTIFIER) {
-          return std::make_unique<InstrLabel>(opcode, lexer.getIdentifier());
+          return std::make_unique<InstrLabel>(opcode, lexer.getIdentifier(), true);
         } else {
-          return std::make_unique<InstrImm>(opcode, parseInteger());
+          return std::make_unique<InstrImm>(opcode, parseInteger());\
         }
       }
       default:
@@ -551,16 +560,22 @@ static void resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
       if (directive->getToken() == Token::IDENTIFIER) {
         dynamic_cast<Label*>(directive.get())->setLabelValue(byteOffset);
       }
-      // Update the label operand value of an instruction.
+      // Update the label operand value of an instruction, accounting for
+      // relative and absolute references.
       if (directive->operandIsLabel()) {
         auto instrLabel = dynamic_cast<InstrLabel*>(directive.get());
         int labelValue = labelMap[instrLabel->getLabel()]->getValue();
-        int offset = labelValue - byteOffset;
-        //std::cout << "label value " << labelValue << " byteOffset " << byteOffset << " instrlen " << instrLen(labelValue, byteOffset) << "\n";
-        if (offset >= 0) {
-          instrLabel->setLabelValue(offset - instrLen(labelValue, byteOffset));
+        if (instrLabel->isRelative()) {
+          int offset = labelValue - byteOffset;
+          //std::cout << "label value " << labelValue << " byteOffset " << byteOffset << " instrlen " << instrLen(labelValue, byteOffset) << "\n";
+          if (offset >= 0) {
+            instrLabel->setLabelValue(offset - instrLen(labelValue, byteOffset));
+          } else {
+            instrLabel->setLabelValue(offset - instrLen(labelValue, byteOffset));
+          }
         } else {
-          instrLabel->setLabelValue(offset - instrLen(labelValue, byteOffset));
+          assert((labelValue & 0x3) == 0 && "absolute label value is not word aligned");
+          instrLabel->setLabelValue(labelValue >> 2);
         }
       }
       byteOffset += directive->getSize();

@@ -39,7 +39,7 @@ class Processor {
 public:
 
   Processor() :
-    running(true), tracing(false), cycles(0) {}
+    pc(0), areg(0), breg(0), oreg(0), running(true), tracing(false), cycles(0) {}
 
   void setTracing(bool value) { tracing = value; }
 
@@ -65,17 +65,15 @@ public:
     }
   }
 
-  void dumpBinaryFile() {
-  }
-
   void traceSyscall() {
-    unsigned spWordIndex = memory[1] >> 2;
+    unsigned spWordIndex = memory[1];
+    std::cout << "spWordIndex="<<spWordIndex<<"\n";
     switch (static_cast<hex::Syscall>(areg)) {
       case hex::Syscall::EXIT:
         std::cout << "exit\n";
         break;
       case hex::Syscall::WRITE:
-        std::cout << boost::format("write %d to simin(%d))\n") % memory[spWordIndex+2] % memory[spWordIndex+3];
+        std::cout << boost::format("write %d to simin(%d)\n") % memory[spWordIndex+2] % memory[spWordIndex+3];
         break;
       case hex::Syscall::READ:
         std::cout << boost::format("read to mem[%08x]\n") % (spWordIndex+1);
@@ -102,25 +100,25 @@ public:
         std::cout << boost::format("breg = oreg %d\n") % oreg;
         break;
       case hex::Instr::LDAP:
-        std::cout << boost::format("areg = pc (%d) + oreg (%d) %d\n") % pc % oreg % (pc + (oreg<<2));
+        std::cout << boost::format("areg = pc (%d) + oreg (%d) %d\n") % pc % oreg % (pc + oreg);
         break;
       case hex::Instr::LDAI:
-        std::cout << boost::format("areg = mem[areg (%d) + oreg (%d) = %#08x] (%d)\n") % areg % oreg % (((areg>>2)+oreg)<<2) % memory[(areg>>2)+oreg];
+        std::cout << boost::format("areg = mem[areg (%d) + oreg (%d) = %#08x] (%d)\n") % areg % oreg % (areg+oreg) % memory[areg+oreg];
         break;
       case hex::Instr::LDBI:
-        std::cout << boost::format("breg = mem[breg (%d) + oreg (%d) = %#08x] (%d)\n") % breg % oreg % (((breg>>2)+oreg)<<2) % memory[(breg>>2)+oreg];
+        std::cout << boost::format("breg = mem[breg (%d) + oreg (%d) = %#08x] (%d)\n") % breg % oreg % (breg+oreg) % memory[breg+oreg];
         break;
       case hex::Instr::STAI:
-        std::cout << boost::format("mem[breg (%d) + oreg (%d) = %#08x] = areg (%d)\n") % breg % oreg % (((breg>>2)+oreg)<<2) % areg;
+        std::cout << boost::format("mem[breg (%d) + oreg (%d) = %#08x] = areg (%d)\n") % breg % oreg % (breg+oreg) % areg;
         break;
       case hex::Instr::BR:
-        std::cout << boost::format("pc = pc + oreg (%d) (%#08x)\n") % oreg % (pc + (oreg<<2));
+        std::cout << boost::format("pc = pc + oreg (%d) (%#08x)\n") % oreg % (pc + oreg);
         break;
       case hex::Instr::BRZ:
-        std::cout << boost::format("pc = areg == zero ? pc + oreg (%d) (%#08x) : pc\n") % oreg % (pc + (oreg<<2));
+        std::cout << boost::format("pc = areg == zero ? pc + oreg (%d) (%#08x) : pc\n") % oreg % (pc + oreg);
         break;
       case hex::Instr::BRN:
-        std::cout << boost::format("pc = areg < zero ? pc + oreg (%d) (%#08x) : pc\n") % oreg % (pc + (oreg<<2));
+        std::cout << boost::format("pc = areg < zero ? pc + oreg (%d) (%#08x) : pc\n") % oreg % (pc + oreg);
         break;
       case hex::Instr::PFIX:
         std::cout << boost::format("oreg = oreg (%d) << 4 (%#08x)\n") % oreg % (oreg << 4);
@@ -148,7 +146,7 @@ public:
   }
 
   void syscall() {
-    unsigned spWordIndex = memory[1] >> 2;
+    unsigned spWordIndex = memory[1];
     switch (static_cast<hex::Syscall>(areg)) {
       case hex::Syscall::EXIT:
         running = false;
@@ -199,15 +197,15 @@ public:
           oreg = 0;
           break;
         case hex::Instr::LDAI:
-          areg = memory[(areg >> 2) + oreg];
+          areg = memory[areg + oreg];
           oreg = 0;
           break;
         case hex::Instr::LDBI:
-          breg = memory[(breg >> 2) + oreg];
+          breg = memory[breg + oreg];
           oreg = 0;
           break;
         case hex::Instr::STAI:
-          memory[(breg >> 2) + oreg] = areg;
+          memory[breg + oreg] = areg;
           oreg = 0;
           break;
         case hex::Instr::BR:

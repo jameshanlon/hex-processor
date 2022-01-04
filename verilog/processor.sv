@@ -18,22 +18,22 @@ module processor
   );
 
   // State
-  hex_pkg::iaddr_t pc_q /* verilator public */;
-  hex_pkg::data_t  areg_q;
-  hex_pkg::data_t  breg_q;
-  hex_pkg::data_t  oreg_q;
+  hex_pkg::iaddr_t   pc_q /* verilator public */;
+  hex_pkg::data_t    areg_q;
+  hex_pkg::data_t    breg_q;
+  hex_pkg::data_t    oreg_q;
 
   // Nets
-  hex_pkg::instr_t instr /* verilator public */;
-  logic            instr_svc;
-  hex_pkg::iaddr_t pc_d;
-  hex_pkg::data_t  areg_d;
-  hex_pkg::data_t  breg_d;
-  hex_pkg::data_t  oreg_d;
-  hex_pkg::data_t  opr_d;
-  hex_pkg::iaddr_t opr_iaddr;
-  hex_pkg::opc_t   instr_opc;
-  hex_pkg::opr_t   instr_opr;
+  hex_pkg::instr_t   instr /* verilator public */;
+  logic              instr_svc;
+  hex_pkg::iaddr_t   pc_d;
+  hex_pkg::data_t    areg_d;
+  hex_pkg::data_t    breg_d;
+  hex_pkg::data_t    oreg_d;
+  hex_pkg::data_t    opr_d;
+  hex_pkg::iaddr_t   opr_iaddr;
+  hex_pkg::opcode_t  instr_opc;
+  hex_pkg::operand_t instr_opr;
 
   always_ff @(posedge i_clk or posedge i_rst)
     if (i_rst) begin
@@ -52,17 +52,17 @@ module processor
   assign o_f_valid = 1'b1;
   assign o_f_addr = pc_q;
   assign instr = i_f_data;
-  assign instr_opc = instr.opc;
-  assign instr_opr = instr.opr;
-  assign instr_svc = instr.opc == hex_pkg::OPR && instr.opr == hex_pkg::SVC;
+  assign instr_opc = instr.opcode;
+  assign instr_opr = instr.operand;
+  assign instr_svc = instr.opcode == hex_pkg::OPR && instr.operand == hex_pkg::SVC;
 
   // Current operand (oreg) value.
-  assign opr_d = oreg_q | {28'b0, instr.opr};
+  assign opr_d = oreg_q | {28'b0, instr.operand};
 
   // PC update
   always_comb begin
     pc_d = {pc_q + 18'b1};
-    unique case (instr.opc)
+    unique case (instr.opcode)
       hex_pkg::BR:
         pc_d = {pc_d + signed'(opr_d[hex_pkg::MEM_ADDR_WIDTH-1:0])};
       hex_pkg::BRZ:
@@ -70,14 +70,14 @@ module processor
       hex_pkg::BRN:
         pc_d = (signed'(areg_q) < 0) ? {pc_d + signed'(opr_d[hex_pkg::MEM_ADDR_WIDTH-1:0])} : pc_d;
       hex_pkg::OPR:
-        pc_d = (instr.opr == hex_pkg::BRB) ? breg_q[hex_pkg::MEM_ADDR_WIDTH-1:0] : pc_d;
+        pc_d = (instr.operand == hex_pkg::BRB) ? breg_q[hex_pkg::MEM_ADDR_WIDTH-1:0] : pc_d;
       default:;
     endcase
   end
 
   // oreg update
   always_comb begin
-    unique case (instr.opc)
+    unique case (instr.opcode)
       hex_pkg::PFIX: oreg_d = opr_d << 4;
       hex_pkg::NFIX: oreg_d = 32'hFFFFFF00 | (opr_d << 4);
       default:       oreg_d = 0;
@@ -87,13 +87,13 @@ module processor
   // areg update
   always_comb begin
     areg_d = areg_q;
-    unique case (instr.opc)
+    unique case (instr.opcode)
       hex_pkg::LDAM: areg_d = i_d_data;
       hex_pkg::LDAC: areg_d = opr_d;
       hex_pkg::LDAP: areg_d = {14'b0, pc_d + signed'(opr_d[hex_pkg::MEM_ADDR_WIDTH-1:0])};
       hex_pkg::LDAI: areg_d = i_d_data;
       hex_pkg::OPR:
-        unique case(instr.opr)
+        unique case(instr.operand)
           hex_pkg::ADD: areg_d = {areg_q + breg_q};
           hex_pkg::SUB: areg_d = {areg_q - breg_q};
           default:;
@@ -105,35 +105,35 @@ module processor
   // breg update
   always_comb begin
     breg_d = breg_q;
-    unique case (instr.opc)
-      hex_pkg::LDBM: breg_d = i_d_data;
-      hex_pkg::LDBC: breg_d = opr_d;
+    unique case (instr.opcode)
+      hex_pkg::LDBM,
       hex_pkg::LDBI: breg_d = i_d_data;
+      hex_pkg::LDBC: breg_d = opr_d;
       default:;
     endcase
   end
 
   // Memory valid
-  assign o_d_valid = instr.opc inside {hex_pkg::LDAM, hex_pkg::LDBM, hex_pkg::STAM,
-                                       hex_pkg::LDAI, hex_pkg::LDBI, hex_pkg::STAI};
+  assign o_d_valid = instr.opcode inside {hex_pkg::LDAM, hex_pkg::LDBM, hex_pkg::STAM,
+                                          hex_pkg::LDAI, hex_pkg::LDBI, hex_pkg::STAI};
 
   // Memory write enable
-  assign o_d_we = instr.opc inside {hex_pkg::STAM, hex_pkg::STAI};
+  assign o_d_we = instr.opcode inside {hex_pkg::STAM, hex_pkg::STAI};
 
   // Memory address generation
   always_comb begin
     o_d_addr = '0;
-    unique case (instr.opc)
+    unique case (instr.opcode)
       hex_pkg::LDAM,
       hex_pkg::LDBM,
       hex_pkg::STAM:
         o_d_addr = opr_d[hex_pkg::MEM_ADDR_WIDTH-3:0];
       hex_pkg::LDAI:
-        o_d_addr = {areg_q[hex_pkg::MEM_ADDR_WIDTH-1:2]
+        o_d_addr = {areg_q[hex_pkg::MEM_ADDR_WIDTH-3:0]
                      + signed'(opr_d[hex_pkg::MEM_ADDR_WIDTH-3:0])};
       hex_pkg::LDBI,
       hex_pkg::STAI:
-        o_d_addr = {breg_q[hex_pkg::MEM_ADDR_WIDTH-1:2]
+        o_d_addr = {breg_q[hex_pkg::MEM_ADDR_WIDTH-3:0]
                      + signed'(opr_d[hex_pkg::MEM_ADDR_WIDTH-3:0])};
       default:;
     endcase

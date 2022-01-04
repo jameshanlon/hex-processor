@@ -45,7 +45,7 @@ void load(const char *filename,
 void handleSyscall(hex::Syscall syscall,
                    const std::unique_ptr<Vhex_pkg> &top,
                    bool trace) {
-  unsigned spWordIndex = top->hex->u_memory->memory_q[1] >> 2;
+  unsigned spWordIndex = top->hex->u_memory->memory_q[1];
   switch (syscall) {
     case hex::Syscall::EXIT:
       if (trace) {

@@ -1,6 +1,6 @@
 BR start
 
-DATA 65536 # sp
+DATA 16383 # sp
 
 string
 DATA 104 # h
@@ -34,7 +34,7 @@ putchar
 LDBM 1 # breg <- sp
 STAI 0 # sp[0] <- areg
 # Adjust stack pointer
-LDBC 16 # breg <- 16 (4 stack words)
+LDBC 4 # breg <- 4 stack words
 LDAM 1 # areg <- sp
 OPR SUB # areg <- sp - breg (3)
 STAM 1 # Store sp
@@ -49,7 +49,7 @@ OPR SVC
 # Exit
 # Adjust stack pointer
 LDAM 1 # areg <- sp
-LDBC 16 # breg <- 16 (4 stack words)
+LDBC 4 # breg <- 4 stack words
 OPR ADD # areg <- sp + breg (3)
 STAM 1 # Store sp
 # Restore return address
@@ -60,7 +60,7 @@ OPR BRB
 start
 # h
 LDBM 1 # breg <- sp
-LDAP string # areg = string
+LDAC string # areg = string
 LDAI 0 # areg <- 'h'
 STAI 1 # sp[1] <- areg ('h')
 LDAP returnh
@@ -68,7 +68,7 @@ BR putchar
 returnh
 # e
 LDBM 1 # breg <- sp
-LDAP string # areg = string
+LDAC string # areg = string
 LDAI 1 # areg <- 'e'
 STAI 1 # sp[1] <- areg ('e')
 LDAP returne
@@ -76,7 +76,7 @@ BR putchar
 returne
 # l
 LDBM 1 # breg <- sp
-LDAP string # areg = string
+LDAC string # areg = string
 LDAI 2 # areg <- 'l'
 STAI 1 # sp[1] <- areg ('l')
 LDAP returnl1
@@ -84,7 +84,7 @@ BR putchar
 returnl1
 # l
 LDBM 1 # breg <- sp
-LDAP string # areg = string
+LDAC string # areg = string
 LDAI 3 # areg <- 'l'
 STAI 1 # sp[1] <- areg ('l')
 LDAP returnl2
@@ -92,7 +92,7 @@ BR putchar
 returnl2
 # o
 LDBM 1 # breg <- sp
-LDAP string # areg = string
+LDAC string # areg = string
 LDAI 4 # areg <- 'o'
 STAI 1 # sp[1] <- areg ('o')
 LDAP returno
@@ -100,7 +100,7 @@ BR putchar
 returno
 # \n
 LDBM 1 # breg <- sp
-LDAP string # areg = string
+LDAC string # areg = string
 LDAI 5 # areg <- '\n'
 STAI 1 # sp[1] <- areg ('\n')
 LDAP returnnl
