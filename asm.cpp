@@ -290,18 +290,21 @@ public:
 
 /// Return the number of 4-bit immediates required to represent the value.
 static size_t numNibbles(int value) {
+  bool neg = false;
   if (value == 0) {
     return 1;
   }
   if (value < 0) {
-    value = ~value;
+    value = std::abs(value);
+    neg = true;
   }
   size_t n = 1;
   while (value >= 16) {
     value >>= 4;
     n++;
   }
-  return n;
+  // Account for NFIX required for any negative number.
+  return neg && (n == 1) ? 2 : n;
 }
 
 /// Return the length of an instruction that has a relative label reference.
@@ -567,7 +570,10 @@ static void resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
         int labelValue = labelMap[instrLabel->getLabel()]->getValue();
         if (instrLabel->isRelative()) {
           int offset = labelValue - byteOffset;
-          //std::cout << "label value " << labelValue << " byteOffset " << byteOffset << " instrlen " << instrLen(labelValue, byteOffset) << "\n";
+          //std::cout << "label value " << labelValue
+          //          << " byteOffset " << byteOffset
+          //          << " offset " << offset
+          //          << " instrlen " << instrLen(labelValue, byteOffset) << "\n";
           if (offset >= 0) {
             instrLabel->setLabelValue(offset - instrLen(labelValue, byteOffset));
           } else {
@@ -618,10 +624,16 @@ static void emitProgramBin(std::vector<std::unique_ptr<Directive>> &program,
     // Instruction
     } else if (size > 0) {
       if (size > 1) {
-        hex::Instr instr = (directive->getValue() < 0) ? hex::Instr::NFIX : hex::Instr::PFIX;
         // Output PFIX/NFIX to extend the immediate value.
-        for (size_t i=size-1; i>0; i--) {
-          char instrValue = instrToInstrOpc(instr) << 4 |
+        hex::Instr instr = (directive->getValue() < 0) ? hex::Instr::NFIX : hex::Instr::PFIX;
+        char instrValue = instrToInstrOpc(instr) << 4 |
+                          ((directive->getValue() >> ((size - 1) * 4)) & 0xF);
+        outputFile.put(instrValue);
+        byteOffset++;
+      }
+      if (size > 2) {
+        for (size_t i=size-2; i>0; i--) {
+          char instrValue = instrToInstrOpc(hex::Instr::PFIX) << 4 |
                             ((directive->getValue() >> (i * 4)) & 0xF);
           outputFile.put(instrValue);
           byteOffset++;

@@ -25,9 +25,6 @@ class Processor {
   // Memory.
   std::array<uint32_t, MEMORY_SIZE_WORDS> memory;
 
-  // IO
-  std::vector<std::fstream> fileIO;
-
   // Control.
   bool running;
   bool tracing;
@@ -152,10 +149,10 @@ public:
         running = false;
         break;
       case hex::Syscall::WRITE:
-        hex::output(fileIO, memory[spWordIndex+2], memory[spWordIndex+3]);
+        hex::output(memory[spWordIndex+2], memory[spWordIndex+3]);
         break;
       case hex::Syscall::READ:
-        memory[spWordIndex+1] = hex::input(fileIO, memory[spWordIndex+2]);
+        memory[spWordIndex+1] = hex::input(memory[spWordIndex+2]);
         break;
       default:
         throw std::runtime_error("invalid syscall: " + std::to_string(areg));

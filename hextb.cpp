@@ -18,8 +18,6 @@ double sc_time_stamp() { return 0; }
 constexpr size_t RESET_BEGIN = 1;
 constexpr size_t RESET_END = 10;
 
-std::vector<std::fstream> fileIO;
-
 
 void load(const char *filename,
           const std::unique_ptr<Vhex_pkg> &top) {
@@ -58,7 +56,7 @@ void handleSyscall(hex::Syscall syscall,
       if (trace) {
         std::cout << boost::format("output(%c, %d)\n") % value % stream;
       }
-      hex::output(fileIO, value, stream);
+      hex::output(value, stream);
       break;
     }
     case hex::Syscall::READ: {
@@ -66,7 +64,7 @@ void handleSyscall(hex::Syscall syscall,
       if (trace) {
         std::cout << boost::format("input(%d)\n") % stream;
       }
-      top->hex->u_memory->memory_q[spWordIndex+1] = hex::input(fileIO, stream);
+      top->hex->u_memory->memory_q[spWordIndex+1] = hex::input(stream);
       break;
     }
     default:
