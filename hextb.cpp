@@ -30,9 +30,18 @@ void load(const char *filename,
   fileSize = file.tellg();
   file.seekg(0, std::ios::beg);
 
+  // Check the file length matches.
+  unsigned remainingFileSize = static_cast<unsigned>(fileSize) - 4;
+  unsigned programSize;
+  file.read(reinterpret_cast<char*>(&programSize), 4);
+  if (programSize != remainingFileSize) {
+    auto message = boost::format("mismatching program size %d != %d") % programSize % remainingFileSize;
+    throw std::runtime_error(message.str());
+  }
+
   // Read the file contents.
-  std::vector<uint32_t> buffer(fileSize);
-  file.read(reinterpret_cast<char*>(buffer.data()), fileSize);
+  std::vector<uint32_t> buffer(programSize);
+  file.read(reinterpret_cast<char*>(buffer.data()), programSize);
 
   // Write program to DUT memory.
   std::memcpy(top->hex->u_memory->memory_q.data(), buffer.data(), buffer.size());

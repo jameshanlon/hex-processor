@@ -50,13 +50,24 @@ public:
     fileSize = file.tellg();
     file.seekg(0, std::ios::beg);
 
+    // Check the file length matches.
+    unsigned remainingFileSize = static_cast<unsigned>(fileSize) - 4;
+    remainingFileSize = (remainingFileSize + 3U) & ~3U; // Round up to multiple of 4.
+    unsigned programSize;
+    file.read(reinterpret_cast<char*>(&programSize), 4);
+    programSize <<= 2;
+    if (programSize != remainingFileSize) {
+      auto message = boost::format("mismatching program size %d != %d") % programSize % remainingFileSize;
+      throw std::runtime_error(message.str());
+    }
+
     // Read the contents.
-    file.read(reinterpret_cast<char*>(memory.data()), fileSize);
+    file.read(reinterpret_cast<char*>(memory.data()), programSize);
 
     // Print the contents of the binary.
     if (dumpContents) {
-      std::cout << "Read " << std::to_string(fileSize) << " bytes\n";
-      for (size_t i=0; i<(fileSize / 4) + 1; i++) {
+      std::cout << "Read " << std::to_string(programSize) << " bytes\n";
+      for (size_t i=0; i<(programSize / 4) + 1; i++) {
         std::cout << boost::format("%08d %08x\n") % i % memory[i];
       }
     }
@@ -152,7 +163,7 @@ public:
         hex::output(memory[spWordIndex+2], memory[spWordIndex+3]);
         break;
       case hex::Syscall::READ:
-        memory[spWordIndex+1] = hex::input(memory[spWordIndex+2]);
+        memory[spWordIndex+1] = hex::input(memory[spWordIndex+2]) & 0xFF;
         break;
       default:
         throw std::runtime_error("invalid syscall: " + std::to_string(areg));
