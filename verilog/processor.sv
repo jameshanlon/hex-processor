@@ -61,7 +61,7 @@ module processor
 
   // PC update
   always_comb begin
-    pc_d = {pc_q + 18'b1};
+    pc_d = {pc_q + 20'b1};
     unique case (instr.opcode)
       hex_pkg::BR:
         pc_d = {pc_d + signed'(opr_d[hex_pkg::MEM_ADDR_WIDTH-1:0])};
@@ -90,7 +90,7 @@ module processor
     unique case (instr.opcode)
       hex_pkg::LDAM: areg_d = i_d_data;
       hex_pkg::LDAC: areg_d = opr_d;
-      hex_pkg::LDAP: areg_d = {14'b0, pc_d + signed'(opr_d[hex_pkg::MEM_ADDR_WIDTH-1:0])};
+      hex_pkg::LDAP: areg_d = {11'b0, pc_d + signed'(opr_d[hex_pkg::MEM_ADDR_WIDTH-1:0])};
       hex_pkg::LDAI: areg_d = i_d_data;
       hex_pkg::OPR:
         unique case(instr.operand)

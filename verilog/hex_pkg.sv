@@ -1,6 +1,6 @@
 package hex_pkg;
 
-  localparam MEM_ADDR_WIDTH = 18;
+  localparam MEM_ADDR_WIDTH = 21;
   localparam MEM_ADDR_MSB = MEM_ADDR_WIDTH-1;
   localparam MEM_ADDR_WORD_LSB = 2;
   localparam MEM_ADDR_BYTE_LSB = 0;
@@ -18,34 +18,34 @@ package hex_pkg;
   typedef logic [INSTR_OPR_WIDTH-1:0] operand_t;
 
   typedef enum logic [INSTR_OPC_WIDTH-1:0] {
-    LDAM = 0,
-    LDBM,
-    STAM,
-    LDAC,
-    LDBC,
-    LDAP,
-    LDAI,
-    LDBI,
-    STAI,
-    BR,
-    BRZ,
-    BRN,
-    OPR,
-    PFIX,
-    NFIX
+    LDAM = 'h0,
+    LDBM = 'h1,
+    STAM = 'h2,
+    LDAC = 'h3,
+    LDBC = 'h4,
+    LDAP = 'h5,
+    LDAI = 'h6,
+    LDBI = 'h7,
+    STAI = 'h8,
+    BR   = 'h9,
+    BRZ  = 'hA,
+    BRN  = 'hB,
+    OPR  = 'hD,
+    PFIX = 'hE,
+    NFIX = 'hF
   } opcode_t;
 
   typedef enum logic [INSTR_OPR_WIDTH-1:0] {
-    ADD = 0,
-    SUB,
-    BRB,
-    SVC
+    BRB = 0,
+    ADD = 1,
+    SUB = 2,
+    SVC = 3
   } opr_opcode_t;
 
   typedef enum logic [SYSCALL_OPC_WIDTH-1:0] {
-    EXIT = 0,
-    WRITE,
-    READ
+    EXIT  = 0,
+    WRITE = 1,
+    READ  = 2
   } syscall_t;
 
   typedef struct packed {

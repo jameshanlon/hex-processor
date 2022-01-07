@@ -57,12 +57,12 @@ public:
     file.read(reinterpret_cast<char*>(&programSize), 4);
     programSize <<= 2;
     if (programSize != remainingFileSize) {
-      auto message = boost::format("mismatching program size %d != %d") % programSize % remainingFileSize;
-      throw std::runtime_error(message.str());
+      std::cerr << boost::format("Warning: mismatching program size %d != %d\n")
+                     % programSize % remainingFileSize;
     }
 
     // Read the contents.
-    file.read(reinterpret_cast<char*>(memory.data()), programSize);
+    file.read(reinterpret_cast<char*>(memory.data()), remainingFileSize);
 
     // Print the contents of the binary.
     if (dumpContents) {
@@ -81,7 +81,7 @@ public:
         std::cout << "exit\n";
         break;
       case hex::Syscall::WRITE:
-        std::cout << boost::format("write %d to simin(%d)\n") % memory[spWordIndex+2] % memory[spWordIndex+3];
+        std::cout << boost::format("write %d to simout(%d)\n") % memory[spWordIndex+2] % memory[spWordIndex+3];
         break;
       case hex::Syscall::READ:
         std::cout << boost::format("read to mem[%08x]\n") % (spWordIndex+1);

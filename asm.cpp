@@ -327,9 +327,12 @@ static int instrLen(int labelOffset, int byteOffset) {
 // Base class for all directives.
 struct Directive {
   Token token;
-  Directive(Token token) : token(token) {}
+  int byteOffset;
+  Directive(Token token) : token(token), byteOffset(0) {}
   virtual ~Directive() = default;
   Token getToken() const { return token; }
+  void setByteOffset(unsigned value) { byteOffset = value; }
+  unsigned getByteOffset() const { return byteOffset; }
   virtual bool operandIsLabel() const = 0;
   virtual size_t getSize() const = 0;
   virtual int getValue() const = 0;
@@ -545,8 +548,8 @@ createLabelMap(std::vector<std::unique_ptr<Directive>> &program) {
 
 /// Iteratively update label values until the program size does not change.
 /// Return the final size of the program.
-static unsigned resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
-                              std::map<std::string, Label*> &labelMap) {
+static void resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
+                          std::map<std::string, Label*> &labelMap) {
   int lastSize = -1;
   int byteOffset = 0;
   //int count = 0;
@@ -586,23 +589,26 @@ static unsigned resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
           instrLabel->setLabelValue(labelValue >> 2);
         }
       }
+      directive->setByteOffset(byteOffset);
       byteOffset += directive->getSize();
     }
   }
-  return lastSize;
+}
+
+/// Return the size of the program in bytes (after resolveLabels()).
+static size_t getProgramSize(std::vector<std::unique_ptr<Directive>> &program) {
+  return program.back()->getByteOffset() + program.back()->getSize();
 }
 
 /// Emit the program to stdout.
 static void emitProgramText(std::vector<std::unique_ptr<Directive>> &program) {
-  int byteOffset = 0;
   for (auto &directive : program) {
-    // Data at 4-byte alignment.
-    if (directive->getToken() == Token::DATA && (byteOffset & 0x3)) {
-      byteOffset += 4 - (byteOffset & 0x3);
-    }
-    std::cout << boost::format("%#08x %-20s (%d bytes)\n") % byteOffset % directive->toString() % directive->getSize();
-    byteOffset += directive->getSize();
+    std::cout << boost::format("%#08x %-20s (%d bytes)\n")
+                   % directive->getByteOffset()
+                   % directive->toString()
+                   % directive->getSize();
   }
+  std::cout << boost::format("%d bytes\n") % getProgramSize(program);
 }
 
 /// Emit the program in binary.
@@ -741,10 +747,14 @@ int main(int argc, const char *argv[]) {
 
     // Iteratively resolve label values.
     auto labelMap = createLabelMap(program);
-    auto programSize = resolveLabels(program, labelMap);
+    resolveLabels(program, labelMap);
+
+    // Determine the size of the program.
+    auto programSize = getProgramSize(program);
 
     // Add space for padding bytes at the end.
     auto paddingBytes = ((programSize + 3U) & ~3U) - programSize;
+    programSize += paddingBytes;
 
     // Parse and print program only.
     if (treeOnly) {

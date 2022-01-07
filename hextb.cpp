@@ -32,11 +32,13 @@ void load(const char *filename,
 
   // Check the file length matches.
   unsigned remainingFileSize = static_cast<unsigned>(fileSize) - 4;
+  remainingFileSize = (remainingFileSize + 3U) & ~3U; // Round up to multiple of 4.
   unsigned programSize;
   file.read(reinterpret_cast<char*>(&programSize), 4);
+  programSize <<= 2;
   if (programSize != remainingFileSize) {
-    auto message = boost::format("mismatching program size %d != %d") % programSize % remainingFileSize;
-    throw std::runtime_error(message.str());
+    std::cerr << boost::format("Warning: mismatching program size %d != %d\n")
+                   % programSize % remainingFileSize;
   }
 
   // Read the file contents.
@@ -46,7 +48,7 @@ void load(const char *filename,
   // Write program to DUT memory.
   std::memcpy(top->hex->u_memory->memory_q.data(), buffer.data(), buffer.size());
 
-  std::cout << "Wrote " << fileSize << " bytes to memory\n";
+  std::cout << "Wrote " << programSize << " bytes to memory\n";
 }
 
 void handleSyscall(hex::Syscall syscall,
@@ -73,7 +75,7 @@ void handleSyscall(hex::Syscall syscall,
       if (trace) {
         std::cout << boost::format("input(%d)\n") % stream;
       }
-      top->hex->u_memory->memory_q[spWordIndex+1] = hex::input(stream);
+      top->hex->u_memory->memory_q[spWordIndex+1] = hex::input(stream) & 0xFF;
       break;
     }
     default:
