@@ -290,21 +290,22 @@ public:
 
 /// Return the number of 4-bit immediates required to represent the value.
 static size_t numNibbles(int value) {
-  bool neg = false;
   if (value == 0) {
     return 1;
   }
+  if (value < 0 && std::abs(value) < 16) {
+    // Account for NFIX required to add leading 1s.
+    return 2;
+  }
   if (value < 0) {
     value = std::abs(value);
-    neg = true;
   }
   size_t n = 1;
   while (value >= 16) {
     value >>= 4;
     n++;
   }
-  // Account for NFIX required for any negative number.
-  return neg && (n == 1) ? 2 : n;
+  return n;
 }
 
 /// Return the length of an instruction that has a relative label reference.
