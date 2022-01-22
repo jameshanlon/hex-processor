@@ -48,7 +48,11 @@ target_link_libraries(sim ${Boost_LIBRARIES})
 add_executable(asm asm.cpp)
 target_link_libraries(asm ${Boost_LIBRARIES})
 
-install(TARGETS asm sim
+# Compiler
+add_executable(cmp cmp.cpp)
+target_link_libraries(cmp ${Boost_LIBRARIES})
+
+install(TARGETS asm cmp sim
         DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # Verilator
