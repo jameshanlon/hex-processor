@@ -11,6 +11,12 @@
 
 #include "Hex.hpp"
 
+// A compiler for the X language, based on xhexb.x and with inspiration from
+// the LLVM Kaleidoscope tutorial.
+//   http://people.cs.bris.ac.uk/~dave/xarmdoc.pdf
+//   https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl02.html
+
+
 //===---------------------------------------------------------------------===//
 // Lexer
 //===---------------------------------------------------------------------===//
@@ -78,7 +84,7 @@ static const char *tokenEnumStr(Token token) {
   case Token::SKIP:        return "skip";
   case Token::BEGIN:       return "begin";
   case Token::END:         return "end";
-  case Token::SEMICOLON:   return ":";
+  case Token::SEMICOLON:   return ";";
   case Token::COMMA:       return ",";
   case Token::VAR:         return "var";
   case Token::ARRAY:       return "array";
@@ -89,6 +95,7 @@ static const char *tokenEnumStr(Token token) {
   case Token::NOT:         return "not";
   case Token::NEG:         return "-";
   case Token::VAL:         return "val";
+  case Token::STRING:      return "string";
   case Token::TRUE:        return "true";
   case Token::FALSE:       return "false";
   case Token::RETURN:      return "return";
@@ -107,6 +114,24 @@ static const char *tokenEnumStr(Token token) {
     throw std::runtime_error(std::string("unexpected token: ")+std::to_string(static_cast<int>(token)));
   }
 };
+
+bool isBinaryOp(Token token) {
+  switch (token) {
+  case Token::PLUS:
+  case Token::MINUS:
+  case Token::OR:
+  case Token::AND:
+  case Token::EQ:
+  case Token::NE:
+  case Token::LS:
+  case Token::LE:
+  case Token::GR:
+  case Token::GE:
+    return true;
+  default:
+    return false;
+  }
+}
 
 class Table {
   std::map<std::string, Token> table;
@@ -187,37 +212,33 @@ class Lexer {
     value = std::strtoul(number.c_str(), nullptr, 16);
   }
 
-  int readCharConst() {
-    readChar();
-    int value;
+  char readCharConst() {
+    char ch;
     if (lastChar == '\\') {
+      // Handle escape characters.
       readChar();
       switch (lastChar) {
-      case '\\': value = '\\'; break;
-      case '\'': value = '\''; break;
-      case '"':  value = '"';  break;
-      case 't':  value = '\t'; break;
-      case 'r':  value = '\r'; break;
-      case 'n':  value = '\n'; break;
-      default: throw std::runtime_error("bad character constant");
+      case '\\': ch = '\\'; break;
+      case '\'': ch = '\''; break;
+      case '"':  ch = '"';  break;
+      case 't':  ch = '\t'; break;
+      case 'r':  ch = '\r'; break;
+      case 'n':  ch = '\n'; break;
+      default:
+          throw std::runtime_error("bad character constant");
       }
     } else {
-      value = static_cast<int>(lastChar);
+      ch = lastChar;
     }
     readChar();
-    if (lastChar != '\'') {
-      throw std::runtime_error("expected ' after char constant");
-    }
-    return value;
+    return ch;
   }
 
   void readString() {
     string.clear();
-    do {
+    while (lastChar != '"' && lastChar != EOF) {
       string += readCharConst();
     }
-    while (lastChar != '"' && lastChar != EOF);
-    readChar();
   }
 
   Token readToken() {
@@ -301,6 +322,7 @@ class Lexer {
       }
       break;
     case '\'':
+      readChar();
       value = readCharConst();
       token = Token::NUMBER;
       if (lastChar != '\'') {
@@ -308,6 +330,7 @@ class Lexer {
       }
       break;
     case '\"':
+      readChar();
       readString();
       token = Token::STRING;
       if (lastChar != '"') {
@@ -316,7 +339,8 @@ class Lexer {
       break;
     case EOF:
       file.close();
-      token = Token::END_OF_FILE; break;
+      token = Token::END_OF_FILE;
+      break;
     default:
       throw std::runtime_error("unexpected character");
     }
@@ -343,110 +367,485 @@ public:
   }
 
   const std::string &getIdentifier() const { return identifier; }
-  unsigned getNumber() const { return value; }
+  int getNumber() const { return value; }
+  const std::string &getString() const { return string; }
   Token getLastToken() const { return lastToken; }
   size_t getLineNumber() const { return currentLineNumber; }
   const std::string &getLine() const { return currentLine; }
 };
 
 //===---------------------------------------------------------------------===//
+// AST
+//===---------------------------------------------------------------------===//
+
+// Concrete AstNode forward references.
+class Proc;
+class Program;
+class ArrayDecl;
+class ValDecl;
+class VarDecl;
+class BinaryOp;
+class UnaryOp;
+class String;
+class Boolean;
+class Number;
+class Call;
+class ArraySubscript;
+class VarRef;
+
+/// A visitor base class for the AST.
+struct AstVisitor {
+  virtual void visit(Program&) = 0;
+  virtual void visit(Proc&) = 0;
+  virtual void visit(ArrayDecl&) = 0;
+  virtual void visit(VarDecl&) = 0;
+  virtual void visit(ValDecl&) = 0;
+  virtual void visit(BinaryOp&) = 0;
+  virtual void visit(UnaryOp&) = 0;
+  virtual void visit(String&) = 0;
+  virtual void visit(Boolean&) = 0;
+  virtual void visit(Number&) = 0;
+  virtual void visit(Call&) = 0;
+  virtual void visit(ArraySubscript&) = 0;
+  virtual void visit(VarRef&) = 0;
+};
+
+/// AST node base class.
+class AstNode {
+public:
+  virtual ~AstNode() = default;
+  virtual void accept(AstVisitor* visitor) = 0;
+};
+
+// Expressions ============================================================= //
+
+class Expr : public AstNode {
+public:
+  Expr() {}
+};
+
+class VarRef : public Expr {
+  std::string name;
+  std::unique_ptr<Expr> expr;
+public:
+  VarRef(std::string name) : name(name) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visit(*this);
+  }
+};
+
+class ArraySubscript : public Expr {
+  std::string name;
+  std::unique_ptr<Expr> expr;
+public:
+  ArraySubscript(std::string name, std::unique_ptr<Expr> expr) :
+      name(name), expr(std::move(expr)) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visit(*this);
+    expr->accept(visitor);
+  }
+};
+
+class Call : public Expr {
+  std::string name;
+  std::vector<std::unique_ptr<Expr>> args;
+public:
+  Call(std::string name) : name(name) {}
+  Call(std::string name, std::vector<std::unique_ptr<Expr>> args) :
+      name(name), args(std::move(args)) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visit(*this);
+    for (auto &arg : args) {
+      arg->accept(visitor);
+    }
+  }
+};
+
+class Number : public Expr {
+  unsigned value;
+public:
+  Number(unsigned value) : value(value) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visit(*this);
+  }
+  unsigned getValue() const { return value; }
+};
+
+class Boolean : public Expr {
+  bool value;
+public:
+  Boolean(bool value) : value(value) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visit(*this);
+  }
+  bool getValue() const { return value; }
+};
+
+class String : public Expr {
+  std::string value;
+public:
+  String(std::string value) : value(value) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visit(*this);
+  }
+  std::string getValue() const { return value; }
+};
+
+class UnaryOp : public Expr {
+  Token op;
+  std::unique_ptr<Expr> element;
+public:
+  UnaryOp(Token op, std::unique_ptr<Expr> element) :
+      op(op), element(std::move(element)) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visit(*this);
+    element->accept(visitor);
+  }
+  Token getOp() const { return op; }
+};
+
+class BinaryOp : public Expr {
+  Token op;
+  std::unique_ptr<Expr> LHS, RHS;
+public:
+  BinaryOp(Token op, std::unique_ptr<Expr> LHS, std::unique_ptr<Expr> RHS) :
+      op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visit(*this);
+    LHS->accept(visitor);
+    RHS->accept(visitor);
+  }
+  Token getOp() const { return op; }
+};
+
+// Declarations ============================================================ //
+
+class Decl : public AstNode {
+  std::string name;
+public:
+  Decl(std::string name) : name(name) {}
+  std::string getName() const { return name; }
+};
+
+class ValDecl : public Decl {
+  std::unique_ptr<Expr> expr;
+public:
+  ValDecl(std::string name, std::unique_ptr<Expr> expr) :
+      Decl(name), expr(std::move(expr)) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visit(*this);
+    expr->accept(visitor);
+  }
+};
+
+class VarDecl : public Decl {
+public:
+  VarDecl(std::string name) : Decl(name) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visit(*this);
+  }
+};
+
+class ArrayDecl : public Decl {
+  std::unique_ptr<Expr> expr;
+public:
+  ArrayDecl(std::string name, std::unique_ptr<Expr> expr) :
+      Decl(name), expr(std::move(expr)) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visit(*this);
+    expr->accept(visitor);
+  }
+};
+
+// Procedures and functions ================================================ //
+
+class Proc : public AstNode {
+  std::string name;
+public:
+  Proc() {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visit(*this);
+  }
+  std::string getName() const { return name; }
+};
+
+class Program : public AstNode {
+  std::vector<std::unique_ptr<Decl>> globals;
+  std::vector<std::unique_ptr<Proc>> procs;
+
+public:
+  void addGlobalDecl(std::unique_ptr<Decl> decl) {
+    globals.push_back(std::move(decl));
+  }
+  void addProcDecl(std::unique_ptr<Proc> proc) {
+    procs.push_back(std::move(proc));
+  }
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visit(*this);
+    for (auto &decl : globals) {
+      decl->accept(visitor);
+    }
+    //for (auto &proc : procs) {
+    //  proc->accept(visitor);
+    //}
+  }
+};
+
+// AST printer visitor ===================================================== //
+
+class AstPrinter : public AstVisitor {
+  std::ostream outs;
+  //unsigned indent;
+public:
+  AstPrinter(std::ostream& outs = std::cout) :
+      outs(outs.rdbuf())/*, indent(0)*/ {}
+  virtual void visit(Program &decl) override {
+    outs << "program\n";
+  };
+  virtual void visit(Proc &decl) override {
+    outs << "proc\n";
+  };
+  virtual void visit(ArrayDecl &decl) override {
+    outs << "arraydecl\n";
+  };
+  virtual void visit(VarDecl &decl) override {
+    outs << "vardecl\n";
+  };
+  virtual void visit(ValDecl &decl) override {
+    outs << "valdecl\n";
+  };
+  virtual void visit(BinaryOp &decl) override {
+    outs << "binaryop\n";
+  };
+  virtual void visit(UnaryOp &decl) override {
+    outs << "unaryop\n";
+  };
+  virtual void visit(String &decl) override {
+    outs << "unaryop\n";
+  };
+  virtual void visit(Boolean &decl) override {
+    outs << "boolean\n";
+  };
+  virtual void visit(Number &decl) override {
+    outs << "number\n";
+  };
+  virtual void visit(Call &decl) override {
+    outs << "call\n";
+  };
+  virtual void visit(ArraySubscript &decl) override {
+    outs << "arraysubscript\n";
+  };
+  virtual void visit(VarRef &decl) override {
+    outs << "varref\n";
+  };
+};
+
+
+//===---------------------------------------------------------------------===//
 // Parser
 //===---------------------------------------------------------------------===//
 
-//class Parser {
-//  Lexer &lexer;
-//
-//  void expectLast(Token token) const {
-//    if (token != lexer.getLastToken()) {
-//      throw std::runtime_error(std::string("expected ")+tokenEnumStr(token));
-//    }
-//  }
-//
-//  void expectNext(Token token) const {
-//    lexer.getNextToken();
-//    expectLast(token);
-//  }
-//
-//  int parseInteger() {
-//    if (lexer.getLastToken() == Token::MINUS) {
-//       expectNext(Token::NUMBER);
-//       return -lexer.getNumber();
-//    }
-//    expectLast(Token::NUMBER);
-//    return lexer.getNumber();
-//  }
-//
-//  std::string parseIdentifier() {
-//    lexer.getNextToken();
-//    return lexer.getIdentifier();
-//  }
-//
-//  std::unique_ptr<Directive> parseDirective() {
-//    switch (lexer.getLastToken()) {
-//      case Token::DATA:
-//        lexer.getNextToken();
-//        return std::make_unique<Data>(Token::DATA, parseInteger());
-//      case Token::FUNC:
-//        return std::make_unique<Func>(Token::FUNC, parseIdentifier());
-//      case Token::PROC:
-//        return std::make_unique<Proc>(Token::PROC, parseIdentifier());
-//      case Token::IDENTIFIER:
-//        return std::make_unique<Label>(Token::IDENTIFIER, lexer.getIdentifier());
-//      case Token::OPR:
-//        return std::make_unique<InstrOp>(Token::OPR, lexer.getNextToken());
-//      case Token::LDAM:
-//      case Token::LDBM:
-//      case Token::STAM:
-//      case Token::LDAC:
-//      case Token::LDBC: {
-//        auto opcode = lexer.getLastToken();
-//        if (lexer.getNextToken() == Token::IDENTIFIER) {
-//          return std::make_unique<InstrLabel>(opcode, lexer.getIdentifier(), false);
-//        } else {
-//          return std::make_unique<InstrImm>(opcode, parseInteger());
-//        }
-//      }
-//      case Token::LDAP:
-//      case Token::LDAI:
-//      case Token::LDBI:
-//      case Token::STAI:
-//      case Token::BR:
-//      case Token::BRN:
-//      case Token::BRZ: {
-//        auto opcode = lexer.getLastToken();
-//        if (lexer.getNextToken() == Token::IDENTIFIER) {
-//          return std::make_unique<InstrLabel>(opcode, lexer.getIdentifier(), true);
-//        } else {
-//          return std::make_unique<InstrImm>(opcode, parseInteger());\
-//        }
-//      }
-//      default:
-//        throw std::runtime_error(std::string("unrecognised token ")+tokenEnumStr(lexer.getLastToken()));
-//    }
-//  }
-//
-//public:
-//  Parser(Lexer &lexer) : lexer(lexer) {}
-//
-//  std::vector<std::unique_ptr<Directive>> parseProgram() {
-//    std::vector<std::unique_ptr<Directive>> program;
-//    while (lexer.getNextToken() != Token::END_OF_FILE) {
-//      program.push_back(parseDirective());
-//    }
-//    return program;
-//  }
-//};
+class Parser {
+  Lexer &lexer;
 
-///// Emit the program to stdout.
-//static void emitProgramText(std::vector<std::unique_ptr<Directive>> &program) {
-//  for (auto &directive : program) {
-//    std::cout << boost::format("%#08x %-20s (%d bytes)\n")
-//                   % directive->getByteOffset()
-//                   % directive->toString()
-//                   % directive->getSize();
-//  }
-//  std::cout << boost::format("%d bytes\n") % getProgramSize(program);
-//}
+  /// Expect the given last token, otherwise raise an error.
+  void expectLast(Token token) const {
+    if (token != lexer.getLastToken()) {
+      throw std::runtime_error(std::string("expected ")+tokenEnumStr(token));
+    }
+  }
+
+  /// Expect the given next token.
+  void expectNext(Token token) const {
+    //lexer.getNextToken();
+    expectLast(token);
+  }
+
+  int parseInteger() {
+    if (lexer.getLastToken() == Token::MINUS) {
+       expectNext(Token::NUMBER);
+       return -lexer.getNumber();
+    }
+    expectLast(Token::NUMBER);
+    return lexer.getNumber();
+  }
+
+  /// identifier
+  std::string parseIdentifier() {
+    if (lexer.getLastToken() == Token::IDENTIFIER) {
+      lexer.getNextToken();
+      return lexer.getIdentifier();
+    } else {
+      throw std::runtime_error("name expected");
+    }
+  }
+
+  /// Associative operators can be chained (eg a + b + c + d).
+  bool isAssociative(Token op) const {
+    return op == Token::AND ||
+           op == Token::OR ||
+           op == Token::PLUS;
+  }
+
+  /// There is no operator associativity, so chains of associative operators
+  /// are allowed, but otherwise binary expressions must be explicity bracketed.
+  /// binary-op-RHS :=
+  ///   <binary-op> <element> <binary-op>
+  ///   <element>
+  std::unique_ptr<Expr> parseBinOpRHS(Token op) {
+    auto element = parseElement();
+    if (isAssociative(op) && op == lexer.getLastToken()) {
+      auto RHS = parseBinOpRHS(op);
+      return std::make_unique<BinaryOp>(op, std::move(element), std::move(RHS));
+    } else {
+      return element;
+    }
+  }
+
+  /// expression :=
+  ///   "-" <element>
+  ///   "~" <element>
+  ///   <element> <binary-op-RHS>
+  ///   <element>
+  std::unique_ptr<Expr> parseExpr() {
+    // Unary operations.
+    if (lexer.getLastToken() == Token::MINUS) {
+      auto element = parseElement();
+      return std::make_unique<UnaryOp>(Token::MINUS, std::move(element));
+    }
+    if (lexer.getLastToken() == Token::NOT) {
+      auto element = parseElement();
+      return std::make_unique<UnaryOp>(Token::NOT, std::move(element));
+    }
+    auto element = parseElement();
+    if (isBinaryOp(lexer.getLastToken())) {
+      // Binary operation.
+      auto op = lexer.getLastToken();
+      auto RHS = parseBinOpRHS(op);
+      return std::make_unique<BinaryOp>(op, std::move(element), std::move(RHS));
+    }
+    // Otherwise just return an element.
+    return element;
+  }
+
+  /// expression-list :=
+  ///   <expr> [ "," <expr> ]
+  std::vector<std::unique_ptr<Expr>> parseExprList() {
+    std::vector<std::unique_ptr<Expr>> exprList;
+    do {
+      exprList.push_back(parseExpr());
+    } while (lexer.getLastToken() == Token::COMMA);
+    return exprList;
+  }
+
+  /// element :=
+  ///   <identifier>
+  ///   <identifier> "[" <expr> "]"
+  ///   <identifier> "(" <expr-list> ")"
+  ///   <number>
+  ///   <string>
+  ///   "true"
+  ///   "false"
+  ///   "(" <expr> ")"
+  std::unique_ptr<Expr> parseElement() {
+    switch (lexer.getLastToken()) {
+    case Token::IDENTIFIER: {
+      auto name = parseIdentifier();
+      // Array subscript.
+      if (lexer.getLastToken() == Token::LBRACKET) {
+        lexer.getNextToken();
+        auto expr = parseExpr();
+        expectNext(Token::RBRACKET);
+        return std::make_unique<ArraySubscript>(name, std::move(expr));
+      // Procedure call.
+      } else if (lexer.getLastToken() == Token::LPAREN) {
+        if (lexer.getNextToken() == Token::RPAREN) {
+          return std::make_unique<Call>(name);
+        } else {
+          auto exprList = parseExprList();
+          expectNext(Token::RPAREN);
+          return std::make_unique<Call>(name, std::move(exprList));
+        }
+      // Variable reference.
+      } else {
+        return std::make_unique<VarRef>(name);
+      }
+    }
+    case Token::NUMBER:
+      return std::make_unique<Number>(lexer.getNumber());
+    case Token::STRING:
+      return std::make_unique<String>(lexer.getString());
+    case Token::TRUE:
+      return std::make_unique<Boolean>(true);
+    case Token::FALSE:
+      return std::make_unique<Boolean>(false);
+    case Token::LPAREN: {
+      lexer.getNextToken();
+      auto expr = parseExpr();
+      expectNext(Token::RPAREN);
+      return expr;
+    }
+    default:
+      throw std::runtime_error("in expression");
+    }
+  }
+
+  /// declaration :=
+  ///   "val" <identifier> "=" <expr> ";"
+  ///   "var" <identifier> ";"
+  ///   "array" <identifier> "[" <expr> "]" ";"
+  std::unique_ptr<Decl> parseDecl() {
+    switch (lexer.getLastToken()) {
+    case Token::VAL: {
+      lexer.getNextToken();
+      auto name = parseIdentifier();
+      expectNext(Token::EQ);
+      auto expr = parseExpr();
+      expectNext(Token::SEMICOLON);
+      return std::make_unique<ValDecl>(name, std::move(expr));
+    }
+    case Token::VAR: {
+      lexer.getNextToken();
+      auto name = parseIdentifier();
+      expectNext(Token::SEMICOLON);
+      return std::make_unique<VarDecl>(name);
+    }
+    case Token::ARRAY: {
+      lexer.getNextToken();
+      auto name = parseIdentifier();
+      expectNext(Token::LBRACKET);
+      auto expr = parseExpr();
+      expectNext(Token::RBRACKET);
+      expectNext(Token::SEMICOLON);
+      return std::make_unique<ArrayDecl>(name, std::move(expr));
+    }
+    default:
+      throw std::runtime_error("invalid declaration");
+    }
+  }
+
+  std::unique_ptr<Proc> parseProcDecl() {
+    return std::make_unique<Proc>();
+  }
+
+public:
+  Parser(Lexer &lexer) : lexer(lexer) {}
+
+  Program parseProgram() {
+    Program program;
+    lexer.getNextToken();
+    while (lexer.getLastToken() != Token::END_OF_FILE &&
+           (lexer.getLastToken() == Token::VAL ||
+            lexer.getLastToken() == Token::VAR ||
+            lexer.getLastToken() == Token::ARRAY)) {
+      program.addGlobalDecl(parseDecl());
+    }
+    while (lexer.getNextToken() != Token::END_OF_FILE) {
+      program.addProcDecl(parseProcDecl());
+    }
+    return program;
+  }
+};
 
 //===---------------------------------------------------------------------===//
 // Driver
@@ -466,7 +865,7 @@ static void help(const char *argv[]) {
 
 int main(int argc, const char *argv[]) {
   Lexer lexer;
-  //Parser parser(lexer);
+  Parser parser(lexer);
 
   try {
 
@@ -517,6 +916,9 @@ int main(int argc, const char *argv[]) {
           case Token::NUMBER:
             std::cout << lexer.getNumber() << "\n";
             break;
+          case Token::STRING:
+            std::cout << lexer.getString() << "\n";
+            break;
           case Token::END_OF_FILE:
             std::cout << "EOF\n";
             std::exit(0);
@@ -529,11 +931,12 @@ int main(int argc, const char *argv[]) {
     }
 
     // Parse the program.
-    //auto program = parser.parseProgram();
+    auto ast = parser.parseProgram();
 
     // Parse and print program only.
     if (treeOnly) {
-      //emitProgramText(program);
+      AstPrinter printer;
+      ast.accept(&printer);
       return 0;
     }
 
