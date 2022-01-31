@@ -649,24 +649,19 @@ class Parser {
   Lexer &lexer;
 
   /// Expect the given last token, otherwise raise an error.
-  void expectLast(Token token) const {
+  void expect(Token token) const {
     if (token != lexer.getLastToken()) {
       throw std::runtime_error(std::string("expected ")+tokenEnumStr(token));
     }
   }
 
-  /// Expect the given next token.
-  void expectNext(Token token) const {
-    //lexer.getNextToken();
-    expectLast(token);
-  }
-
   int parseInteger() {
     if (lexer.getLastToken() == Token::MINUS) {
-       expectNext(Token::NUMBER);
+       lexer.getNextToken();
+       expect(Token::NUMBER);
        return -lexer.getNumber();
     }
-    expectLast(Token::NUMBER);
+    expect(Token::NUMBER);
     return lexer.getNumber();
   }
 
@@ -755,7 +750,7 @@ class Parser {
       if (lexer.getLastToken() == Token::LBRACKET) {
         lexer.getNextToken();
         auto expr = parseExpr();
-        expectNext(Token::RBRACKET);
+        expect(Token::RBRACKET);
         return std::make_unique<ArraySubscript>(name, std::move(expr));
       // Procedure call.
       } else if (lexer.getLastToken() == Token::LPAREN) {
@@ -763,7 +758,7 @@ class Parser {
           return std::make_unique<Call>(name);
         } else {
           auto exprList = parseExprList();
-          expectNext(Token::RPAREN);
+          expect(Token::RPAREN);
           return std::make_unique<Call>(name, std::move(exprList));
         }
       // Variable reference.
@@ -782,7 +777,7 @@ class Parser {
     case Token::LPAREN: {
       lexer.getNextToken();
       auto expr = parseExpr();
-      expectNext(Token::RPAREN);
+      expect(Token::RPAREN);
       return expr;
     }
     default:
@@ -799,24 +794,24 @@ class Parser {
     case Token::VAL: {
       lexer.getNextToken();
       auto name = parseIdentifier();
-      expectNext(Token::EQ);
+      expect(Token::EQ);
       auto expr = parseExpr();
-      expectNext(Token::SEMICOLON);
+      expect(Token::SEMICOLON);
       return std::make_unique<ValDecl>(name, std::move(expr));
     }
     case Token::VAR: {
       lexer.getNextToken();
       auto name = parseIdentifier();
-      expectNext(Token::SEMICOLON);
+      expect(Token::SEMICOLON);
       return std::make_unique<VarDecl>(name);
     }
     case Token::ARRAY: {
       lexer.getNextToken();
       auto name = parseIdentifier();
-      expectNext(Token::LBRACKET);
+      expect(Token::LBRACKET);
       auto expr = parseExpr();
-      expectNext(Token::RBRACKET);
-      expectNext(Token::SEMICOLON);
+      expect(Token::RBRACKET);
+      expect(Token::SEMICOLON);
       return std::make_unique<ArrayDecl>(name, std::move(expr));
     }
     default:
