@@ -395,19 +395,32 @@ class VarRef;
 
 /// A visitor base class for the AST.
 struct AstVisitor {
-  virtual void visit(Program&) = 0;
-  virtual void visit(Proc&) = 0;
-  virtual void visit(ArrayDecl&) = 0;
-  virtual void visit(VarDecl&) = 0;
-  virtual void visit(ValDecl&) = 0;
-  virtual void visit(BinaryOp&) = 0;
-  virtual void visit(UnaryOp&) = 0;
-  virtual void visit(String&) = 0;
-  virtual void visit(Boolean&) = 0;
-  virtual void visit(Number&) = 0;
-  virtual void visit(Call&) = 0;
-  virtual void visit(ArraySubscript&) = 0;
-  virtual void visit(VarRef&) = 0;
+  virtual void visitPre(Program&) = 0;
+  virtual void visitPost(Program&) = 0;
+  virtual void visitPre(Proc&) = 0;
+  virtual void visitPost(Proc&) = 0;
+  virtual void visitPre(ArrayDecl&) = 0;
+  virtual void visitPost(ArrayDecl&) = 0;
+  virtual void visitPre(VarDecl&) = 0;
+  virtual void visitPost(VarDecl&) = 0;
+  virtual void visitPre(ValDecl&) = 0;
+  virtual void visitPost(ValDecl&) = 0;
+  virtual void visitPre(BinaryOp&) = 0;
+  virtual void visitPost(BinaryOp&) = 0;
+  virtual void visitPre(UnaryOp&) = 0;
+  virtual void visitPost(UnaryOp&) = 0;
+  virtual void visitPre(String&) = 0;
+  virtual void visitPost(String&) = 0;
+  virtual void visitPre(Boolean&) = 0;
+  virtual void visitPost(Boolean&) = 0;
+  virtual void visitPre(Number&) = 0;
+  virtual void visitPost(Number&) = 0;
+  virtual void visitPre(Call&) = 0;
+  virtual void visitPost(Call&) = 0;
+  virtual void visitPre(ArraySubscript&) = 0;
+  virtual void visitPost(ArraySubscript&) = 0;
+  virtual void visitPre(VarRef&) = 0;
+  virtual void visitPost(VarRef&) = 0;
 };
 
 /// AST node base class.
@@ -430,7 +443,8 @@ class VarRef : public Expr {
 public:
   VarRef(std::string name) : name(name) {}
   virtual void accept(AstVisitor *visitor) override {
-    visitor->visit(*this);
+    visitor->visitPre(*this);
+    visitor->visitPost(*this);
   }
 };
 
@@ -441,8 +455,9 @@ public:
   ArraySubscript(std::string name, std::unique_ptr<Expr> expr) :
       name(name), expr(std::move(expr)) {}
   virtual void accept(AstVisitor *visitor) override {
-    visitor->visit(*this);
+    visitor->visitPre(*this);
     expr->accept(visitor);
+    visitor->visitPost(*this);
   }
 };
 
@@ -454,10 +469,11 @@ public:
   Call(std::string name, std::vector<std::unique_ptr<Expr>> args) :
       name(name), args(std::move(args)) {}
   virtual void accept(AstVisitor *visitor) override {
-    visitor->visit(*this);
+    visitor->visitPre(*this);
     for (auto &arg : args) {
       arg->accept(visitor);
     }
+    visitor->visitPost(*this);
   }
 };
 
@@ -466,7 +482,8 @@ class Number : public Expr {
 public:
   Number(unsigned value) : value(value) {}
   virtual void accept(AstVisitor *visitor) override {
-    visitor->visit(*this);
+    visitor->visitPre(*this);
+    visitor->visitPost(*this);
   }
   unsigned getValue() const { return value; }
 };
@@ -476,7 +493,8 @@ class Boolean : public Expr {
 public:
   Boolean(bool value) : value(value) {}
   virtual void accept(AstVisitor *visitor) override {
-    visitor->visit(*this);
+    visitor->visitPre(*this);
+    visitor->visitPost(*this);
   }
   bool getValue() const { return value; }
 };
@@ -486,7 +504,8 @@ class String : public Expr {
 public:
   String(std::string value) : value(value) {}
   virtual void accept(AstVisitor *visitor) override {
-    visitor->visit(*this);
+    visitor->visitPre(*this);
+    visitor->visitPost(*this);
   }
   std::string getValue() const { return value; }
 };
@@ -498,8 +517,9 @@ public:
   UnaryOp(Token op, std::unique_ptr<Expr> element) :
       op(op), element(std::move(element)) {}
   virtual void accept(AstVisitor *visitor) override {
-    visitor->visit(*this);
+    visitor->visitPre(*this);
     element->accept(visitor);
+    visitor->visitPost(*this);
   }
   Token getOp() const { return op; }
 };
@@ -511,9 +531,10 @@ public:
   BinaryOp(Token op, std::unique_ptr<Expr> LHS, std::unique_ptr<Expr> RHS) :
       op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
   virtual void accept(AstVisitor *visitor) override {
-    visitor->visit(*this);
+    visitor->visitPre(*this);
     LHS->accept(visitor);
     RHS->accept(visitor);
+    visitor->visitPost(*this);
   }
   Token getOp() const { return op; }
 };
@@ -533,8 +554,9 @@ public:
   ValDecl(std::string name, std::unique_ptr<Expr> expr) :
       Decl(name), expr(std::move(expr)) {}
   virtual void accept(AstVisitor *visitor) override {
-    visitor->visit(*this);
+    visitor->visitPre(*this);
     expr->accept(visitor);
+    visitor->visitPost(*this);
   }
 };
 
@@ -542,7 +564,8 @@ class VarDecl : public Decl {
 public:
   VarDecl(std::string name) : Decl(name) {}
   virtual void accept(AstVisitor *visitor) override {
-    visitor->visit(*this);
+    visitor->visitPre(*this);
+    visitor->visitPost(*this);
   }
 };
 
@@ -552,8 +575,9 @@ public:
   ArrayDecl(std::string name, std::unique_ptr<Expr> expr) :
       Decl(name), expr(std::move(expr)) {}
   virtual void accept(AstVisitor *visitor) override {
-    visitor->visit(*this);
+    visitor->visitPre(*this);
     expr->accept(visitor);
+    visitor->visitPost(*this);
   }
 };
 
@@ -564,7 +588,8 @@ class Proc : public AstNode {
 public:
   Proc() {}
   virtual void accept(AstVisitor *visitor) override {
-    visitor->visit(*this);
+    visitor->visitPre(*this);
+    visitor->visitPost(*this);
   }
   std::string getName() const { return name; }
 };
@@ -581,13 +606,14 @@ public:
     procs.push_back(std::move(proc));
   }
   virtual void accept(AstVisitor *visitor) override {
-    visitor->visit(*this);
+    visitor->visitPre(*this);
     for (auto &decl : globals) {
       decl->accept(visitor);
     }
-    //for (auto &proc : procs) {
-    //  proc->accept(visitor);
-    //}
+    for (auto &proc : procs) {
+      proc->accept(visitor);
+    }
+    visitor->visitPost(*this);
   }
 };
 
@@ -595,49 +621,73 @@ public:
 
 class AstPrinter : public AstVisitor {
   std::ostream outs;
-  //unsigned indent;
+  unsigned indentCount;
+  void indent() {
+    for (size_t i=0; i<indentCount; i++) {
+      outs << "  ";
+    }
+  }
 public:
   AstPrinter(std::ostream& outs = std::cout) :
-      outs(outs.rdbuf())/*, indent(0)*/ {}
-  virtual void visit(Program &decl) override {
-    outs << "program\n";
+      outs(outs.rdbuf()), indentCount(0) {}
+  virtual void visitPre(Program &decl) override {
+    indent(); outs << "program\n";
+    indentCount++;
   };
-  virtual void visit(Proc &decl) override {
-    outs << "proc\n";
+  virtual void visitPost(Program &decl) override {
+    indentCount--;
+  }
+  virtual void visitPre(Proc &decl) override {
+    indent(); outs << "proc\n";
   };
-  virtual void visit(ArrayDecl &decl) override {
-    outs << "arraydecl\n";
+  virtual void visitPost(Proc &decl) override { }
+  virtual void visitPre(ArrayDecl &decl) override {
+    indent(); outs << boost::format("arraydecl %s\n") % decl.getName();
   };
-  virtual void visit(VarDecl &decl) override {
-    outs << "vardecl\n";
+  virtual void visitPost(ArrayDecl &decl) override { }
+  virtual void visitPre(VarDecl &decl) override {
+    indent(); outs << boost::format("vardecl %s\n") % decl.getName();
   };
-  virtual void visit(ValDecl &decl) override {
-    outs << "valdecl\n";
+  virtual void visitPost(VarDecl &decl) override { }
+  virtual void visitPre(ValDecl &decl) override {
+    indent(); outs << boost::format("valdecl %s\n") % decl.getName();
+    indentCount++;
   };
-  virtual void visit(BinaryOp &decl) override {
-    outs << "binaryop\n";
+  virtual void visitPost(ValDecl &decl) override {
+    indentCount--;
+  }
+  virtual void visitPre(BinaryOp &decl) override {
+    indent(); outs << "binaryop\n";
   };
-  virtual void visit(UnaryOp &decl) override {
-    outs << "unaryop\n";
+  virtual void visitPost(BinaryOp &decl) override { }
+  virtual void visitPre(UnaryOp &decl) override {
+    indent(); outs << "unaryop\n";
   };
-  virtual void visit(String &decl) override {
-    outs << "unaryop\n";
+  virtual void visitPost(UnaryOp &decl) override { }
+  virtual void visitPre(String &decl) override {
+    indent(); outs << "unaryop\n";
   };
-  virtual void visit(Boolean &decl) override {
-    outs << "boolean\n";
+  virtual void visitPost(String &decl) override { }
+  virtual void visitPre(Boolean &decl) override {
+    indent(); outs << "boolean\n";
   };
-  virtual void visit(Number &decl) override {
-    outs << "number\n";
+  virtual void visitPost(Boolean &decl) override { }
+  virtual void visitPre(Number &decl) override {
+    indent(); outs << boost::format("number %d\n") % decl.getValue();
   };
-  virtual void visit(Call &decl) override {
-    outs << "call\n";
+  virtual void visitPost(Number &decl) override { }
+  virtual void visitPre(Call &decl) override {
+    indent(); outs << "call\n";
   };
-  virtual void visit(ArraySubscript &decl) override {
-    outs << "arraysubscript\n";
+  virtual void visitPost(Call &decl) override { }
+  virtual void visitPre(ArraySubscript &decl) override {
+    indent(); outs << "arraysubscript\n";
   };
-  virtual void visit(VarRef &decl) override {
-    outs << "varref\n";
+  virtual void visitPost(ArraySubscript &decl) override { }
+  virtual void visitPre(VarRef &decl) override {
+    indent(); outs << "varref\n";
   };
+  virtual void visitPost(VarRef &decl) override { }
 };
 
 
@@ -653,6 +703,7 @@ class Parser {
     if (token != lexer.getLastToken()) {
       throw std::runtime_error(std::string("expected ")+tokenEnumStr(token));
     }
+    lexer.getNextToken();
   }
 
   int parseInteger() {
@@ -720,6 +771,7 @@ class Parser {
       return std::make_unique<BinaryOp>(op, std::move(element), std::move(RHS));
     }
     // Otherwise just return an element.
+    lexer.getNextToken();
     return element;
   }
 
