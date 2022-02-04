@@ -392,6 +392,18 @@ class Number;
 class Call;
 class ArraySubscript;
 class VarRef;
+class ValFormal;
+class ArrayFormal;
+class ProcFormal;
+class FuncFormal;
+class SkipStatement;
+class StopStatement;
+class ReturnStatement;
+class IfStatement;
+class WhileStatement;
+class SeqStatement;
+class CallStatement;
+class AssStatement;
 
 /// A visitor base class for the AST.
 struct AstVisitor {
@@ -421,6 +433,30 @@ struct AstVisitor {
   virtual void visitPost(ArraySubscript&) = 0;
   virtual void visitPre(VarRef&) = 0;
   virtual void visitPost(VarRef&) = 0;
+  virtual void visitPre(ValFormal&) = 0;
+  virtual void visitPost(ValFormal&) = 0;
+  virtual void visitPre(ArrayFormal&) = 0;
+  virtual void visitPost(ArrayFormal&) = 0;
+  virtual void visitPre(ProcFormal&) = 0;
+  virtual void visitPost(ProcFormal&) = 0;
+  virtual void visitPre(FuncFormal&) = 0;
+  virtual void visitPost(FuncFormal&) = 0;
+  virtual void visitPre(SkipStatement&) = 0;
+  virtual void visitPost(SkipStatement&) = 0;
+  virtual void visitPre(StopStatement&) = 0;
+  virtual void visitPost(StopStatement&) = 0;
+  virtual void visitPre(ReturnStatement&) = 0;
+  virtual void visitPost(ReturnStatement&) = 0;
+  virtual void visitPre(IfStatement&) = 0;
+  virtual void visitPost(IfStatement&) = 0;
+  virtual void visitPre(WhileStatement&) = 0;
+  virtual void visitPost(WhileStatement&) = 0;
+  virtual void visitPre(SeqStatement&) = 0;
+  virtual void visitPost(SeqStatement&) = 0;
+  virtual void visitPre(CallStatement&) = 0;
+  virtual void visitPost(CallStatement&) = 0;
+  virtual void visitPre(AssStatement&) = 0;
+  virtual void visitPost(AssStatement&) = 0;
 };
 
 /// AST node base class.
@@ -446,6 +482,7 @@ public:
     visitor->visitPre(*this);
     visitor->visitPost(*this);
   }
+  const std::string &getName() const { return name; }
 };
 
 class ArraySubscript : public Expr {
@@ -475,6 +512,8 @@ public:
     }
     visitor->visitPost(*this);
   }
+  const std::string &getName() const { return name; }
+  const std::vector<std::unique_ptr<Expr>> &getArgs() const { return args; }
 };
 
 class Number : public Expr {
@@ -581,36 +620,205 @@ public:
   }
 };
 
-// Procedures and functions ================================================ //
+// Formals ================================================================= //
+
+class Formal : public AstNode {
+  std::string name;
+public:
+  Formal(std::string name) : name(name) {}
+  std::string getName() const { return name; }
+};
+
+class ValFormal : public Formal {
+public:
+  ValFormal(std::string name) : Formal(name) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    visitor->visitPost(*this);
+  }
+};
+
+class ArrayFormal : public Formal {
+public:
+  ArrayFormal(std::string name) : Formal(name) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    visitor->visitPost(*this);
+  }
+};
+
+class ProcFormal : public Formal {
+public:
+  ProcFormal(std::string name) : Formal(name) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    visitor->visitPost(*this);
+  }
+};
+
+class FuncFormal : public Formal {
+public:
+  FuncFormal(std::string name) : Formal(name) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    visitor->visitPost(*this);
+  }
+};
+
+// Statement ================================================================ //
+
+class Statement : public AstNode {};
+
+class SkipStatement : public Statement {
+public:
+  SkipStatement() {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    visitor->visitPost(*this);
+  }
+};
+
+class StopStatement : public Statement {
+public:
+  StopStatement() {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    visitor->visitPost(*this);
+  }
+};
+
+class ReturnStatement : public Statement {
+  std::unique_ptr<Expr> expr;
+public:
+  ReturnStatement(std::unique_ptr<Expr> expr) : expr(std::move(expr)) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    expr->accept(visitor);
+    visitor->visitPost(*this);
+  }
+};
+
+class IfStatement : public Statement {
+  std::unique_ptr<Expr> condition;
+  std::unique_ptr<Statement> thenStmt;
+  std::unique_ptr<Statement> elseStmt;
+public:
+  IfStatement(std::unique_ptr<Expr> condition,
+              std::unique_ptr<Statement> thenStmt,
+              std::unique_ptr<Statement> elseStmt) :
+      condition(std::move(condition)),
+      thenStmt(std::move(thenStmt)),
+      elseStmt(std::move(elseStmt)) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    condition->accept(visitor);
+    thenStmt->accept(visitor);
+    elseStmt->accept(visitor);
+    visitor->visitPost(*this);
+  }
+};
+
+class WhileStatement : public Statement {
+  std::unique_ptr<Expr> condition;
+  std::unique_ptr<Statement> stmt;
+public:
+  WhileStatement(std::unique_ptr<Expr> condition,
+                 std::unique_ptr<Statement> stmt) :
+      condition(std::move(condition)),
+      stmt(std::move(stmt)) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    condition->accept(visitor);
+    stmt->accept(visitor);
+    visitor->visitPost(*this);
+  }
+};
+
+class SeqStatement : public Statement {
+  std::vector<std::unique_ptr<Statement>> stmts;
+public:
+  SeqStatement(std::vector<std::unique_ptr<Statement>>) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    for (auto &stmt : stmts) {
+      stmt->accept(visitor);
+    }
+    visitor->visitPost(*this);
+  }
+};
+
+class CallStatement : public Statement {
+  std::unique_ptr<Expr> call;
+  // TODO: work out a better way than dynamically casting.
+public:
+  CallStatement(std::unique_ptr<Expr> call) :
+      call(std::move(call)) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    for (auto &arg : dynamic_cast<Call*>(call.get())->getArgs()) {
+      arg->accept(visitor);
+    }
+    visitor->visitPost(*this);
+  }
+  const std::string &getName() const { return dynamic_cast<Call*>(call.get())->getName(); }
+};
+
+class AssStatement : public Statement {
+  std::unique_ptr<Expr> LHS, RHS;
+public:
+  AssStatement(std::unique_ptr<Expr> LHS,
+               std::unique_ptr<Expr> RHS) :
+      LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    LHS->accept(visitor);
+    RHS->accept(visitor);
+    visitor->visitPost(*this);
+  }
+};
+
+// Procedures and functions ================================================= //
 
 class Proc : public AstNode {
   std::string name;
+  std::vector<std::unique_ptr<Formal>> formals;
+  std::vector<std::unique_ptr<Decl>> decls;
+  std::unique_ptr<Statement> statement;
 public:
-  Proc() {}
+  Proc(std::string name,
+       std::vector<std::unique_ptr<Formal>> formals,
+       std::vector<std::unique_ptr<Decl>> decls,
+       std::unique_ptr<Statement> statement) :
+      name(name), formals(std::move(formals)),
+      decls(std::move(decls)), statement(std::move(statement)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
+    for (auto &formal : formals) {
+      formal->accept(visitor);
+    }
+    for (auto &decl : decls) {
+      decl->accept(visitor);
+    }
+    statement->accept(visitor);
     visitor->visitPost(*this);
   }
   std::string getName() const { return name; }
 };
 
 class Program : public AstNode {
-  std::vector<std::unique_ptr<Decl>> globals;
-  std::vector<std::unique_ptr<Proc>> procs;
+  std::vector<std::unique_ptr<Decl>> globalDecls;
+  std::vector<std::unique_ptr<Proc>> procDecls;
 
 public:
-  void addGlobalDecl(std::unique_ptr<Decl> decl) {
-    globals.push_back(std::move(decl));
-  }
-  void addProcDecl(std::unique_ptr<Proc> proc) {
-    procs.push_back(std::move(proc));
-  }
+  Program(std::vector<std::unique_ptr<Decl>> globals,
+          std::vector<std::unique_ptr<Proc>> procs) :
+      globalDecls(std::move(globals)), procDecls(std::move(procs)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    for (auto &decl : globals) {
+    for (auto &decl : globalDecls) {
       decl->accept(visitor);
     }
-    for (auto &proc : procs) {
+    for (auto &proc : procDecls) {
       proc->accept(visitor);
     }
     visitor->visitPost(*this);
@@ -638,13 +846,19 @@ public:
     indentCount--;
   }
   virtual void visitPre(Proc &decl) override {
-    indent(); outs << "proc\n";
+    indent(); outs << boost::format("proc %s\n") % decl.getName();
+    indentCount++;
   };
-  virtual void visitPost(Proc &decl) override { }
+  virtual void visitPost(Proc &decl) override {
+    indentCount--;
+  }
   virtual void visitPre(ArrayDecl &decl) override {
     indent(); outs << boost::format("arraydecl %s\n") % decl.getName();
+    indentCount++;
   };
-  virtual void visitPost(ArrayDecl &decl) override { }
+  virtual void visitPost(ArrayDecl &decl) override {
+    indentCount--;
+  }
   virtual void visitPre(VarDecl &decl) override {
     indent(); outs << boost::format("vardecl %s\n") % decl.getName();
   };
@@ -656,38 +870,116 @@ public:
   virtual void visitPost(ValDecl &decl) override {
     indentCount--;
   }
-  virtual void visitPre(BinaryOp &decl) override {
-    indent(); outs << "binaryop\n";
+  virtual void visitPre(BinaryOp &expr) override {
+    indent(); outs << boost::format("binaryop %s\n") % tokenEnumStr(expr.getOp());
+    indentCount++;
   };
-  virtual void visitPost(BinaryOp &decl) override { }
-  virtual void visitPre(UnaryOp &decl) override {
+  virtual void visitPost(BinaryOp &expr) override {
+    indentCount--;
+  }
+  virtual void visitPre(UnaryOp &expr) override {
+    indent(); outs << boost::format("unaryop %s\n") % tokenEnumStr(expr.getOp());
+    indentCount++;
+  };
+  virtual void visitPost(UnaryOp &expr) override {
+    indentCount--;
+  }
+  virtual void visitPre(String &expr) override {
     indent(); outs << "unaryop\n";
   };
-  virtual void visitPost(UnaryOp &decl) override { }
-  virtual void visitPre(String &decl) override {
-    indent(); outs << "unaryop\n";
-  };
-  virtual void visitPost(String &decl) override { }
-  virtual void visitPre(Boolean &decl) override {
+  virtual void visitPost(String &expr) override { }
+  virtual void visitPre(Boolean &expr) override {
     indent(); outs << "boolean\n";
   };
-  virtual void visitPost(Boolean &decl) override { }
-  virtual void visitPre(Number &decl) override {
-    indent(); outs << boost::format("number %d\n") % decl.getValue();
+  virtual void visitPost(Boolean &expr) override { }
+  virtual void visitPre(Number &expr) override {
+    indent(); outs << boost::format("number %d\n") % expr.getValue();
   };
-  virtual void visitPost(Number &decl) override { }
-  virtual void visitPre(Call &decl) override {
+  virtual void visitPost(Number &expr) override { }
+  virtual void visitPre(Call &expr) override {
     indent(); outs << "call\n";
+    indentCount++;
   };
-  virtual void visitPost(Call &decl) override { }
-  virtual void visitPre(ArraySubscript &decl) override {
+  virtual void visitPost(Call &expr) override {
+    indentCount++;
+  }
+  virtual void visitPre(ArraySubscript &expr) override {
     indent(); outs << "arraysubscript\n";
+    indentCount++;
   };
-  virtual void visitPost(ArraySubscript &decl) override { }
-  virtual void visitPre(VarRef &decl) override {
-    indent(); outs << "varref\n";
+  virtual void visitPost(ArraySubscript &expr) override {
+    indentCount--;
+  }
+  virtual void visitPre(VarRef &expr) override {
+    indent(); outs << boost::format("varref %s\n") % expr.getName();
   };
-  virtual void visitPost(VarRef &decl) override { }
+  virtual void visitPost(VarRef &expr) override { }
+  virtual void visitPre(ValFormal &formal) override {
+    indent(); outs << boost::format("valformal %s\n") % formal.getName();
+  };
+  virtual void visitPost(ValFormal &formal) override {};
+  virtual void visitPre(ArrayFormal &formal) override {
+    indent(); outs << boost::format("arrayformal %s\n") % formal.getName();
+  };
+  virtual void visitPost(ArrayFormal &formal) override {};
+  virtual void visitPre(ProcFormal &formal) override {
+    indent(); outs << boost::format("procformal %s\n") % formal.getName();
+  };
+  virtual void visitPost(ProcFormal &formal) override {};
+  virtual void visitPre(FuncFormal &formal) override {
+    indent(); outs << boost::format("funcformal %s\n") % formal.getName();
+  };
+  virtual void visitPost(FuncFormal &formal) override {};
+  virtual void visitPre(SkipStatement &stmt) override {
+    indent(); outs << "skipstmt\n";
+  };
+  virtual void visitPost(SkipStatement &stmt) override {};
+  virtual void visitPre(StopStatement &stmt) override {
+    indent(); outs << "stopstmt\n";
+  };
+  virtual void visitPost(StopStatement &stmt) override {};
+  virtual void visitPre(ReturnStatement &stmt) override {
+    indent(); outs << "returnstmt\n";
+    indentCount++;
+  };
+  virtual void visitPost(ReturnStatement &stmt) override {
+    indentCount--;
+  };
+  virtual void visitPre(IfStatement &stmt) override {
+    indent(); outs << "ifstmt\n";
+    indentCount++;
+  };
+  virtual void visitPost(IfStatement &stmt) override {
+    indentCount--;
+  };
+  virtual void visitPre(WhileStatement &stmt) override {
+    indent(); outs << "whilestmt\n";
+    indentCount++;
+  };
+  virtual void visitPost(WhileStatement &stmt) override {
+    indentCount--;
+  };
+  virtual void visitPre(SeqStatement &stmt) override {
+    indent(); outs << "seqstmt\n";
+    indentCount++;
+  };
+  virtual void visitPost(SeqStatement &stmt) override {
+    indentCount--;
+  };
+  virtual void visitPre(CallStatement &stmt) override {
+    indent(); outs << "Callstmt\n";
+    indentCount++;
+  };
+  virtual void visitPost(CallStatement &stmt) override {
+    indentCount--;
+  };
+  virtual void visitPre(AssStatement &stmt) override {
+    indent(); outs << "assstmt\n";
+    indentCount++;
+  };
+  virtual void visitPost(AssStatement &stmt) override {
+    indentCount--;
+  };
 };
 
 
@@ -741,6 +1033,7 @@ class Parser {
   std::unique_ptr<Expr> parseBinOpRHS(Token op) {
     auto element = parseElement();
     if (isAssociative(op) && op == lexer.getLastToken()) {
+      lexer.getNextToken();
       auto RHS = parseBinOpRHS(op);
       return std::make_unique<BinaryOp>(op, std::move(element), std::move(RHS));
     } else {
@@ -767,11 +1060,11 @@ class Parser {
     if (isBinaryOp(lexer.getLastToken())) {
       // Binary operation.
       auto op = lexer.getLastToken();
+      lexer.getNextToken();
       auto RHS = parseBinOpRHS(op);
       return std::make_unique<BinaryOp>(op, std::move(element), std::move(RHS));
     }
     // Otherwise just return an element.
-    lexer.getNextToken();
     return element;
   }
 
@@ -819,12 +1112,16 @@ class Parser {
       }
     }
     case Token::NUMBER:
+      lexer.getNextToken();
       return std::make_unique<Number>(lexer.getNumber());
     case Token::STRING:
+      lexer.getNextToken();
       return std::make_unique<String>(lexer.getString());
     case Token::TRUE:
+      lexer.getNextToken();
       return std::make_unique<Boolean>(true);
     case Token::FALSE:
+      lexer.getNextToken();
       return std::make_unique<Boolean>(false);
     case Token::LPAREN: {
       lexer.getNextToken();
@@ -871,26 +1168,195 @@ class Parser {
     }
   }
 
+  /// local-decls :=
+  ///   [0 <local-decl> ]
+  /// local-decl :=
+  ///   "val" ...
+  ///   "var" ...
+  std::vector<std::unique_ptr<Decl>> parseLocalDecls() {
+    std::vector<std::unique_ptr<Decl>> decls;
+    while (lexer.getLastToken() == Token::VAL ||
+           lexer.getLastToken() == Token::VAR) {
+      decls.push_back(parseDecl());
+    }
+    return decls;
+  }
+
+  /// global-decls :=
+  ///   [0 <global-decl> ]
+  /// global-decl :=
+  ///   "val" ...
+  ///   "var" ...
+  ///   "global" ...
+  std::vector<std::unique_ptr<Decl>> parseGlobalDecls() {
+    std::vector<std::unique_ptr<Decl>> decls;
+    while (lexer.getLastToken() == Token::VAL ||
+           lexer.getLastToken() == Token::VAR ||
+           lexer.getLastToken() == Token::ARRAY) {
+      decls.push_back(parseDecl());
+    }
+    return decls;
+  }
+
+  /// formals :=
+  ///   [0 <formal> "," ]
+  std::vector<std::unique_ptr<Formal>> parseFormals() {
+    std::vector<std::unique_ptr<Formal>> formals;
+      while (lexer.getLastToken() == Token::VAL ||
+             lexer.getLastToken() == Token::ARRAY) {
+      formals.push_back(parseFormal());
+      if (lexer.getLastToken() == Token::COMMA) {
+        lexer.getNextToken();
+      }
+    }
+    return formals;
+  }
+
+  /// formal :=
+  ///   "val" <name>
+  ///   "array" <name>
+  ///   "proc" <name>
+  ///   "func" <name>
+  std::unique_ptr<Formal> parseFormal() {
+    switch (lexer.getLastToken()) {
+    case Token::VAL:
+      lexer.getNextToken();
+      return std::make_unique<ValFormal>(parseIdentifier());
+    case Token::ARRAY:
+      lexer.getNextToken();
+      return std::make_unique<ArrayFormal>(parseIdentifier());
+    case Token::PROC:
+      lexer.getNextToken();
+      return std::make_unique<ProcFormal>(parseIdentifier());
+    case Token::FUNC:
+      lexer.getNextToken();
+      return std::make_unique<FuncFormal>(parseIdentifier());
+    default:
+      throw std::runtime_error("invalid formal");
+    }
+  }
+
+  /// statements :=
+  ///   [1 <stmt> "," ]
+  std::vector<std::unique_ptr<Statement>> parseStatements() {
+    std::vector<std::unique_ptr<Statement>> stmts;
+    stmts.push_back(parseStatement());
+    while (lexer.getLastToken() == Token::SEMICOLON) {
+      lexer.getNextToken();
+      stmts.push_back(parseStatement());
+    }
+    return stmts;
+  }
+
+  /// statement :=
+  ///   "skip"
+  ///   "stop"
+  ///   "return" <expr>
+  ///   "if" <expr> "then" <stmt> "else" <stmt>
+  ///   "while" <expr> "do" <stmt>
+  ///   "{" [1 <stmt> "," ] "}"
+  ///   <identifier> ":=" <expr>
+  ///   <identifier> "(" [ <expr> "," ] ")"
+  std::unique_ptr<Statement> parseStatement() {
+    switch (lexer.getLastToken()) {
+    case Token::SKIP:
+      lexer.getNextToken();
+      return std::make_unique<SkipStatement>();
+    case Token::STOP:
+      lexer.getNextToken();
+      return std::make_unique<StopStatement>();
+    case Token::RETURN:
+      lexer.getNextToken();
+      return std::make_unique<ReturnStatement>(parseExpr());
+    case Token::IF: {
+      lexer.getNextToken();
+      auto condition = parseExpr();
+      expect(Token::THEN);
+      auto thenStmt = parseStatement();
+      expect(Token::ELSE);
+      auto elseStmt = parseStatement();
+      return std::make_unique<IfStatement>(std::move(condition),
+                                           std::move(thenStmt),
+                                           std::move(elseStmt));
+    }
+    case Token::WHILE: {
+      lexer.getNextToken();
+      auto condition = parseExpr();
+      expect(Token::DO);
+      auto stmt = parseStatement();
+      return std::make_unique<WhileStatement>(std::move(condition), std::move(stmt));
+    }
+    case Token::BEGIN: {
+      lexer.getNextToken();
+      auto body = parseStatements();
+      expect(Token::END);
+      return std::make_unique<SeqStatement>(std::move(body));
+    }
+    case Token::IDENTIFIER: {
+      auto element = parseElement();
+      // Procedure call
+      if (dynamic_cast<Call*>(element.get())) {
+        return std::make_unique<CallStatement>(std::move(element));
+      }
+      // Assignment
+      expect(Token::ASS);
+      return std::make_unique<AssStatement>(std::move(element), parseExpr());
+    }
+    default:
+      throw std::runtime_error("invalid statement");
+    }
+  }
+
+  /// proc-decl :=
+  ///  "proc" <name> "(" <formals> ")" "is" [0 <var-decl> ] <statement>
   std::unique_ptr<Proc> parseProcDecl() {
-    return std::make_unique<Proc>();
+    lexer.getNextToken();
+    // Name
+    auto name = parseIdentifier();
+    // Formals
+    expect(Token::LPAREN);
+    std::vector<std::unique_ptr<Formal>> formals;
+    if (lexer.getLastToken() == Token::RPAREN) {
+      lexer.getNextToken();
+    } else {
+      formals = parseFormals();
+      expect(Token::RPAREN);
+    }
+    // "is"
+    expect(Token::IS);
+    // Declarations
+    std::vector<std::unique_ptr<Decl>> decls;
+    if (lexer.getLastToken() == Token::VAL ||
+        lexer.getLastToken() == Token::VAR) {
+      decls = parseLocalDecls();
+    }
+    auto statement = parseStatement();
+    return std::make_unique<Proc>(name, std::move(formals),
+                                  std::move(decls), std::move(statement));
+  }
+
+  /// proc-decls :=
+  ///   [1 <proc-decl> ]
+  std::vector<std::unique_ptr<Proc>> parseProcDecls() {
+    std::vector<std::unique_ptr<Proc>> procDecls;
+    while (lexer.getLastToken() == Token::PROC ||
+           lexer.getLastToken() == Token::FUNC) {
+      procDecls.push_back(parseProcDecl());
+    }
+    return procDecls;
   }
 
 public:
   Parser(Lexer &lexer) : lexer(lexer) {}
 
-  Program parseProgram() {
-    Program program;
+  std::unique_ptr<Program> parseProgram() {
     lexer.getNextToken();
-    while (lexer.getLastToken() != Token::END_OF_FILE &&
-           (lexer.getLastToken() == Token::VAL ||
-            lexer.getLastToken() == Token::VAR ||
-            lexer.getLastToken() == Token::ARRAY)) {
-      program.addGlobalDecl(parseDecl());
-    }
-    while (lexer.getNextToken() != Token::END_OF_FILE) {
-      program.addProcDecl(parseProcDecl());
-    }
-    return program;
+    auto globalDecls = parseGlobalDecls();
+    auto procDecls = parseProcDecls();
+    lexer.getNextToken();
+    expect(Token::END_OF_FILE);
+    return std::make_unique<Program>(std::move(globalDecls),
+                                     std::move(procDecls));
   }
 };
 
@@ -983,7 +1449,7 @@ int main(int argc, const char *argv[]) {
     // Parse and print program only.
     if (treeOnly) {
       AstPrinter printer;
-      ast.accept(&printer);
+      ast->accept(&printer);
       return 0;
     }
 
