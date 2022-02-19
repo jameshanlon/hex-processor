@@ -82,8 +82,8 @@ static const char *tokenEnumStr(Token token) {
   case Token::DO:          return "do";
   case Token::ASS:         return ":=";
   case Token::SKIP:        return "skip";
-  case Token::BEGIN:       return "begin";
-  case Token::END:         return "end";
+  case Token::BEGIN:       return "{";
+  case Token::END:         return "}";
   case Token::SEMICOLON:   return ";";
   case Token::COMMA:       return ",";
   case Token::VAR:         return "var";
@@ -384,14 +384,14 @@ class Program;
 class ArrayDecl;
 class ValDecl;
 class VarDecl;
-class BinaryOp;
-class UnaryOp;
-class String;
-class Boolean;
-class Number;
-class Call;
-class ArraySubscript;
-class VarRef;
+class BinaryOpExpr;
+class UnaryOpExpr;
+class StringExpr;
+class BooleanExpr;
+class NumberExpr;
+class CallExpr;
+class ArraySubscriptExpr;
+class VarRefExpr;
 class ValFormal;
 class ArrayFormal;
 class ProcFormal;
@@ -417,22 +417,22 @@ struct AstVisitor {
   virtual void visitPost(VarDecl&) = 0;
   virtual void visitPre(ValDecl&) = 0;
   virtual void visitPost(ValDecl&) = 0;
-  virtual void visitPre(BinaryOp&) = 0;
-  virtual void visitPost(BinaryOp&) = 0;
-  virtual void visitPre(UnaryOp&) = 0;
-  virtual void visitPost(UnaryOp&) = 0;
-  virtual void visitPre(String&) = 0;
-  virtual void visitPost(String&) = 0;
-  virtual void visitPre(Boolean&) = 0;
-  virtual void visitPost(Boolean&) = 0;
-  virtual void visitPre(Number&) = 0;
-  virtual void visitPost(Number&) = 0;
-  virtual void visitPre(Call&) = 0;
-  virtual void visitPost(Call&) = 0;
-  virtual void visitPre(ArraySubscript&) = 0;
-  virtual void visitPost(ArraySubscript&) = 0;
-  virtual void visitPre(VarRef&) = 0;
-  virtual void visitPost(VarRef&) = 0;
+  virtual void visitPre(BinaryOpExpr&) = 0;
+  virtual void visitPost(BinaryOpExpr&) = 0;
+  virtual void visitPre(UnaryOpExpr&) = 0;
+  virtual void visitPost(UnaryOpExpr&) = 0;
+  virtual void visitPre(StringExpr&) = 0;
+  virtual void visitPost(StringExpr&) = 0;
+  virtual void visitPre(BooleanExpr&) = 0;
+  virtual void visitPost(BooleanExpr&) = 0;
+  virtual void visitPre(NumberExpr&) = 0;
+  virtual void visitPost(NumberExpr&) = 0;
+  virtual void visitPre(CallExpr&) = 0;
+  virtual void visitPost(CallExpr&) = 0;
+  virtual void visitPre(ArraySubscriptExpr&) = 0;
+  virtual void visitPost(ArraySubscriptExpr&) = 0;
+  virtual void visitPre(VarRefExpr&) = 0;
+  virtual void visitPost(VarRefExpr&) = 0;
   virtual void visitPre(ValFormal&) = 0;
   virtual void visitPost(ValFormal&) = 0;
   virtual void visitPre(ArrayFormal&) = 0;
@@ -468,16 +468,13 @@ public:
 
 // Expressions ============================================================= //
 
-class Expr : public AstNode {
-public:
-  Expr() {}
-};
+class Expr : public AstNode {};
 
-class VarRef : public Expr {
+class VarRefExpr : public Expr {
   std::string name;
   std::unique_ptr<Expr> expr;
 public:
-  VarRef(std::string name) : name(name) {}
+  VarRefExpr(std::string name) : name(name) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -485,11 +482,11 @@ public:
   const std::string &getName() const { return name; }
 };
 
-class ArraySubscript : public Expr {
+class ArraySubscriptExpr : public Expr {
   std::string name;
   std::unique_ptr<Expr> expr;
 public:
-  ArraySubscript(std::string name, std::unique_ptr<Expr> expr) :
+  ArraySubscriptExpr(std::string name, std::unique_ptr<Expr> expr) :
       name(name), expr(std::move(expr)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
@@ -498,12 +495,12 @@ public:
   }
 };
 
-class Call : public Expr {
+class CallExpr : public Expr {
   std::string name;
   std::vector<std::unique_ptr<Expr>> args;
 public:
-  Call(std::string name) : name(name) {}
-  Call(std::string name, std::vector<std::unique_ptr<Expr>> args) :
+  CallExpr(std::string name) : name(name) {}
+  CallExpr(std::string name, std::vector<std::unique_ptr<Expr>> args) :
       name(name), args(std::move(args)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
@@ -516,10 +513,10 @@ public:
   const std::vector<std::unique_ptr<Expr>> &getArgs() const { return args; }
 };
 
-class Number : public Expr {
+class NumberExpr : public Expr {
   unsigned value;
 public:
-  Number(unsigned value) : value(value) {}
+  NumberExpr(unsigned value) : value(value) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -527,10 +524,10 @@ public:
   unsigned getValue() const { return value; }
 };
 
-class Boolean : public Expr {
+class BooleanExpr : public Expr {
   bool value;
 public:
-  Boolean(bool value) : value(value) {}
+  BooleanExpr(bool value) : value(value) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -538,10 +535,10 @@ public:
   bool getValue() const { return value; }
 };
 
-class String : public Expr {
+class StringExpr : public Expr {
   std::string value;
 public:
-  String(std::string value) : value(value) {}
+  StringExpr(std::string value) : value(value) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -549,11 +546,11 @@ public:
   std::string getValue() const { return value; }
 };
 
-class UnaryOp : public Expr {
+class UnaryOpExpr : public Expr {
   Token op;
   std::unique_ptr<Expr> element;
 public:
-  UnaryOp(Token op, std::unique_ptr<Expr> element) :
+  UnaryOpExpr(Token op, std::unique_ptr<Expr> element) :
       op(op), element(std::move(element)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
@@ -563,11 +560,11 @@ public:
   Token getOp() const { return op; }
 };
 
-class BinaryOp : public Expr {
+class BinaryOpExpr : public Expr {
   Token op;
   std::unique_ptr<Expr> LHS, RHS;
 public:
-  BinaryOp(Token op, std::unique_ptr<Expr> LHS, std::unique_ptr<Expr> RHS) :
+  BinaryOpExpr(Token op, std::unique_ptr<Expr> LHS, std::unique_ptr<Expr> RHS) :
       op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
@@ -737,7 +734,8 @@ public:
 class SeqStatement : public Statement {
   std::vector<std::unique_ptr<Statement>> stmts;
 public:
-  SeqStatement(std::vector<std::unique_ptr<Statement>>) {}
+  SeqStatement(std::vector<std::unique_ptr<Statement>> stmts) :
+      stmts(std::move(stmts)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     for (auto &stmt : stmts) {
@@ -755,12 +753,12 @@ public:
       call(std::move(call)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    for (auto &arg : dynamic_cast<Call*>(call.get())->getArgs()) {
+    for (auto &arg : dynamic_cast<CallExpr*>(call.get())->getArgs()) {
       arg->accept(visitor);
     }
     visitor->visitPost(*this);
   }
-  const std::string &getName() const { return dynamic_cast<Call*>(call.get())->getName(); }
+  const std::string &getName() const { return dynamic_cast<CallExpr*>(call.get())->getName(); }
 };
 
 class AssStatement : public Statement {
@@ -870,50 +868,50 @@ public:
   virtual void visitPost(ValDecl &decl) override {
     indentCount--;
   }
-  virtual void visitPre(BinaryOp &expr) override {
+  virtual void visitPre(BinaryOpExpr &expr) override {
     indent(); outs << boost::format("binaryop %s\n") % tokenEnumStr(expr.getOp());
     indentCount++;
   };
-  virtual void visitPost(BinaryOp &expr) override {
+  virtual void visitPost(BinaryOpExpr &expr) override {
     indentCount--;
   }
-  virtual void visitPre(UnaryOp &expr) override {
+  virtual void visitPre(UnaryOpExpr &expr) override {
     indent(); outs << boost::format("unaryop %s\n") % tokenEnumStr(expr.getOp());
     indentCount++;
   };
-  virtual void visitPost(UnaryOp &expr) override {
+  virtual void visitPost(UnaryOpExpr &expr) override {
     indentCount--;
   }
-  virtual void visitPre(String &expr) override {
+  virtual void visitPre(StringExpr &expr) override {
     indent(); outs << "unaryop\n";
   };
-  virtual void visitPost(String &expr) override { }
-  virtual void visitPre(Boolean &expr) override {
+  virtual void visitPost(StringExpr &expr) override { }
+  virtual void visitPre(BooleanExpr &expr) override {
     indent(); outs << "boolean\n";
   };
-  virtual void visitPost(Boolean &expr) override { }
-  virtual void visitPre(Number &expr) override {
+  virtual void visitPost(BooleanExpr &expr) override { }
+  virtual void visitPre(NumberExpr &expr) override {
     indent(); outs << boost::format("number %d\n") % expr.getValue();
   };
-  virtual void visitPost(Number &expr) override { }
-  virtual void visitPre(Call &expr) override {
-    indent(); outs << "call\n";
+  virtual void visitPost(NumberExpr &expr) override { }
+  virtual void visitPre(CallExpr &expr) override {
+    indent(); outs << boost::format("call %d\n") % expr.getName();
     indentCount++;
   };
-  virtual void visitPost(Call &expr) override {
-    indentCount++;
+  virtual void visitPost(CallExpr &expr) override {
+    indentCount--;
   }
-  virtual void visitPre(ArraySubscript &expr) override {
+  virtual void visitPre(ArraySubscriptExpr &expr) override {
     indent(); outs << "arraysubscript\n";
     indentCount++;
   };
-  virtual void visitPost(ArraySubscript &expr) override {
+  virtual void visitPost(ArraySubscriptExpr &expr) override {
     indentCount--;
   }
-  virtual void visitPre(VarRef &expr) override {
+  virtual void visitPre(VarRefExpr &expr) override {
     indent(); outs << boost::format("varref %s\n") % expr.getName();
   };
-  virtual void visitPost(VarRef &expr) override { }
+  virtual void visitPost(VarRefExpr &expr) override { }
   virtual void visitPre(ValFormal &formal) override {
     indent(); outs << boost::format("valformal %s\n") % formal.getName();
   };
@@ -967,7 +965,7 @@ public:
     indentCount--;
   };
   virtual void visitPre(CallStatement &stmt) override {
-    indent(); outs << "Callstmt\n";
+    indent(); outs << "callstmt\n";
     indentCount++;
   };
   virtual void visitPost(CallStatement &stmt) override {
@@ -1035,7 +1033,7 @@ class Parser {
     if (isAssociative(op) && op == lexer.getLastToken()) {
       lexer.getNextToken();
       auto RHS = parseBinOpRHS(op);
-      return std::make_unique<BinaryOp>(op, std::move(element), std::move(RHS));
+      return std::make_unique<BinaryOpExpr>(op, std::move(element), std::move(RHS));
     } else {
       return element;
     }
@@ -1050,11 +1048,11 @@ class Parser {
     // Unary operations.
     if (lexer.getLastToken() == Token::MINUS) {
       auto element = parseElement();
-      return std::make_unique<UnaryOp>(Token::MINUS, std::move(element));
+      return std::make_unique<UnaryOpExpr>(Token::MINUS, std::move(element));
     }
     if (lexer.getLastToken() == Token::NOT) {
       auto element = parseElement();
-      return std::make_unique<UnaryOp>(Token::NOT, std::move(element));
+      return std::make_unique<UnaryOpExpr>(Token::NOT, std::move(element));
     }
     auto element = parseElement();
     if (isBinaryOp(lexer.getLastToken())) {
@@ -1062,7 +1060,7 @@ class Parser {
       auto op = lexer.getLastToken();
       lexer.getNextToken();
       auto RHS = parseBinOpRHS(op);
-      return std::make_unique<BinaryOp>(op, std::move(element), std::move(RHS));
+      return std::make_unique<BinaryOpExpr>(op, std::move(element), std::move(RHS));
     }
     // Otherwise just return an element.
     return element;
@@ -1086,6 +1084,7 @@ class Parser {
   ///   <string>
   ///   "true"
   ///   "false"
+  ///   "(" ")"
   ///   "(" <expr> ")"
   std::unique_ptr<Expr> parseElement() {
     switch (lexer.getLastToken()) {
@@ -1096,33 +1095,34 @@ class Parser {
         lexer.getNextToken();
         auto expr = parseExpr();
         expect(Token::RBRACKET);
-        return std::make_unique<ArraySubscript>(name, std::move(expr));
+        return std::make_unique<ArraySubscriptExpr>(name, std::move(expr));
       // Procedure call.
       } else if (lexer.getLastToken() == Token::LPAREN) {
         if (lexer.getNextToken() == Token::RPAREN) {
-          return std::make_unique<Call>(name);
+          lexer.getNextToken();
+          return std::make_unique<CallExpr>(name);
         } else {
           auto exprList = parseExprList();
           expect(Token::RPAREN);
-          return std::make_unique<Call>(name, std::move(exprList));
+          return std::make_unique<CallExpr>(name, std::move(exprList));
         }
       // Variable reference.
       } else {
-        return std::make_unique<VarRef>(name);
+        return std::make_unique<VarRefExpr>(name);
       }
     }
     case Token::NUMBER:
       lexer.getNextToken();
-      return std::make_unique<Number>(lexer.getNumber());
+      return std::make_unique<NumberExpr>(lexer.getNumber());
     case Token::STRING:
       lexer.getNextToken();
-      return std::make_unique<String>(lexer.getString());
+      return std::make_unique<StringExpr>(lexer.getString());
     case Token::TRUE:
       lexer.getNextToken();
-      return std::make_unique<Boolean>(true);
+      return std::make_unique<BooleanExpr>(true);
     case Token::FALSE:
       lexer.getNextToken();
-      return std::make_unique<Boolean>(false);
+      return std::make_unique<BooleanExpr>(false);
     case Token::LPAREN: {
       lexer.getNextToken();
       auto expr = parseExpr();
@@ -1203,7 +1203,9 @@ class Parser {
   std::vector<std::unique_ptr<Formal>> parseFormals() {
     std::vector<std::unique_ptr<Formal>> formals;
       while (lexer.getLastToken() == Token::VAL ||
-             lexer.getLastToken() == Token::ARRAY) {
+             lexer.getLastToken() == Token::ARRAY ||
+             lexer.getLastToken() == Token::PROC ||
+             lexer.getLastToken() == Token::FUNC) {
       formals.push_back(parseFormal());
       if (lexer.getLastToken() == Token::COMMA) {
         lexer.getNextToken();
@@ -1295,7 +1297,7 @@ class Parser {
     case Token::IDENTIFIER: {
       auto element = parseElement();
       // Procedure call
-      if (dynamic_cast<Call*>(element.get())) {
+      if (dynamic_cast<CallExpr*>(element.get())) {
         return std::make_unique<CallStatement>(std::move(element));
       }
       // Assignment
