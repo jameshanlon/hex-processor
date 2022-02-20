@@ -1,7 +1,9 @@
 #ifndef ASM_HPP
 #define ASM_HPP
 
-#include "Hex.hpp"
+#include "hex.hpp"
+
+namespace hexasm {
 
 //===---------------------------------------------------------------------===//
 // Token enumeration and helper functions
@@ -449,5 +451,7 @@ void emitBin(std::vector<std::unique_ptr<Directive>> &program,
   // Done.
   outputFile.close();
 }
+
+} // End namespace hexasm.
 
 #endif // ASM_HPP

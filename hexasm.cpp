@@ -9,7 +9,9 @@
 #include <map>
 #include <boost/format.hpp>
 
-#include "asm.hpp"
+#include "hexasm.hpp"
+
+using namespace hexasm;
 
 // An assembler for the Hex instruction set, based on xhexb.x and with
 // inspiration from the LLVM Kaleidoscope tutorial:
@@ -69,7 +71,7 @@ class Lexer {
   char          lastChar;
   std::string   identifier;
   unsigned      value;
-  Token         lastToken;
+  Token    lastToken;
   size_t        currentLineNumber;
   std::string   currentLine;
 

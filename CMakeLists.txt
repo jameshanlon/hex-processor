@@ -41,18 +41,18 @@ add_compile_options(-Wall -pedantic)
 include_directories(${Boost_INCLUDE_DIRS})
 
 # Simulator
-add_executable(sim sim.cpp)
-target_link_libraries(sim ${Boost_LIBRARIES})
+add_executable(hexsim hexsim.cpp)
+target_link_libraries(hexsim ${Boost_LIBRARIES})
 
 # Assembler
-add_executable(asm asm.cpp)
-target_link_libraries(asm ${Boost_LIBRARIES})
+add_executable(hexasm hexasm.cpp)
+target_link_libraries(hexasm ${Boost_LIBRARIES})
 
 # Compiler
-add_executable(cmp cmp.cpp)
-target_link_libraries(cmp ${Boost_LIBRARIES})
+add_executable(xcmp xcmp.cpp)
+target_link_libraries(xcmp ${Boost_LIBRARIES})
 
-install(TARGETS asm cmp sim
+install(TARGETS hexasm xcmp hexsim
         DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # Verilator

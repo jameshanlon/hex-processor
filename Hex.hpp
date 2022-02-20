@@ -77,4 +77,3 @@ const char *syscallEnumToStr(Syscall syscall) {
 }; // End namespace hex.
 
 #endif // HEX_HPP
-

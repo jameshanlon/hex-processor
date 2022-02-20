@@ -10,8 +10,8 @@
 #include "Vhex_pkg_hex.h"
 #include "Vhex_pkg_memory.h"
 #include "Vhex_pkg_processor.h"
-#include "Hex.hpp"
-#include "Util.hpp"
+#include "hex.hpp"
+#include "util.hpp"
 
 double sc_time_stamp() { return 0; }
 

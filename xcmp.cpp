@@ -9,7 +9,8 @@
 #include <map>
 #include <boost/format.hpp>
 
-#include "Hex.hpp"
+#include "hex.hpp"
+#include "hexasm.hpp"
 
 // A compiler for the X language, based on xhexb.x and with inspiration from
 // the LLVM Kaleidoscope tutorial.
@@ -407,56 +408,56 @@ class AssStatement;
 
 /// A visitor base class for the AST.
 struct AstVisitor {
-  virtual void visitPre(Program&) = 0;
-  virtual void visitPost(Program&) = 0;
-  virtual void visitPre(Proc&) = 0;
-  virtual void visitPost(Proc&) = 0;
-  virtual void visitPre(ArrayDecl&) = 0;
-  virtual void visitPost(ArrayDecl&) = 0;
-  virtual void visitPre(VarDecl&) = 0;
-  virtual void visitPost(VarDecl&) = 0;
-  virtual void visitPre(ValDecl&) = 0;
-  virtual void visitPost(ValDecl&) = 0;
-  virtual void visitPre(BinaryOpExpr&) = 0;
-  virtual void visitPost(BinaryOpExpr&) = 0;
-  virtual void visitPre(UnaryOpExpr&) = 0;
-  virtual void visitPost(UnaryOpExpr&) = 0;
-  virtual void visitPre(StringExpr&) = 0;
-  virtual void visitPost(StringExpr&) = 0;
-  virtual void visitPre(BooleanExpr&) = 0;
-  virtual void visitPost(BooleanExpr&) = 0;
-  virtual void visitPre(NumberExpr&) = 0;
-  virtual void visitPost(NumberExpr&) = 0;
-  virtual void visitPre(CallExpr&) = 0;
-  virtual void visitPost(CallExpr&) = 0;
-  virtual void visitPre(ArraySubscriptExpr&) = 0;
-  virtual void visitPost(ArraySubscriptExpr&) = 0;
-  virtual void visitPre(VarRefExpr&) = 0;
-  virtual void visitPost(VarRefExpr&) = 0;
-  virtual void visitPre(ValFormal&) = 0;
-  virtual void visitPost(ValFormal&) = 0;
-  virtual void visitPre(ArrayFormal&) = 0;
-  virtual void visitPost(ArrayFormal&) = 0;
-  virtual void visitPre(ProcFormal&) = 0;
-  virtual void visitPost(ProcFormal&) = 0;
-  virtual void visitPre(FuncFormal&) = 0;
-  virtual void visitPost(FuncFormal&) = 0;
-  virtual void visitPre(SkipStatement&) = 0;
-  virtual void visitPost(SkipStatement&) = 0;
-  virtual void visitPre(StopStatement&) = 0;
-  virtual void visitPost(StopStatement&) = 0;
-  virtual void visitPre(ReturnStatement&) = 0;
-  virtual void visitPost(ReturnStatement&) = 0;
-  virtual void visitPre(IfStatement&) = 0;
-  virtual void visitPost(IfStatement&) = 0;
-  virtual void visitPre(WhileStatement&) = 0;
-  virtual void visitPost(WhileStatement&) = 0;
-  virtual void visitPre(SeqStatement&) = 0;
-  virtual void visitPost(SeqStatement&) = 0;
-  virtual void visitPre(CallStatement&) = 0;
-  virtual void visitPost(CallStatement&) = 0;
-  virtual void visitPre(AssStatement&) = 0;
-  virtual void visitPost(AssStatement&) = 0;
+  virtual void visitPre(Program&) {}
+  virtual void visitPost(Program&) {}
+  virtual void visitPre(Proc&) {}
+  virtual void visitPost(Proc&) {}
+  virtual void visitPre(ArrayDecl&) {}
+  virtual void visitPost(ArrayDecl&) {}
+  virtual void visitPre(VarDecl&) {}
+  virtual void visitPost(VarDecl&) {}
+  virtual void visitPre(ValDecl&) {}
+  virtual void visitPost(ValDecl&) {}
+  virtual void visitPre(BinaryOpExpr&) {}
+  virtual void visitPost(BinaryOpExpr&) {}
+  virtual void visitPre(UnaryOpExpr&) {}
+  virtual void visitPost(UnaryOpExpr&) {}
+  virtual void visitPre(StringExpr&) {}
+  virtual void visitPost(StringExpr&) {}
+  virtual void visitPre(BooleanExpr&) {}
+  virtual void visitPost(BooleanExpr&) {}
+  virtual void visitPre(NumberExpr&) {}
+  virtual void visitPost(NumberExpr&) {}
+  virtual void visitPre(CallExpr&) {}
+  virtual void visitPost(CallExpr&) {}
+  virtual void visitPre(ArraySubscriptExpr&) {}
+  virtual void visitPost(ArraySubscriptExpr&) {}
+  virtual void visitPre(VarRefExpr&) {}
+  virtual void visitPost(VarRefExpr&) {}
+  virtual void visitPre(ValFormal&) {}
+  virtual void visitPost(ValFormal&) {}
+  virtual void visitPre(ArrayFormal&) {}
+  virtual void visitPost(ArrayFormal&) {}
+  virtual void visitPre(ProcFormal&) {}
+  virtual void visitPost(ProcFormal&) {}
+  virtual void visitPre(FuncFormal&) {}
+  virtual void visitPost(FuncFormal&) {}
+  virtual void visitPre(SkipStatement&) {}
+  virtual void visitPost(SkipStatement&) {}
+  virtual void visitPre(StopStatement&) {}
+  virtual void visitPost(StopStatement&) {}
+  virtual void visitPre(ReturnStatement&) {}
+  virtual void visitPost(ReturnStatement&) {}
+  virtual void visitPre(IfStatement&) {}
+  virtual void visitPost(IfStatement&) {}
+  virtual void visitPre(WhileStatement&) {}
+  virtual void visitPost(WhileStatement&) {}
+  virtual void visitPre(SeqStatement&) {}
+  virtual void visitPost(SeqStatement&) {}
+  virtual void visitPre(CallStatement&) {}
+  virtual void visitPost(CallStatement&) {}
+  virtual void visitPre(AssStatement&) {}
+  virtual void visitPost(AssStatement&) {}
 };
 
 /// AST node base class.
@@ -836,146 +837,146 @@ class AstPrinter : public AstVisitor {
 public:
   AstPrinter(std::ostream& outs = std::cout) :
       outs(outs.rdbuf()), indentCount(0) {}
-  virtual void visitPre(Program &decl) override {
+  void visitPre(Program &decl) override {
     indent(); outs << "program\n";
     indentCount++;
   };
-  virtual void visitPost(Program &decl) override {
+  void visitPost(Program &decl) override {
     indentCount--;
   }
-  virtual void visitPre(Proc &decl) override {
+  void visitPre(Proc &decl) override {
     indent(); outs << boost::format("proc %s\n") % decl.getName();
     indentCount++;
   };
-  virtual void visitPost(Proc &decl) override {
+  void visitPost(Proc &decl) override {
     indentCount--;
   }
-  virtual void visitPre(ArrayDecl &decl) override {
+  void visitPre(ArrayDecl &decl) override {
     indent(); outs << boost::format("arraydecl %s\n") % decl.getName();
     indentCount++;
   };
-  virtual void visitPost(ArrayDecl &decl) override {
+  void visitPost(ArrayDecl &decl) override {
     indentCount--;
   }
-  virtual void visitPre(VarDecl &decl) override {
+  void visitPre(VarDecl &decl) override {
     indent(); outs << boost::format("vardecl %s\n") % decl.getName();
   };
-  virtual void visitPost(VarDecl &decl) override { }
-  virtual void visitPre(ValDecl &decl) override {
+  void visitPost(VarDecl &decl) override { }
+  void visitPre(ValDecl &decl) override {
     indent(); outs << boost::format("valdecl %s\n") % decl.getName();
     indentCount++;
   };
-  virtual void visitPost(ValDecl &decl) override {
+  void visitPost(ValDecl &decl) override {
     indentCount--;
   }
-  virtual void visitPre(BinaryOpExpr &expr) override {
+  void visitPre(BinaryOpExpr &expr) override {
     indent(); outs << boost::format("binaryop %s\n") % tokenEnumStr(expr.getOp());
     indentCount++;
   };
-  virtual void visitPost(BinaryOpExpr &expr) override {
+  void visitPost(BinaryOpExpr &expr) override {
     indentCount--;
   }
-  virtual void visitPre(UnaryOpExpr &expr) override {
+  void visitPre(UnaryOpExpr &expr) override {
     indent(); outs << boost::format("unaryop %s\n") % tokenEnumStr(expr.getOp());
     indentCount++;
   };
-  virtual void visitPost(UnaryOpExpr &expr) override {
+  void visitPost(UnaryOpExpr &expr) override {
     indentCount--;
   }
-  virtual void visitPre(StringExpr &expr) override {
+  void visitPre(StringExpr &expr) override {
     indent(); outs << "unaryop\n";
   };
-  virtual void visitPost(StringExpr &expr) override { }
-  virtual void visitPre(BooleanExpr &expr) override {
+  void visitPost(StringExpr &expr) override { }
+  void visitPre(BooleanExpr &expr) override {
     indent(); outs << "boolean\n";
   };
-  virtual void visitPost(BooleanExpr &expr) override { }
-  virtual void visitPre(NumberExpr &expr) override {
+  void visitPost(BooleanExpr &expr) override { }
+  void visitPre(NumberExpr &expr) override {
     indent(); outs << boost::format("number %d\n") % expr.getValue();
   };
-  virtual void visitPost(NumberExpr &expr) override { }
-  virtual void visitPre(CallExpr &expr) override {
+  void visitPost(NumberExpr &expr) override { }
+  void visitPre(CallExpr &expr) override {
     indent(); outs << boost::format("call %d\n") % expr.getName();
     indentCount++;
   };
-  virtual void visitPost(CallExpr &expr) override {
+  void visitPost(CallExpr &expr) override {
     indentCount--;
   }
-  virtual void visitPre(ArraySubscriptExpr &expr) override {
+  void visitPre(ArraySubscriptExpr &expr) override {
     indent(); outs << "arraysubscript\n";
     indentCount++;
   };
-  virtual void visitPost(ArraySubscriptExpr &expr) override {
+  void visitPost(ArraySubscriptExpr &expr) override {
     indentCount--;
   }
-  virtual void visitPre(VarRefExpr &expr) override {
+  void visitPre(VarRefExpr &expr) override {
     indent(); outs << boost::format("varref %s\n") % expr.getName();
   };
-  virtual void visitPost(VarRefExpr &expr) override { }
-  virtual void visitPre(ValFormal &formal) override {
+  void visitPost(VarRefExpr &expr) override { }
+  void visitPre(ValFormal &formal) override {
     indent(); outs << boost::format("valformal %s\n") % formal.getName();
   };
-  virtual void visitPost(ValFormal &formal) override {};
-  virtual void visitPre(ArrayFormal &formal) override {
+  void visitPost(ValFormal &formal) override {};
+  void visitPre(ArrayFormal &formal) override {
     indent(); outs << boost::format("arrayformal %s\n") % formal.getName();
   };
-  virtual void visitPost(ArrayFormal &formal) override {};
-  virtual void visitPre(ProcFormal &formal) override {
+  void visitPost(ArrayFormal &formal) override {};
+  void visitPre(ProcFormal &formal) override {
     indent(); outs << boost::format("procformal %s\n") % formal.getName();
   };
-  virtual void visitPost(ProcFormal &formal) override {};
-  virtual void visitPre(FuncFormal &formal) override {
+  void visitPost(ProcFormal &formal) override {};
+  void visitPre(FuncFormal &formal) override {
     indent(); outs << boost::format("funcformal %s\n") % formal.getName();
   };
-  virtual void visitPost(FuncFormal &formal) override {};
-  virtual void visitPre(SkipStatement &stmt) override {
+  void visitPost(FuncFormal &formal) override {};
+  void visitPre(SkipStatement &stmt) override {
     indent(); outs << "skipstmt\n";
   };
-  virtual void visitPost(SkipStatement &stmt) override {};
-  virtual void visitPre(StopStatement &stmt) override {
+  void visitPost(SkipStatement &stmt) override {};
+  void visitPre(StopStatement &stmt) override {
     indent(); outs << "stopstmt\n";
   };
-  virtual void visitPost(StopStatement &stmt) override {};
-  virtual void visitPre(ReturnStatement &stmt) override {
+  void visitPost(StopStatement &stmt) override {};
+  void visitPre(ReturnStatement &stmt) override {
     indent(); outs << "returnstmt\n";
     indentCount++;
   };
-  virtual void visitPost(ReturnStatement &stmt) override {
+  void visitPost(ReturnStatement &stmt) override {
     indentCount--;
   };
-  virtual void visitPre(IfStatement &stmt) override {
+  void visitPre(IfStatement &stmt) override {
     indent(); outs << "ifstmt\n";
     indentCount++;
   };
-  virtual void visitPost(IfStatement &stmt) override {
+  void visitPost(IfStatement &stmt) override {
     indentCount--;
   };
-  virtual void visitPre(WhileStatement &stmt) override {
+  void visitPre(WhileStatement &stmt) override {
     indent(); outs << "whilestmt\n";
     indentCount++;
   };
-  virtual void visitPost(WhileStatement &stmt) override {
+  void visitPost(WhileStatement &stmt) override {
     indentCount--;
   };
-  virtual void visitPre(SeqStatement &stmt) override {
+  void visitPre(SeqStatement &stmt) override {
     indent(); outs << "seqstmt\n";
     indentCount++;
   };
-  virtual void visitPost(SeqStatement &stmt) override {
+  void visitPost(SeqStatement &stmt) override {
     indentCount--;
   };
-  virtual void visitPre(CallStatement &stmt) override {
+  void visitPre(CallStatement &stmt) override {
     indent(); outs << "callstmt\n";
     indentCount++;
   };
-  virtual void visitPost(CallStatement &stmt) override {
+  void visitPost(CallStatement &stmt) override {
     indentCount--;
   };
-  virtual void visitPre(AssStatement &stmt) override {
+  void visitPre(AssStatement &stmt) override {
     indent(); outs << "assstmt\n";
     indentCount++;
   };
-  virtual void visitPost(AssStatement &stmt) override {
+  void visitPost(AssStatement &stmt) override {
     indentCount--;
   };
 };
@@ -1363,6 +1364,51 @@ public:
 };
 
 //===---------------------------------------------------------------------===//
+// Code generation.
+//===---------------------------------------------------------------------===//
+
+class CodeGen : public AstVisitor {
+
+  std::vector<std::unique_ptr<hexasm::Directive>> instrs;
+
+  void genData(uint32_t value) {
+    instrs.push_back(std::make_unique<hexasm::Data>(hexasm::Token::DATA, value));
+  }
+
+  void genLabel(std::string name) {
+    instrs.push_back(std::make_unique<hexasm::Label>(hexasm::Token::IDENTIFIER, name));
+  }
+
+  void genBR(std::string label) {
+    instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::BR, label, true));
+  }
+
+  void genLDAC(int value) {
+    instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAC, value));
+  }
+
+  void genOPR(hexasm::Token op) {
+    instrs.push_back(std::make_unique<hexasm::InstrOp>(hexasm::Token::OPR, op));
+  }
+
+public:
+  CodeGen() {
+    genBR("start");
+    genData(1<<16);
+    genLabel("start");
+    genBR("exit");
+    genLabel("exit");
+    genLDAC(0);
+    genOPR(hexasm::Token::SVC);
+  }
+  void visitPre(Program &tree) {}
+  void visitPost(Program &tree) {}
+  std::vector<std::unique_ptr<hexasm::Directive>> &getInstrs() {
+    return instrs;
+  }
+};
+
+//===---------------------------------------------------------------------===//
 // Driver
 //===---------------------------------------------------------------------===//
 
@@ -1446,14 +1492,20 @@ int main(int argc, const char *argv[]) {
     }
 
     // Parse the program.
-    auto ast = parser.parseProgram();
+    auto tree = parser.parseProgram();
 
     // Parse and print program only.
     if (treeOnly) {
       AstPrinter printer;
-      ast->accept(&printer);
+      tree->accept(&printer);
       return 0;
     }
+
+    // Generate code.
+    CodeGen codeGen;
+    tree->accept(&codeGen);
+    auto programSize = hexasm::prepareProgram(codeGen.getInstrs());
+    hexasm::emitBin(codeGen.getInstrs(), outputFilename, programSize);
 
   } catch (std::exception &e) {
     std::cerr << "Error: " << e.what() << "\n";

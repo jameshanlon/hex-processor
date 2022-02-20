@@ -3,9 +3,10 @@ import subprocess
 import unittest
 import definitions as defs
 
-ASM_BINARY = os.path.join(defs.INSTALL_PREFIX, 'asm')
-SIM_BINARY = os.path.join(defs.INSTALL_PREFIX, 'sim')
+ASM_BINARY = os.path.join(defs.INSTALL_PREFIX, 'hexasm')
+SIM_BINARY = os.path.join(defs.INSTALL_PREFIX, 'hexsim')
 VTB_BINARY = os.path.join(defs.INSTALL_PREFIX, 'hextb')
+CMP_BINARY = os.path.join(defs.INSTALL_PREFIX, 'xcmp')
 
 class Tests(unittest.TestCase):
 
@@ -61,6 +62,13 @@ class Tests(unittest.TestCase):
         output = subprocess.run([VTB_BINARY, 'xhexb.bin'], input=infile.read(), capture_output=True)
         self.assertTrue(output.stdout.decode('utf-8').endswith('tree size: 18631\nprogram size: 17101\nsize: 177105\n'))
         infile.close()
+
+    def test_x_compiler_empty(self):
+        # Compile an empty program and check it executes.
+        infile = os.path.join(defs.TEST_SRC_PREFIX, 'empty.x')
+        subprocess.run([CMP_BINARY, infile, '-o', 'a.bin'])
+        output = subprocess.run([SIM_BINARY, 'a.bin'], capture_output=True)
+        self.assertTrue(output.stdout.decode('utf-8') == '')
 
 if __name__ == '__main__':
     unittest.main()

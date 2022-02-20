@@ -7,8 +7,8 @@
 #include <exception>
 #include <boost/format.hpp>
 
-#include "Hex.hpp"
-#include "Util.hpp"
+#include "hex.hpp"
+#include "util.hpp"
 
 class Processor {
 
