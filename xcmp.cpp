@@ -283,19 +283,20 @@ class Lexer {
     }
     Token token;
     switch(lastChar) {
-    case '[': token = Token::LBRACKET;  break;
-    case ']': token = Token::RBRACKET;  break;
-    case '(': token = Token::LPAREN;    break;
-    case ')': token = Token::RPAREN;    break;
-    case '{': token = Token::BEGIN;     break;
-    case '}': token = Token::END;       break;
-    case ';': token = Token::SEMICOLON; break;
-    case ',': token = Token::COMMA;     break;
-    case '+': token = Token::PLUS;      break;
-    case '-': token = Token::MINUS;     break;
-    case '=': token = Token::EQ;        break;
+    case '[': readChar(); token = Token::LBRACKET;  break;
+    case ']': readChar(); token = Token::RBRACKET;  break;
+    case '(': readChar(); token = Token::LPAREN;    break;
+    case ')': readChar(); token = Token::RPAREN;    break;
+    case '{': readChar(); token = Token::BEGIN;     break;
+    case '}': readChar(); token = Token::END;       break;
+    case ';': readChar(); token = Token::SEMICOLON; break;
+    case ',': readChar(); token = Token::COMMA;     break;
+    case '+': readChar(); token = Token::PLUS;      break;
+    case '-': readChar(); token = Token::MINUS;     break;
+    case '=': readChar(); token = Token::EQ;        break;
     case '<':
       if (readChar() == '=') {
+        readChar();
         token = Token::LE;
       } else {
         token = Token::LS;
@@ -303,6 +304,7 @@ class Lexer {
       break;
     case '>':
       if (readChar() == '=') {
+        readChar();
         token = Token::GE;
       } else {
         token = Token::GR;
@@ -310,6 +312,7 @@ class Lexer {
       break;
     case '~':
       if (readChar() == '=') {
+        readChar();
         token = Token::NE;
       } else {
         token = Token::NOT;
@@ -317,6 +320,7 @@ class Lexer {
       break;
     case ':':
       if (readChar() == '=') {
+        readChar();
         token = Token::ASS;
       } else {
         throw std::runtime_error("'=' expected");
@@ -329,6 +333,7 @@ class Lexer {
       if (lastChar != '\'') {
         throw std::runtime_error("expected ' after char constant");
       }
+      readChar();
       break;
     case '\"':
       readChar();
@@ -337,15 +342,16 @@ class Lexer {
       if (lastChar != '"') {
         throw std::runtime_error("expected \" after string");
       }
+      readChar();
       break;
     case EOF:
       file.close();
       token = Token::END_OF_FILE;
+      readChar();
       break;
     default:
       throw std::runtime_error("unexpected character");
     }
-    readChar();
     return token;
   }
 
@@ -966,7 +972,7 @@ public:
     indentCount--;
   };
   void visitPre(CallStatement &stmt) override {
-    indent(); outs << "callstmt\n";
+    indent(); outs << boost::format("callstmt %s\n") % stmt.getName();
     indentCount++;
   };
   void visitPost(CallStatement &stmt) override {
@@ -1048,10 +1054,12 @@ class Parser {
   std::unique_ptr<Expr> parseExpr() {
     // Unary operations.
     if (lexer.getLastToken() == Token::MINUS) {
+      lexer.getNextToken();
       auto element = parseElement();
       return std::make_unique<UnaryOpExpr>(Token::MINUS, std::move(element));
     }
     if (lexer.getLastToken() == Token::NOT) {
+      lexer.getNextToken();
       auto element = parseElement();
       return std::make_unique<UnaryOpExpr>(Token::NOT, std::move(element));
     }
@@ -1071,9 +1079,11 @@ class Parser {
   ///   <expr> [ "," <expr> ]
   std::vector<std::unique_ptr<Expr>> parseExprList() {
     std::vector<std::unique_ptr<Expr>> exprList;
-    do {
+    exprList.push_back(parseExpr());
+    while (lexer.getLastToken() == Token::COMMA) {
+      lexer.getNextToken();
       exprList.push_back(parseExpr());
-    } while (lexer.getLastToken() == Token::COMMA);
+    }
     return exprList;
   }
 
@@ -1131,7 +1141,8 @@ class Parser {
       return expr;
     }
     default:
-      throw std::runtime_error("in expression");
+      std::cout << tokenEnumStr(lexer.getLastToken()) << "\n";
+      throw std::runtime_error("in expression element");
     }
   }
 
