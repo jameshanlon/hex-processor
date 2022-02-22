@@ -52,12 +52,14 @@ class Tests(unittest.TestCase):
         self.run_x_program('hello.x', 'hello\n')
 
     def test_x_compiler_sim(self):
+        # Compile xhexb.x with xhexb.bin on simulator.
         infile = open(os.path.join(defs.TEST_SRC_PREFIX, 'xhexb.x'), 'rb')
         output = subprocess.run([SIM_BINARY, 'xhexb.bin'], input=infile.read(), capture_output=True)
         self.assertTrue(output.stdout.decode('utf-8') == 'tree size: 18631\nprogram size: 17101\nsize: 177105\n')
         infile.close()
 
     def test_x_compiler_verilator(self):
+        # Compile xhexb.x with xhexb.bin on RTL.
         infile = open(os.path.join(defs.TEST_SRC_PREFIX, 'xhexb.x'), 'rb')
         output = subprocess.run([VTB_BINARY, 'xhexb.bin'], input=infile.read(), capture_output=True)
         self.assertTrue(output.stdout.decode('utf-8').endswith('tree size: 18631\nprogram size: 17101\nsize: 177105\n'))
@@ -69,6 +71,11 @@ class Tests(unittest.TestCase):
         subprocess.run([CMP_BINARY, infile, '-o', 'a.bin'])
         output = subprocess.run([SIM_BINARY, 'a.bin'], capture_output=True)
         self.assertTrue(output.stdout.decode('utf-8') == '')
+
+    def test_x_compiler_xhexb_x_tree(self):
+        # Check xcmp can parse and print the tree of xhexb.x
+        infile = os.path.join(defs.TEST_SRC_PREFIX, 'xhexb.x')
+        subprocess.run([CMP_BINARY, infile, '--tree'])
 
 if __name__ == '__main__':
     unittest.main()
