@@ -1,3 +1,5 @@
+![Build](https://github.com/jameshanlon/hex-processor/workflows/Build%20and%20test/badge.svg)
+
 # Hex processor
 
 This repository contains an assembler, simulator and hardware implementation
