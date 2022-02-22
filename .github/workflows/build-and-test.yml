@@ -1,0 +1,51 @@
+name: Build and test
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -yq libboost-all-dev libfl-dev verilator yosys
+
+    - name: Install Python packages
+      run:  |
+        cd / # Workaround for pip installing binaries into '/home/runner/.local/bin'
+        sudo python3 -m pip install --upgrade pip
+    - name: Create build environment
+      run: cmake -E make_directory ${{github.workspace}}/build
+
+    - name: Create install environment
+      run: cmake -E make_directory ${{github.workspace}}/install
+
+    - name: Configure CMake
+      shell: bash
+      working-directory: ${{github.workspace}}/build
+      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DUSE_YOSYS=NO
+
+    - name: Build
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      run: cmake --build . --config $BUILD_TYPE
+
+    - name: Install
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      run: cmake --install . --config $BUILD_TYPE
+
+    - name: Test
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      run: ctest -C $BUILD_TYPE --verbose
