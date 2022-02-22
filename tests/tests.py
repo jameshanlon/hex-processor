@@ -60,10 +60,11 @@ class Tests(unittest.TestCase):
 
     def test_x_compiler_verilator(self):
         # Compile xhexb.x with xhexb.bin on RTL.
-        infile = open(os.path.join(defs.TEST_SRC_PREFIX, 'xhexb.x'), 'rb')
-        output = subprocess.run([VTB_BINARY, 'xhexb.bin'], input=infile.read(), capture_output=True)
-        self.assertTrue(output.stdout.decode('utf-8').endswith('tree size: 18631\nprogram size: 17101\nsize: 177105\n'))
-        infile.close()
+        if (defs.USE_VERILATOR):
+            infile = open(os.path.join(defs.TEST_SRC_PREFIX, 'xhexb.x'), 'rb')
+            output = subprocess.run([VTB_BINARY, 'xhexb.bin'], input=infile.read(), capture_output=True)
+            self.assertTrue(output.stdout.decode('utf-8').endswith('tree size: 18631\nprogram size: 17101\nsize: 177105\n'))
+            infile.close()
 
     def test_x_compiler_empty(self):
         # Compile an empty program and check it executes.
