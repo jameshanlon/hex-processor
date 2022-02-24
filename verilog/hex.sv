@@ -47,13 +47,11 @@ module hex
   );
 
   initial begin
-`ifdef VERILATOR_TRACE
     if ($test$plusargs("trace") != 0) begin
        $display("[%0t] Tracing to logs/vlt_dump.vcd...\n", $time);
        $dumpfile("logs/vlt_dump.vcd");
        $dumpvars();
     end
-`endif
   end
 
 endmodule

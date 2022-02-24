@@ -61,7 +61,6 @@ if (USE_VERILATOR)
 
   verilate(hextb TRACE
            VERILATOR_ARGS --top-module hex
-           #VERILATOR_ARGS -DVERILATOR_TRACE
            SOURCES verilog/hex_pkg.sv
                    verilog/hex.sv
                    verilog/processor.sv
