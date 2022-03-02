@@ -1,7 +1,49 @@
-#ifndef ASM_HPP
-#define ASM_HPP
+#ifndef HEX_ASM_HPP
+#define HEX_ASM_HPP
+
+#include <cctype>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <istream>
+#include <fstream>
+#include <sstream>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+#include <map>
+#include <boost/format.hpp>
 
 #include "hex.hpp"
+
+// An assembler for the Hex instruction set, based on xhexb.x and with
+// inspiration from the LLVM Kaleidoscope tutorial:
+//   https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl02.html
+
+// EBNF grammar:
+//
+// program        := { <label> | <data> | <instruction> | <func> | <proc> }
+// label          := <alpha> <natural-number>
+// data           := <data> <integer-number>
+// func           := "FUNC" <identifier>
+// proc           := "PROC" <identifier>
+// instruction    := <opcode> <number>
+//                 | <opcode> <label>
+//                 | "OPR" <opcode>
+// operand        := <number>
+//                 | <label>
+// opcode         := "LDAM" | "LDBM" | "STAM" | "LDAC" | "LDBC" | "LDAP"
+//                 | "LDAI" | "LDBI | "STAI" | "BR" | "BRZ" | "BRN" | "BRB"
+//                 | "SVC" | "ADD" | "SUB
+// identifier     := <alpha> { <aplha> | <digit> | '_' }
+// alpha          := 'a' | 'b' | ... | 'x' | 'A' | 'B' | ... | 'X'
+// digit-not-zero := '1' | '2' | ... | '9'
+// digit          := '0' | <digit-not-zero>
+// natural-number := <digit-not-zero> { <digit> }
+// integer-number := '0' | [ '-' ] <natural-number>
+//
+// Comments start with '#' and continue to the end of the line.
 
 namespace hexasm {
 
@@ -252,6 +294,268 @@ public:
 };
 
 //===---------------------------------------------------------------------===//
+// Lexer
+//===---------------------------------------------------------------------===//
+
+class Table {
+  std::map<std::string, Token> table;
+
+public:
+  void insert(const std::string &name, const Token token) {
+    table.insert(std::make_pair(name, token));
+  }
+
+  /// Lookup a token type by identifier.
+  Token lookup(const std::string &name) {
+    auto it = table.find(name);
+    if(it != table.end()) {
+      return it->second;
+    }
+    table.insert(std::make_pair(name, Token::IDENTIFIER));
+    return Token::IDENTIFIER;
+  }
+};
+
+class Lexer {
+
+  Table         table;
+  std::unique_ptr<std::istream> file;
+  char          lastChar;
+  std::string   identifier;
+  unsigned      value;
+  Token    lastToken;
+  size_t        currentLineNumber;
+  std::string   currentLine;
+
+  void declareKeywords() {
+    table.insert("ADD",  Token::ADD);
+    table.insert("BRN",  Token::BRN);
+    table.insert("BR",   Token::BR);
+    table.insert("BRB",  Token::BRB);
+    table.insert("BRZ",  Token::BRZ);
+    table.insert("DATA", Token::DATA);
+    table.insert("FUNC", Token::FUNC);
+    table.insert("LDAC", Token::LDAC);
+    table.insert("LDAI", Token::LDAI);
+    table.insert("LDAM", Token::LDAM);
+    table.insert("LDAP", Token::LDAP);
+    table.insert("LDBC", Token::LDBC);
+    table.insert("LDBI", Token::LDBI);
+    table.insert("LDBM", Token::LDBM);
+    table.insert("OPR",  Token::OPR);
+    table.insert("PROC", Token::PROC);
+    table.insert("STAI", Token::STAI);
+    table.insert("STAM", Token::STAM);
+    table.insert("SUB",  Token::SUB);
+    table.insert("SVC",  Token::SVC);
+  }
+
+  int readChar() {
+    file->get(lastChar);
+    currentLine += lastChar;
+    if (file->eof()) {
+      lastChar = EOF;
+    }
+    return lastChar;
+  }
+
+  Token readToken() {
+    // Skip whitespace.
+    while (std::isspace(lastChar)) {
+      if (lastChar == '\n') {
+        currentLineNumber++;
+        currentLine.clear();
+      }
+      readChar();
+    }
+    // Comment.
+    if (lastChar == '#') {
+      do {
+        readChar();
+      } while (lastChar != EOF && lastChar != '\n');
+      if (lastChar == '\n') {
+        currentLineNumber++;
+        currentLine.clear();
+        readChar();
+      }
+      return readToken();
+    }
+    // Identifier.
+    if (std::isalpha(lastChar)) {
+      identifier = std::string(1, lastChar);
+      while (std::isalnum(readChar()) || lastChar == '_') {
+        identifier += lastChar;
+      }
+      return table.lookup(identifier);
+    }
+    // Number.
+    if (std::isdigit(lastChar)) {
+      std::string number(1, lastChar);
+      while (std::isdigit(readChar())) {
+        number += lastChar;
+      }
+      value = std::strtoul(number.c_str(), nullptr, 10);
+      return Token::NUMBER;
+    }
+    // Symbols.
+    if (lastChar == '-') {
+      readChar();
+      return Token::MINUS;
+    }
+    // End of file.
+    if (lastChar == EOF) {
+      if (auto ifstream = dynamic_cast<std::ifstream*>(file.get())) {
+        ifstream->close();
+      }
+      return Token::END_OF_FILE;
+    }
+    readChar();
+    return Token::NONE;
+  }
+
+public:
+
+  Lexer() : currentLineNumber(0) {
+    declareKeywords();
+  }
+
+  Token getNextToken() {
+    return lastToken = readToken();
+  }
+
+  /// Open a file using ifstream.
+  void openFile(const char *filename) {
+    auto ifstream = std::make_unique<std::ifstream>();
+    ifstream->open(filename, std::ifstream::in);
+    if (!ifstream->is_open()) {
+      throw std::runtime_error("could not open file");
+    }
+    file.reset(ifstream.release());
+    readChar();
+  }
+
+  /// Load a string using istringstream.
+  void loadBuffer(const std::string &buffer) {
+    file = std::make_unique<std::istringstream>(buffer);
+    readChar();
+  }
+
+  /// Tokenise the input only and report the tokens.
+  void emitTokens(std::ostream &out) {
+    while (true) {
+      switch (getNextToken()) {
+        case Token::IDENTIFIER:
+          out << "IDENTIFIER " << getIdentifier() << "\n";
+          break;
+        case Token::NUMBER:
+          out << "NUMBER " << getNumber() << "\n";
+          break;
+        case Token::END_OF_FILE:
+          out << "EOF\n";
+          return;
+        default:
+          out << tokenEnumStr(getLastToken()) << "\n";
+          break;
+      }
+    }
+  }
+
+  const std::string &getIdentifier() const { return identifier; }
+  unsigned getNumber() const { return value; }
+  Token getLastToken() const { return lastToken; }
+  size_t getLineNumber() const { return currentLineNumber; }
+  const std::string &getLine() const { return currentLine; }
+};
+
+//===---------------------------------------------------------------------===//
+// Parser
+//===---------------------------------------------------------------------===//
+
+class Parser {
+  Lexer &lexer;
+
+  void expectLast(Token token) const {
+    if (token != lexer.getLastToken()) {
+      throw std::runtime_error(std::string("expected ")+tokenEnumStr(token));
+    }
+  }
+
+  void expectNext(Token token) const {
+    lexer.getNextToken();
+    expectLast(token);
+  }
+
+  int parseInteger() {
+    if (lexer.getLastToken() == Token::MINUS) {
+       expectNext(Token::NUMBER);
+       return -lexer.getNumber();
+    }
+    expectLast(Token::NUMBER);
+    return lexer.getNumber();
+  }
+
+  std::string parseIdentifier() {
+    lexer.getNextToken();
+    return lexer.getIdentifier();
+  }
+
+  std::unique_ptr<Directive> parseDirective() {
+    switch (lexer.getLastToken()) {
+      case Token::DATA:
+        lexer.getNextToken();
+        return std::make_unique<Data>(Token::DATA, parseInteger());
+      case Token::FUNC:
+        return std::make_unique<Func>(Token::FUNC, parseIdentifier());
+      case Token::PROC:
+        return std::make_unique<Proc>(Token::PROC, parseIdentifier());
+      case Token::IDENTIFIER:
+        return std::make_unique<Label>(Token::IDENTIFIER, lexer.getIdentifier());
+      case Token::OPR:
+        return std::make_unique<InstrOp>(Token::OPR, lexer.getNextToken());
+      case Token::LDAM:
+      case Token::LDBM:
+      case Token::STAM:
+      case Token::LDAC:
+      case Token::LDBC: {
+        auto opcode = lexer.getLastToken();
+        if (lexer.getNextToken() == Token::IDENTIFIER) {
+          return std::make_unique<InstrLabel>(opcode, lexer.getIdentifier(), false);
+        } else {
+          return std::make_unique<InstrImm>(opcode, parseInteger());
+        }
+      }
+      case Token::LDAP:
+      case Token::LDAI:
+      case Token::LDBI:
+      case Token::STAI:
+      case Token::BR:
+      case Token::BRN:
+      case Token::BRZ: {
+        auto opcode = lexer.getLastToken();
+        if (lexer.getNextToken() == Token::IDENTIFIER) {
+          return std::make_unique<InstrLabel>(opcode, lexer.getIdentifier(), true);
+        } else {
+          return std::make_unique<InstrImm>(opcode, parseInteger());\
+        }
+      }
+      default:
+        throw std::runtime_error(std::string("unrecognised token ")+tokenEnumStr(lexer.getLastToken()));
+    }
+  }
+
+public:
+  Parser(Lexer &lexer) : lexer(lexer) {}
+
+  std::vector<std::unique_ptr<Directive>> parseProgram() {
+    std::vector<std::unique_ptr<Directive>> program;
+    while (lexer.getNextToken() != Token::END_OF_FILE) {
+      program.push_back(parseDirective());
+    }
+    return program;
+  }
+};
+
+//===---------------------------------------------------------------------===//
 // Functions for determining instruction encoding sizes.
 //===---------------------------------------------------------------------===//
 
@@ -376,20 +680,21 @@ size_t prepareProgram(std::vector<std::unique_ptr<Directive>> &program) {
   return programSize;
 }
 
-/// Emit the program to stdout.
-void emitProgramText(std::vector<std::unique_ptr<Directive>> &program) {
+/// Emit the program to an output stream.
+void emitProgramText(std::vector<std::unique_ptr<Directive>> &program,
+                     std::ostream &out) {
   for (auto &directive : program) {
-    std::cout << boost::format("%#08x %-20s (%d bytes)\n")
-                   % directive->getByteOffset()
-                   % directive->toString()
-                   % directive->getSize();
+    out << boost::format("%#08x %-20s (%d bytes)\n")
+             % directive->getByteOffset()
+             % directive->toString()
+             % directive->getSize();
   }
-  std::cout << boost::format("%d bytes\n") % getProgramSize(program);
+  out << boost::format("%d bytes\n") % getProgramSize(program);
 }
 
 /// Emit each directive of the program as binary.
 void emitProgramBin(std::vector<std::unique_ptr<Directive>> &program,
-                    std::fstream &outputFile) {
+                    std::ostream &outputFile) {
   int byteOffset = 0;
   for (auto &directive : program) {
     size_t size = directive->getSize();
@@ -454,4 +759,4 @@ void emitBin(std::vector<std::unique_ptr<Directive>> &program,
 
 } // End namespace hexasm.
 
-#endif // ASM_HPP
+#endif // HEX_ASM_HPP
