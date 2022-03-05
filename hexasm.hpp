@@ -157,10 +157,46 @@ static int tokenToOprInstrOpc(Token token) {
 }
 
 //===---------------------------------------------------------------------===//
+// Functions for determining instruction encoding sizes.
+//===---------------------------------------------------------------------===//
+
+/// Return the number of 4-bit immediates required to represent the value.
+static size_t numNibbles(int value) {
+  if (value == 0) {
+    return 1;
+  }
+  if (value < 0 && std::abs(value) < 16) {
+    // Account for NFIX required to add leading 1s.
+    return 2;
+  }
+  if (value < 0) {
+    value = std::abs(value);
+  }
+  size_t n = 1;
+  while (value >= 16) {
+    value >>= 4;
+    n++;
+  }
+  return n;
+}
+
+/// Return the length of an instruction that has a relative label reference.
+/// The length of the encoding depends on the distance to the label, which in
+/// turn depends on the length of the instruction. Calculate the value by
+/// increasing the length until they match.
+static int instrLen(int labelOffset, int byteOffset) {
+  int length = 1;
+  while (length < numNibbles(labelOffset - byteOffset - length)) {
+    length++;
+  }
+  return length;
+}
+
+//===---------------------------------------------------------------------===//
 // Directive data types.
 //===---------------------------------------------------------------------===//
 
-static size_t numNibbles(int value);
+size_t numNibbles(int value);
 
 // Base class for all directives.
 struct Directive {
@@ -318,14 +354,14 @@ public:
 
 class Lexer {
 
-  Table         table;
+  Table                         table;
   std::unique_ptr<std::istream> file;
-  char          lastChar;
-  std::string   identifier;
-  unsigned      value;
-  Token    lastToken;
-  size_t        currentLineNumber;
-  std::string   currentLine;
+  char                          lastChar;
+  std::string                   identifier;
+  unsigned                      value;
+  Token                         lastToken;
+  size_t                        currentLineNumber;
+  std::string                   currentLine;
 
   void declareKeywords() {
     table.insert("ADD",  Token::ADD);
@@ -556,206 +592,172 @@ public:
 };
 
 //===---------------------------------------------------------------------===//
-// Functions for determining instruction encoding sizes.
+// Code generation.
 //===---------------------------------------------------------------------===//
 
-/// Return the number of 4-bit immediates required to represent the value.
-size_t numNibbles(int value) {
-  if (value == 0) {
-    return 1;
-  }
-  if (value < 0 && std::abs(value) < 16) {
-    // Account for NFIX required to add leading 1s.
-    return 2;
-  }
-  if (value < 0) {
-    value = std::abs(value);
-  }
-  size_t n = 1;
-  while (value >= 16) {
-    value >>= 4;
-    n++;
-  }
-  return n;
-}
+class CodeGen {
 
-/// Return the length of an instruction that has a relative label reference.
-/// The length of the encoding depends on the distance to the label, which in
-/// turn depends on the length of the instruction. Calculate the value by
-/// increasing the length until they match.
-int instrLen(int labelOffset, int byteOffset) {
-  int length = 1;
-  while (length < numNibbles(labelOffset - byteOffset - length)) {
-    length++;
-  }
-  return length;
-}
-
-//===---------------------------------------------------------------------===//
-// Functions for generating binary output.
-//===---------------------------------------------------------------------===//
-
-/// Create a map of label strings to label Directives.
-std::map<std::string, Label*>
-createLabelMap(std::vector<std::unique_ptr<Directive>> &program) {
+  std::vector<std::unique_ptr<Directive>> &program;
   std::map<std::string, Label*> labelMap;
-  for (auto &directive : program) {
-    if (directive->getToken() == Token::IDENTIFIER) {
-      auto label = dynamic_cast<Label*>(directive.get());
-      labelMap[label->getLabel()] = label;
-    }
-  }
-  return labelMap;
-}
+  size_t programSize;
 
-/// Iteratively update label values until the program size does not change.
-/// Return the final size of the program.
-void resolveLabels(std::vector<std::unique_ptr<Directive>> &program,
-                   std::map<std::string, Label*> &labelMap) {
-  int lastSize = -1;
-  int byteOffset = 0;
-  //int count = 0;
-  while (lastSize != byteOffset) {
-    //std::cout << "Resolving labels iteration " << count++ << "\n";
-    lastSize = byteOffset;
-    byteOffset = 0;
+  /// Create a map of label strings to label Directives.
+  std::map<std::string, Label*> createLabelMap() {
+    std::map<std::string, Label*> labelMap;
     for (auto &directive : program) {
-      if (directive->getToken() == Token::DATA) {
-        // Data must be on 4-byte boundaries.
-        if (byteOffset & 0x3) {
-          byteOffset += 4 - (byteOffset & 0x3);
-        }
-      }
-      // Update the label value.
       if (directive->getToken() == Token::IDENTIFIER) {
-        dynamic_cast<Label*>(directive.get())->setLabelValue(byteOffset);
+        auto label = dynamic_cast<Label*>(directive.get());
+        labelMap[label->getLabel()] = label;
       }
-      // Update the label operand value of an instruction, accounting for
-      // relative and absolute references.
-      if (directive->operandIsLabel()) {
-        auto instrLabel = dynamic_cast<InstrLabel*>(directive.get());
-        int labelValue = labelMap[instrLabel->getLabel()]->getValue();
-        if (instrLabel->isRelative()) {
-          int offset = labelValue - byteOffset;
-          //std::cout << "label value " << labelValue
-          //          << " byteOffset " << byteOffset
-          //          << " offset " << offset
-          //          << " instrlen " << instrLen(labelValue, byteOffset) << "\n";
-          if (offset >= 0) {
-            instrLabel->setLabelValue(offset - instrLen(labelValue, byteOffset));
-          } else {
-            instrLabel->setLabelValue(offset - instrLen(labelValue, byteOffset));
+    }
+    return labelMap;
+  }
+
+  /// Iteratively update label values until the program size does not change.
+  /// Return the final size of the program.
+  void resolveLabels() {
+    int lastSize = -1;
+    int byteOffset = 0;
+    //int count = 0;
+    while (lastSize != byteOffset) {
+      //std::cout << "Resolving labels iteration " << count++ << "\n";
+      lastSize = byteOffset;
+      byteOffset = 0;
+      for (auto &directive : program) {
+        if (directive->getToken() == Token::DATA) {
+          // Data must be on 4-byte boundaries.
+          if (byteOffset & 0x3) {
+            byteOffset += 4 - (byteOffset & 0x3);
           }
-        } else {
-          assert((labelValue & 0x3) == 0 && "absolute label value is not word aligned");
-          instrLabel->setLabelValue(labelValue >> 2);
         }
+        // Update the label value.
+        if (directive->getToken() == Token::IDENTIFIER) {
+          dynamic_cast<Label*>(directive.get())->setLabelValue(byteOffset);
+        }
+        // Update the label operand value of an instruction, accounting for
+        // relative and absolute references.
+        if (directive->operandIsLabel()) {
+          auto instrLabel = dynamic_cast<InstrLabel*>(directive.get());
+          int labelValue = labelMap[instrLabel->getLabel()]->getValue();
+          if (instrLabel->isRelative()) {
+            int offset = labelValue - byteOffset;
+            //std::cout << "label value " << labelValue
+            //          << " byteOffset " << byteOffset
+            //          << " offset " << offset
+            //          << " instrlen " << instrLen(labelValue, byteOffset) << "\n";
+            if (offset >= 0) {
+              instrLabel->setLabelValue(offset - instrLen(labelValue, byteOffset));
+            } else {
+              instrLabel->setLabelValue(offset - instrLen(labelValue, byteOffset));
+            }
+          } else {
+            assert((labelValue & 0x3) == 0 && "absolute label value is not word aligned");
+            instrLabel->setLabelValue(labelValue >> 2);
+          }
+        }
+        directive->setByteOffset(byteOffset);
+        byteOffset += directive->getSize();
       }
-      directive->setByteOffset(byteOffset);
-      byteOffset += directive->getSize();
     }
   }
-}
 
-/// Return the size of the program in bytes (after resolveLabels()).
-size_t getProgramSize(std::vector<std::unique_ptr<Directive>> &program) {
-  return program.back()->getByteOffset() + program.back()->getSize();
-}
+public:
 
-/// Prepare the program for binary emission by resolving labels and padding.
-size_t prepareProgram(std::vector<std::unique_ptr<Directive>> &program) {
+  /// Constructor.
+  CodeGen(std::vector<std::unique_ptr<Directive>> &program) :
+      program(program), programSize(0) {
 
-  // Iteratively resolve label values.
-  auto labelMap = createLabelMap(program);
-  resolveLabels(program, labelMap);
+    // Iteratively resolve label values.
+    createLabelMap();
+    resolveLabels();
 
-  // Determine the size of the program.
-  auto programSize = getProgramSize(program);
+    // Determine the size of the program.
+    auto programSize = getProgramSize();
 
-  // Add space for padding bytes at the end.
-  auto paddingBytes = ((programSize + 3U) & ~3U) - programSize;
-  program.push_back(std::make_unique<Padding>(paddingBytes));
-  programSize += paddingBytes;
-
-  return programSize;
-}
-
-/// Emit the program to an output stream.
-void emitProgramText(std::vector<std::unique_ptr<Directive>> &program,
-                     std::ostream &out) {
-  for (auto &directive : program) {
-    out << boost::format("%#08x %-20s (%d bytes)\n")
-             % directive->getByteOffset()
-             % directive->toString()
-             % directive->getSize();
+    // Add space for padding bytes at the end.
+    auto paddingBytes = ((programSize + 3U) & ~3U) - programSize;
+    program.push_back(std::make_unique<Padding>(paddingBytes));
+    programSize += paddingBytes;
   }
-  out << boost::format("%d bytes\n") % getProgramSize(program);
-}
 
-/// Emit each directive of the program as binary.
-void emitProgramBin(std::vector<std::unique_ptr<Directive>> &program,
-                    std::ostream &outputFile) {
-  int byteOffset = 0;
-  for (auto &directive : program) {
-    size_t size = directive->getSize();
-    // Padding
-    if (directive->getToken() == Token::PADDING) {
-      for (size_t i=0; i<directive->getSize(); i++) {
-        outputFile.put(0);
-      }
-    // Data
-    } else if (directive->getToken() == Token::DATA) {
-      // Add padding for 4-byte data alignment.
-      if (byteOffset & 0x3) {
-        int paddingBytes = 4 - (byteOffset & 0x3);
-        int paddingValue = 0;
-        outputFile.write(reinterpret_cast<const char*>(&paddingValue), paddingBytes);
-        byteOffset += paddingBytes;
-      }
-      auto dataDirective = dynamic_cast<Data*>(directive.get());
-      auto value = dataDirective->getValue();
-      outputFile.write(reinterpret_cast<const char*>(&value), size);
-      byteOffset += size;
-    // Instruction
-    } else if (size > 0) {
-      if (size > 1) {
-        // Output PFIX/NFIX to extend the immediate value.
-        hex::Instr instr = (directive->getValue() < 0) ? hex::Instr::NFIX : hex::Instr::PFIX;
-        char instrValue = instrToInstrOpc(instr) << 4 |
-                          ((directive->getValue() >> ((size - 1) * 4)) & 0xF);
-        outputFile.put(instrValue);
-        byteOffset++;
-      }
-      if (size > 2) {
-        for (size_t i=size-2; i>0; i--) {
-          char instrValue = instrToInstrOpc(hex::Instr::PFIX) << 4 |
-                            ((directive->getValue() >> (i * 4)) & 0xF);
+  /// Return the size of the program in bytes (after resolveLabels()).
+  size_t getProgramSize() {
+    return program.back()->getByteOffset() + program.back()->getSize();
+  }
+
+  /// Emit the program to an output stream.
+  void emitProgramText(std::ostream &out) {
+    for (auto &directive : program) {
+      out << boost::format("%#08x %-20s (%d bytes)\n")
+               % directive->getByteOffset()
+               % directive->toString()
+               % directive->getSize();
+    }
+    out << boost::format("%d bytes\n") % getProgramSize();
+  }
+
+  /// Emit each directive of the program as binary.
+  void emitProgramBin(std::ostream &outputFile) {
+    int byteOffset = 0;
+    for (auto &directive : program) {
+      size_t size = directive->getSize();
+      // Padding
+      if (directive->getToken() == Token::PADDING) {
+        for (size_t i=0; i<directive->getSize(); i++) {
+          outputFile.put(0);
+        }
+      // Data
+      } else if (directive->getToken() == Token::DATA) {
+        // Add padding for 4-byte data alignment.
+        if (byteOffset & 0x3) {
+          int paddingBytes = 4 - (byteOffset & 0x3);
+          int paddingValue = 0;
+          outputFile.write(reinterpret_cast<const char*>(&paddingValue), paddingBytes);
+          byteOffset += paddingBytes;
+        }
+        auto dataDirective = dynamic_cast<Data*>(directive.get());
+        auto value = dataDirective->getValue();
+        outputFile.write(reinterpret_cast<const char*>(&value), size);
+        byteOffset += size;
+      // Instruction
+      } else if (size > 0) {
+        if (size > 1) {
+          // Output PFIX/NFIX to extend the immediate value.
+          hex::Instr instr = (directive->getValue() < 0) ? hex::Instr::NFIX : hex::Instr::PFIX;
+          char instrValue = instrToInstrOpc(instr) << 4 |
+                            ((directive->getValue() >> ((size - 1) * 4)) & 0xF);
           outputFile.put(instrValue);
           byteOffset++;
         }
+        if (size > 2) {
+          for (size_t i=size-2; i>0; i--) {
+            char instrValue = instrToInstrOpc(hex::Instr::PFIX) << 4 |
+                              ((directive->getValue() >> (i * 4)) & 0xF);
+            outputFile.put(instrValue);
+            byteOffset++;
+          }
+        }
+        // Output the instruction
+        char instrValue = (tokenToInstrOpc(directive->getToken()) & 0xF) << 4 |
+                          (directive->getValue() & 0xF);
+        outputFile.put(instrValue);
+        byteOffset++;
       }
-      // Output the instruction
-      char instrValue = (tokenToInstrOpc(directive->getToken()) & 0xF) << 4 |
-                        (directive->getValue() & 0xF);
-      outputFile.put(instrValue);
-      byteOffset++;
     }
   }
-}
 
-/// Emit the binary.
-void emitBin(std::vector<std::unique_ptr<Directive>> &program,
-             std::string outputFilename,
-             size_t programSizeBytes) {
-  std::fstream outputFile(outputFilename, std::ios::out | std::ios::binary);
-  // The first four bytes are the remaining binary size.
-  auto programSize = programSizeBytes >> 2;
-  outputFile.write(reinterpret_cast<const char*>(&programSize), sizeof(unsigned));
-  // Emit the program.
-  emitProgramBin(program, outputFile);
-  // Done.
-  outputFile.close();
-}
+  /// Emit the binary.
+  void emitBin(std::string outputFilename) {
+    std::fstream outputFile(outputFilename, std::ios::out | std::ios::binary);
+    // The first four bytes are the remaining binary size.
+    auto programSizeWords = programSize >> 2;
+    outputFile.write(reinterpret_cast<const char*>(&programSizeWords), sizeof(unsigned));
+    // Emit the program.
+    emitProgramBin(outputFile);
+    // Done.
+    outputFile.close();
+  }
+};
 
 } // End namespace hexasm.
 

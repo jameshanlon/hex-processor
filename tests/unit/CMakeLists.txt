@@ -1,6 +1,7 @@
 add_executable(UnitTests
                main.cpp
-               hexasm.cpp)
+               asm_tests.cpp
+               x_tests.cpp)
 
 target_link_libraries(UnitTests
                       ${Boost_LIBRARIES})

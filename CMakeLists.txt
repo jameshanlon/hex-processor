@@ -41,15 +41,15 @@ add_compile_options(-Wall -pedantic)
 include_directories(${Boost_INCLUDE_DIRS})
 
 # Simulator
-add_executable(hexsim hexsim.cpp)
+add_executable(hexsim hex.cpp hexsim.cpp)
 target_link_libraries(hexsim ${Boost_LIBRARIES})
 
 # Assembler
-add_executable(hexasm hexasm.cpp)
+add_executable(hexasm hex.cpp hexasm.cpp)
 target_link_libraries(hexasm ${Boost_LIBRARIES})
 
 # Compiler
-add_executable(xcmp xcmp.cpp)
+add_executable(xcmp hex.cpp xcmp.cpp)
 target_link_libraries(xcmp ${Boost_LIBRARIES})
 
 install(TARGETS hexasm xcmp hexsim
@@ -57,7 +57,7 @@ install(TARGETS hexasm xcmp hexsim
 
 # Verilator
 if (USE_VERILATOR)
-  add_executable(hextb hextb.cpp)
+  add_executable(hextb hex.cpp hextb.cpp)
 
   verilate(hextb TRACE
            VERILATOR_ARGS --top-module hex

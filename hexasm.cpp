@@ -1,7 +1,5 @@
 #include "hexasm.hpp"
 
-using namespace hexasm;
-
 //===---------------------------------------------------------------------===//
 // Driver
 //===---------------------------------------------------------------------===//
@@ -19,8 +17,8 @@ static void help(const char *argv[]) {
 }
 
 int main(int argc, const char *argv[]) {
-  Lexer lexer;
-  Parser parser(lexer);
+  hexasm::Lexer lexer;
+  hexasm::Parser parser(lexer);
 
   try {
 
@@ -70,17 +68,17 @@ int main(int argc, const char *argv[]) {
     // Parse the program.
     auto program = parser.parseProgram();
 
-    // Resolve labels and padding.
-    auto programSize = prepareProgram(program);
+    // Initialise code generation from the parsed program.
+    hexasm::CodeGen codeGen(program);
 
-    // Parse and print program only.
+    // Print program summary only.
     if (treeOnly) {
-      emitProgramText(program, std::cout);
+      codeGen.emitProgramText(std::cout);
       return 0;
     }
 
     // Emit the binary file.
-    emitBin(program, outputFilename, programSize);
+    codeGen.emitBin(outputFilename);
 
   } catch (std::exception &e) {
     std::cerr << "Error: " << e.what() << "\n";

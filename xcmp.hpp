@@ -118,7 +118,7 @@ static const char *tokenEnumStr(Token token) {
   }
 };
 
-bool isBinaryOp(Token token) {
+static bool isBinaryOp(Token token) {
   switch (token) {
   case Token::PLUS:
   case Token::MINUS:
@@ -157,15 +157,15 @@ public:
 
 class Lexer {
 
-  Table         table;
-  std::ifstream file;
-  char          lastChar;
-  std::string   identifier;
-  std::string   string;
-  unsigned      value;
-  Token         lastToken;
-  size_t        currentLineNumber;
-  std::string   currentLine;
+  Table                         table;
+  std::unique_ptr<std::istream> file;
+  char                          lastChar;
+  std::string                   identifier;
+  std::string                   string;
+  unsigned                      value;
+  Token                         lastToken;
+  size_t                        currentLineNumber;
+  std::string                   currentLine;
 
   void declareKeywords() {
     table.insert("and",    Token::AND);
@@ -189,9 +189,9 @@ class Lexer {
   }
 
   int readChar() {
-    file.get(lastChar);
+    file->get(lastChar);
     currentLine += lastChar;
-    if (file.eof()) {
+    if (file->eof()) {
       lastChar = EOF;
     }
     return lastChar;
@@ -347,7 +347,9 @@ class Lexer {
       readChar();
       break;
     case EOF:
-      file.close();
+      if (auto ifstream = dynamic_cast<std::ifstream*>(file.get())) {
+        ifstream->close();
+      }
       token = Token::END_OF_FILE;
       readChar();
       break;
@@ -367,12 +369,44 @@ public:
     return lastToken = readToken();
   }
 
+  /// Open a file using ifstream.
   void openFile(const char *filename) {
-    file.open(filename, std::ifstream::in);
-    if (!file.is_open()) {
+    auto ifstream = std::make_unique<std::ifstream>();
+    ifstream->open(filename, std::ifstream::in);
+    if (!ifstream->is_open()) {
       throw std::runtime_error("could not open file");
     }
+    file.reset(ifstream.release());
     readChar();
+  }
+
+  /// Load a string using istringstream.
+  void loadBuffer(const std::string &buffer) {
+    file = std::make_unique<std::istringstream>(buffer);
+    readChar();
+  }
+
+  /// Tokenise the input only and report the tokens.
+  void emitTokens(std::ostream &out) {
+    while (true) {
+      switch (getNextToken()) {
+        case Token::IDENTIFIER:
+          out << getIdentifier() << "\n";
+          break;
+        case Token::NUMBER:
+          out << getNumber() << "\n";
+          break;
+        case Token::STRING:
+          out << getString() << "\n";
+          break;
+        case Token::END_OF_FILE:
+          out << "EOF\n";
+          return;
+        default:
+          out << tokenEnumStr(getLastToken()) << "\n";
+          break;
+      }
+    }
   }
 
   const std::string &getIdentifier() const { return identifier; }

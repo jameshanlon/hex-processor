@@ -14,8 +14,6 @@
 #include "hexasm.hpp"
 #include "xcmp.hpp"
 
-using namespace xcmp;
-
 //===---------------------------------------------------------------------===//
 // Driver
 //===---------------------------------------------------------------------===//
@@ -33,14 +31,15 @@ static void help(const char *argv[]) {
 }
 
 int main(int argc, const char *argv[]) {
-  Lexer lexer;
-  Parser parser(lexer);
+  xcmp::Lexer lexer;
+  xcmp::Parser parser(lexer);
 
   try {
 
     // Handle arguments.
     bool tokensOnly = false;
     bool treeOnly = false;
+    bool asmOnly = false;
     const char *filename = nullptr;
     const char *outputFilename = "a.out";
     for (unsigned i = 1; i < argc; ++i) {
@@ -52,6 +51,8 @@ int main(int argc, const char *argv[]) {
         tokensOnly = true;
       } else if (std::strcmp(argv[i], "--tree") == 0) {
         treeOnly = true;
+      } else if (std::strcmp(argv[i], "--asm") == 0) {
+        asmOnly = true;
       } else if (std::strcmp(argv[i], "--output") == 0 ||
                  std::strcmp(argv[i], "-o") == 0) {
         outputFilename = argv[++i];
@@ -77,25 +78,7 @@ int main(int argc, const char *argv[]) {
 
     // Tokenise only.
     if (tokensOnly && !treeOnly) {
-      while (true) {
-        switch (lexer.getNextToken()) {
-          case Token::IDENTIFIER:
-            std::cout << lexer.getIdentifier() << "\n";
-            break;
-          case Token::NUMBER:
-            std::cout << lexer.getNumber() << "\n";
-            break;
-          case Token::STRING:
-            std::cout << lexer.getString() << "\n";
-            break;
-          case Token::END_OF_FILE:
-            std::cout << "EOF\n";
-            std::exit(0);
-          default:
-            std::cout << tokenEnumStr(lexer.getLastToken()) << "\n";
-            break;
-        }
-      }
+      lexer.emitTokens(std::cout);
       return 0;
     }
 
@@ -104,16 +87,25 @@ int main(int argc, const char *argv[]) {
 
     // Parse and print program only.
     if (treeOnly) {
-      AstPrinter printer;
+      xcmp::AstPrinter printer;
       tree->accept(&printer);
       return 0;
     }
 
-    // Generate code.
-    CodeGen codeGen;
+    // Generate assembly code.
+    xcmp::CodeGen codeGen;
     tree->accept(&codeGen);
-    auto programSize = hexasm::prepareProgram(codeGen.getInstrs());
-    hexasm::emitBin(codeGen.getInstrs(), outputFilename, programSize);
+
+    // Assemble the instructions.
+    hexasm::CodeGen asmCodeGen(codeGen.getInstrs());
+
+    // Print the assembly instructions only.
+    if (asmOnly) {
+      asmCodeGen.emitProgramText(std::cout);
+      return 0;
+    }
+
+    asmCodeGen.emitBin(outputFilename);
 
   } catch (std::exception &e) {
     std::cerr << "Error: " << e.what() << "\n";
