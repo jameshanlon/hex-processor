@@ -76,7 +76,8 @@ class Tests(unittest.TestCase):
     def test_x_compiler_xhexb_x_tree(self):
         # Check xcmp can parse and print the tree of xhexb.x
         infile = os.path.join(defs.TEST_SRC_PREFIX, 'xhexb.x')
-        subprocess.run([CMP_BINARY, infile, '--tree'])
+        output = subprocess.run([CMP_BINARY, infile, '--tree'], capture_output=True)
+        self.assertTrue(len(output.stdout.decode('utf-8')) > 0)
 
 if __name__ == '__main__':
     unittest.main()

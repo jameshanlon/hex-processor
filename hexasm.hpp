@@ -599,7 +599,7 @@ class CodeGen {
 
   std::vector<std::unique_ptr<Directive>> &program;
   std::map<std::string, Label*> labelMap;
-  size_t programSize;
+  size_t programSizeBytes;
 
   /// Create a map of label strings to label Directives.
   void createLabelMap() {
@@ -663,19 +663,19 @@ public:
 
   /// Constructor.
   CodeGen(std::vector<std::unique_ptr<Directive>> &program) :
-      program(program), programSize(0) {
+      program(program), programSizeBytes(0) {
 
     // Iteratively resolve label values.
     createLabelMap();
     resolveLabels();
 
     // Determine the size of the program.
-    auto programSize = getProgramSize();
+    programSizeBytes = getProgramSize();
 
     // Add space for padding bytes at the end.
-    auto paddingBytes = ((programSize + 3U) & ~3U) - programSize;
+    auto paddingBytes = ((programSizeBytes + 3U) & ~3U) - programSizeBytes;
     program.push_back(std::make_unique<Padding>(paddingBytes));
-    programSize += paddingBytes;
+    programSizeBytes += paddingBytes;
   }
 
   /// Return the size of the program in bytes (after resolveLabels()).
@@ -748,7 +748,7 @@ public:
   void emitBin(std::string outputFilename) {
     std::fstream outputFile(outputFilename, std::ios::out | std::ios::binary);
     // The first four bytes are the remaining binary size.
-    auto programSizeWords = programSize >> 2;
+    auto programSizeWords = programSizeBytes >> 2;
     outputFile.write(reinterpret_cast<const char*>(&programSizeWords), sizeof(unsigned));
     // Emit the program.
     emitProgramBin(outputFile);
