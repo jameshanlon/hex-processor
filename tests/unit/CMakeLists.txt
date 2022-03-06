@@ -1,5 +1,6 @@
 add_executable(UnitTests
                main.cpp
+               ../../hex.cpp
                asm_tests.cpp
                x_tests.cpp)
 

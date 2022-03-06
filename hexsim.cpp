@@ -5,7 +5,7 @@
 #include <iostream>
 
 #include "hexsim.hpp"
-#include "util.hpp"
+#include "hexsimio.hpp"
 
 //===---------------------------------------------------------------------===//
 // Driver
@@ -51,7 +51,7 @@ int main(int argc, const char *argv[]) {
       help(argv);
       return 1;
     }
-    hexsim::Processor p;
+    hexsim::Processor p(std::cin, std::cout);
     p.setTracing(trace);
     p.load(filename, dumpBinary);
     if (dumpBinary) {

@@ -12,7 +12,7 @@
 #include <boost/format.hpp>
 
 #include "hex.hpp"
-#include "util.hpp"
+#include "hexsimio.hpp"
 
 namespace hexsim {
 
@@ -31,8 +31,11 @@ class Processor {
   // Memory.
   std::array<uint32_t, MEMORY_SIZE_WORDS> memory;
 
-  // IO
-  hex::HexIO io;
+  // IO.
+  hex::HexSimIO io;
+
+  // Logging.
+  std::ostream &out;
 
   // Control.
   bool running;
@@ -44,12 +47,12 @@ class Processor {
 
 public:
 
-  Processor() :
-    pc(0), areg(0), breg(0), oreg(0), running(true), tracing(false), cycles(0) {}
+  Processor(std::istream &in, std::ostream &out) :
+    pc(0), areg(0), breg(0), oreg(0), io(in, out), out(out), running(true), tracing(false), cycles(0) {}
 
   void setTracing(bool value) { tracing = value; }
 
-  void load(const char *filename, bool dumpContents) {
+  void load(const char *filename, bool dumpContents=false) {
     // Load the binary file.
     std::streampos fileSize;
     std::ifstream file(filename, std::ios::binary);
@@ -75,84 +78,84 @@ public:
 
     // Print the contents of the binary.
     if (dumpContents) {
-      std::cout << "Read " << std::to_string(programSize) << " bytes\n";
+      out << "Read " << std::to_string(programSize) << " bytes\n";
       for (size_t i=0; i<(programSize / 4) + 1; i++) {
-        std::cout << boost::format("%08d %08x\n") % i % memory[i];
+        out << boost::format("%08d %08x\n") % i % memory[i];
       }
     }
   }
 
   void traceSyscall() {
     unsigned spWordIndex = memory[1];
-    std::cout << "spWordIndex="<<spWordIndex<<"\n";
+    out << "spWordIndex="<<spWordIndex<<"\n";
     switch (static_cast<hex::Syscall>(areg)) {
       case hex::Syscall::EXIT:
-        std::cout << "exit\n";
+        out << "exit\n";
         break;
       case hex::Syscall::WRITE:
-        std::cout << boost::format("write %d to simout(%d)\n") % memory[spWordIndex+2] % memory[spWordIndex+3];
+        out << boost::format("write %d to simout(%d)\n") % memory[spWordIndex+2] % memory[spWordIndex+3];
         break;
       case hex::Syscall::READ:
-        std::cout << boost::format("read to mem[%08x]\n") % (spWordIndex+1);
+        out << boost::format("read to mem[%08x]\n") % (spWordIndex+1);
         break;
     }
   }
 
   void trace(uint32_t instr, hex::Instr instrEnum) {
-    std::cout << boost::format("%-6d %-6s %-4d") % pc % instrEnumToStr(instrEnum) % (instr & 0xF);
+    out << boost::format("%-6d %-6s %-4d") % pc % instrEnumToStr(instrEnum) % (instr & 0xF);
     switch (instrEnum) {
       case hex::Instr::LDAM:
-        std::cout << boost::format("areg = mem[oreg (%#08x)] (%d)\n") % oreg % memory[oreg];
+        out << boost::format("areg = mem[oreg (%#08x)] (%d)\n") % oreg % memory[oreg];
         break;
       case hex::Instr::LDBM:
-        std::cout << boost::format("breg = mem[oreg (%#08x)] (%d)\n") % oreg % memory[oreg];
+        out << boost::format("breg = mem[oreg (%#08x)] (%d)\n") % oreg % memory[oreg];
         break;
       case hex::Instr::STAM:
-        std::cout << boost::format("mem[oreg (%#08x)] = areg %d\n") % oreg % areg;
+        out << boost::format("mem[oreg (%#08x)] = areg %d\n") % oreg % areg;
         break;
       case hex::Instr::LDAC:
-        std::cout << boost::format("areg = oreg %d\n") % oreg;
+        out << boost::format("areg = oreg %d\n") % oreg;
         break;
       case hex::Instr::LDBC:
-        std::cout << boost::format("breg = oreg %d\n") % oreg;
+        out << boost::format("breg = oreg %d\n") % oreg;
         break;
       case hex::Instr::LDAP:
-        std::cout << boost::format("areg = pc (%d) + oreg (%d) %d\n") % pc % oreg % (pc + oreg);
+        out << boost::format("areg = pc (%d) + oreg (%d) %d\n") % pc % oreg % (pc + oreg);
         break;
       case hex::Instr::LDAI:
-        std::cout << boost::format("areg = mem[areg (%d) + oreg (%d) = %#08x] (%d)\n") % areg % oreg % (areg+oreg) % memory[areg+oreg];
+        out << boost::format("areg = mem[areg (%d) + oreg (%d) = %#08x] (%d)\n") % areg % oreg % (areg+oreg) % memory[areg+oreg];
         break;
       case hex::Instr::LDBI:
-        std::cout << boost::format("breg = mem[breg (%d) + oreg (%d) = %#08x] (%d)\n") % breg % oreg % (breg+oreg) % memory[breg+oreg];
+        out << boost::format("breg = mem[breg (%d) + oreg (%d) = %#08x] (%d)\n") % breg % oreg % (breg+oreg) % memory[breg+oreg];
         break;
       case hex::Instr::STAI:
-        std::cout << boost::format("mem[breg (%d) + oreg (%d) = %#08x] = areg (%d)\n") % breg % oreg % (breg+oreg) % areg;
+        out << boost::format("mem[breg (%d) + oreg (%d) = %#08x] = areg (%d)\n") % breg % oreg % (breg+oreg) % areg;
         break;
       case hex::Instr::BR:
-        std::cout << boost::format("pc = pc + oreg (%d) (%#08x)\n") % oreg % (pc + oreg);
+        out << boost::format("pc = pc + oreg (%d) (%#08x)\n") % oreg % (pc + oreg);
         break;
       case hex::Instr::BRZ:
-        std::cout << boost::format("pc = areg == zero ? pc + oreg (%d) (%#08x) : pc\n") % oreg % (pc + oreg);
+        out << boost::format("pc = areg == zero ? pc + oreg (%d) (%#08x) : pc\n") % oreg % (pc + oreg);
         break;
       case hex::Instr::BRN:
-        std::cout << boost::format("pc = areg < zero ? pc + oreg (%d) (%#08x) : pc\n") % oreg % (pc + oreg);
+        out << boost::format("pc = areg < zero ? pc + oreg (%d) (%#08x) : pc\n") % oreg % (pc + oreg);
         break;
       case hex::Instr::PFIX:
-        std::cout << boost::format("oreg = oreg (%d) << 4 (%#08x)\n") % oreg % (oreg << 4);
+        out << boost::format("oreg = oreg (%d) << 4 (%#08x)\n") % oreg % (oreg << 4);
         break;
       case hex::Instr::NFIX:
-        std::cout << boost::format("oreg = 0xFFFFFF00 | oreg (%d) << 4 (%#08x)\n") % oreg % (0xFFFFFF00 | (oreg << 4));
+        out << boost::format("oreg = 0xFFFFFF00 | oreg (%d) << 4 (%#08x)\n") % oreg % (0xFFFFFF00 | (oreg << 4));
         break;
       case hex::Instr::OPR:
         switch (static_cast<hex::OprInstr>(oreg)) {
           case hex::OprInstr::BRB:
-            std::cout << boost::format("pc = breg (%#08x)\n") % breg;
+            out << boost::format("pc = breg (%#08x)\n") % breg;
             break;
           case hex::OprInstr::ADD:
-           std::cout << boost::format("areg = areg (%d) + breg (%d) (%d)\n") % areg % breg % (areg + breg);
+           out << boost::format("areg = areg (%d) + breg (%d) (%d)\n") % areg % breg % (areg + breg);
             break;
           case hex::OprInstr::SUB:
-           std::cout << boost::format("areg = areg (%d) - breg (%d) (%d)\n") % areg % breg % (areg - breg);
+           out << boost::format("areg = areg (%d) - breg (%d) (%d)\n") % areg % breg % (areg - breg);
             break;
           case hex::OprInstr::SVC:
             traceSyscall();

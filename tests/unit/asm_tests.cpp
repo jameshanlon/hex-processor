@@ -46,4 +46,11 @@ OPR SVC)";
   BOOST_TEST(output.tellp() == 4);
 }
 
+BOOST_AUTO_TEST_CASE(exit_run) {
+  auto program = ""
+R"(LDAC 0
+OPR SVC)";
+  runHexProgram(program);
+}
+
 BOOST_AUTO_TEST_SUITE_END();

@@ -1,25 +1,30 @@
-#ifndef UTIL_HPP
-#define UTIL_HPP
+#ifndef HEX_SIM_IO_HPP
+#define HEX_SIM_IO_HPP
 
 #include <fstream>
+#include <istream>
+#include <ostream>
 #include <string>
 #include <vector>
 
 namespace hex {
 
-class HexIO {
+class HexSimIO {
 
+  //std::istream &in;
+  std::ostream &out;
   std::array<std::fstream, 8> fileIO;
   std::array<bool, 8> connected;
 
 public:
 
-  HexIO() : connected({false, false, false, false, false, false, false, false}) {}
+  HexSimIO(std::istream &in, std::ostream &out) :
+      /*in(in),*/ out(out), connected({false, false, false, false, false, false, false, false}) {}
 
-  /// Output a character to stdout or a file.
+  /// Output a character to ostream or a file.
   void output(char value, int stream) {
     if (stream < 256) {
-      std::cout << value;
+      out << value;
     } else {
       size_t index = (stream >> 8) & 7;
       if (!connected[index]) {
@@ -34,6 +39,10 @@ public:
   /// Input a character from stdin or a file.
   char input(int stream) {
     if (stream < 256) {
+      // FIXME
+      //char c;
+      //in.get(c);
+      //return c;
       return std::getchar();
     } else {
       size_t index = (stream >> 8) & 7;
@@ -50,4 +59,4 @@ public:
 
 }; // End namespace hex.
 
-#endif // UTIL_HPP
+#endif // HEX_SIM_IO_HPP

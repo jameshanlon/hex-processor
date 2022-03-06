@@ -602,15 +602,13 @@ class CodeGen {
   size_t programSize;
 
   /// Create a map of label strings to label Directives.
-  std::map<std::string, Label*> createLabelMap() {
-    std::map<std::string, Label*> labelMap;
+  void createLabelMap() {
     for (auto &directive : program) {
       if (directive->getToken() == Token::IDENTIFIER) {
         auto label = dynamic_cast<Label*>(directive.get());
         labelMap[label->getLabel()] = label;
       }
     }
-    return labelMap;
   }
 
   /// Iteratively update label values until the program size does not change.

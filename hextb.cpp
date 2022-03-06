@@ -12,17 +12,18 @@
 #include "Vhex_pkg_memory.h"
 #include "Vhex_pkg_processor.h"
 #include "hex.hpp"
-#include "util.hpp"
+#include "hexsimio.hpp"
 
 double sc_time_stamp() { return 0; }
 
 constexpr size_t RESET_BEGIN = 1;
 constexpr size_t RESET_END = 10;
 
-hex::HexIO io;
+hex::HexSimIO io(std::cin, std::cout);
 
 void load(const char *filename,
           const std::unique_ptr<Vhex_pkg> &top) {
+
   // Load the binary file.
   std::streampos fileSize;
   std::ifstream file(filename, std::ios::binary);
@@ -44,8 +45,8 @@ void load(const char *filename,
   }
 
   // Read the file contents.
-  std::vector<uint32_t> buffer(programSize);
-  file.read(reinterpret_cast<char*>(buffer.data()), programSize);
+  std::vector<uint32_t> buffer(remainingFileSize);
+  file.read(reinterpret_cast<char*>(buffer.data()), remainingFileSize);
 
   // Write program to DUT memory.
   std::memcpy(top->hex->u_memory->memory_q.data(), buffer.data(), buffer.size());

@@ -33,6 +33,23 @@ struct TestContext {
     return outBuffer;
   }
 
+  /// Run an assembly program.
+  void runHexProgram(const std::string &inBuffer) {
+    // Assemble the program.
+    hexasm::Lexer lexer;
+    hexasm::Parser parser(lexer);
+    lexer.loadBuffer(inBuffer);
+    auto program = parser.parseProgram();
+    auto codeGen = hexasm::CodeGen(program);
+    codeGen.emitBin("a.bin");
+    // Run the program.
+    std::istringstream simInBuffer;
+    std::ostringstream simOutBuffer;
+    hexsim::Processor p(simInBuffer, simOutBuffer);
+    p.load("a.bin");
+    p.run();
+  }
+
   /// Convert an X program into tokens.
   std::ostringstream tokeniseXProgram(const std::string &inBuffer) {
     xcmp::Lexer lexer;
@@ -59,7 +76,6 @@ struct TestContext {
     xcmp::Lexer lexer;
     xcmp::Parser parser(lexer);
     std::ostringstream outBuffer;
-    xcmp::AstPrinter printer(outBuffer);
     lexer.loadBuffer(inBuffer);
     auto tree = parser.parseProgram();
     xcmp::CodeGen xCodeGen;
@@ -72,6 +88,27 @@ struct TestContext {
     }
     return outBuffer;
   }
+
+  /// Run an X program.
+  void runXProgram(const std::string &inBuffer) {
+    // Compile and assemble the program.
+    xcmp::Lexer lexer;
+    xcmp::Parser parser(lexer);
+    lexer.loadBuffer(inBuffer);
+    auto tree = parser.parseProgram();
+    xcmp::CodeGen xCodeGen;
+    tree->accept(&xCodeGen);
+    // Assemble.
+    hexasm::CodeGen hexCodeGen(xCodeGen.getInstrs());
+    hexCodeGen.emitBin("a.bin");
+    // Run the program.
+    std::istringstream simInBuffer;
+    std::ostringstream simOutBuffer;
+    hexsim::Processor p(simInBuffer, simOutBuffer);
+    p.load("a.bin");
+    p.run();
+  }
+
 };
 
 #endif // TEST_CONTEXT_HPP
