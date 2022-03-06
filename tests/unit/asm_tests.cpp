@@ -27,7 +27,7 @@ BOOST_AUTO_TEST_CASE(exit_tree) {
 R"(LDAC 0
 OPR SVC
 )";
-  auto output = asmHexProgram(program, true).str();
+  auto output = asmHexProgram(program, false, true).str();
   std::string expected = ""
 R"(00000000 LDAC 0               (1 bytes)
 0x000001 OPR SVC              (1 bytes)

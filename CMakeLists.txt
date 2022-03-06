@@ -5,6 +5,7 @@ include(GNUInstallDirs)
 # Boost
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.68.0 REQUIRED COMPONENTS
+             filesystem
              unit_test_framework)
 
 # Python

@@ -1,6 +1,0 @@
-LDAC 3
-LDBC 4
-OPR ADD
-# Exit
-LDAC 0
-OPR SVC

@@ -33,14 +33,9 @@ class Tests(unittest.TestCase):
             self.assertTrue(output.decode('utf-8').endswith(expected_output))
         infile.close()
 
-    def compile_xhexb(self):
-        subprocess.run([ASM_BINARY, defs.XHEXB_SRC, '-o', 'xhexb.bin'])
-
     def setUp(self):
-        self.compile_xhexb()
-
-    def test_asm_exit(self):
-        self.run_asm_program('exit.S', '')
+        # Create a xhexb compiler binary.
+        subprocess.run([ASM_BINARY, defs.XHEXB_SRC, '-o', 'xhexb.bin'])
 
     def test_asm_hello(self):
         self.run_asm_program('hello.S', 'hello\n')
@@ -59,25 +54,12 @@ class Tests(unittest.TestCase):
         infile.close()
 
     def test_x_compiler_verilator(self):
-        # Compile xhexb.x with xhexb.bin on RTL.
+        # Compile xhexb.x with xhexb.bin on hex RTL.
         if (defs.USE_VERILATOR):
             infile = open(os.path.join(defs.TEST_SRC_PREFIX, 'xhexb.x'), 'rb')
             output = subprocess.run([VTB_BINARY, 'xhexb.bin'], input=infile.read(), capture_output=True)
             self.assertTrue(output.stdout.decode('utf-8').endswith('tree size: 18631\nprogram size: 17101\nsize: 177105\n'))
             infile.close()
-
-    def test_x_compiler_empty(self):
-        # Compile an empty program and check it executes.
-        infile = os.path.join(defs.TEST_SRC_PREFIX, 'empty.x')
-        subprocess.run([CMP_BINARY, infile, '-o', 'a.bin'])
-        output = subprocess.run([SIM_BINARY, 'a.bin'], capture_output=True)
-        self.assertTrue(output.stdout.decode('utf-8') == '')
-
-    def test_x_compiler_xhexb_x_tree(self):
-        # Check xcmp can parse and print the tree of xhexb.x
-        infile = os.path.join(defs.TEST_SRC_PREFIX, 'xhexb.x')
-        output = subprocess.run([CMP_BINARY, infile, '--tree'], capture_output=True)
-        self.assertTrue(len(output.stdout.decode('utf-8')) > 0)
 
 if __name__ == '__main__':
     unittest.main()

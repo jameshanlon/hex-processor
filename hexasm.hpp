@@ -470,6 +470,10 @@ public:
     readChar();
   }
 
+  void openFile(const std::string &filename) {
+    openFile(filename.c_str());
+  }
+
   /// Load a string using istringstream.
   void loadBuffer(const std::string &buffer) {
     file = std::make_unique<std::istringstream>(buffer);
