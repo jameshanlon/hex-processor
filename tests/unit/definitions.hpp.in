@@ -1,0 +1,6 @@
+#ifndef DEFINITIONS_HPP
+#define DEFINITIONS_HPP
+
+const char *TEST_SRC_PREFIX = "${CMAKE_SOURCE_DIR}/tests";
+
+#endif // DEFINITIONS_HPP
