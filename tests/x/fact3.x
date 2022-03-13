@@ -41,4 +41,3 @@ func factorial(val n) is
     return 1
   else
     return times(n, factorial(n-1))
-

@@ -1,6 +1,7 @@
 #ifndef TEST_CONTEXT_HPP
 #define TEST_CONTEXT_HPP
 
+#include "definitions.hpp"
 #include "hexasm.hpp"
 #include "hexsim.hpp"
 #include "xcmp.hpp"
@@ -8,6 +9,21 @@
 struct TestContext {
   TestContext() {}
 
+  /// Return the path to a test filename.
+  std::string getAsmTestPath(std::string filename) {
+    boost::filesystem::path testPath(ASM_TEST_SRC_PREFIX);
+    testPath /= filename;
+    return testPath.string();
+  }
+
+  /// Return the path to a test filename.
+  std::string getXTestPath(std::string filename) {
+    boost::filesystem::path testPath(X_TEST_SRC_PREFIX);
+    testPath /= filename;
+    return testPath.string();
+  }
+
+  /// TODO: merge these routines into a single one based on an action.
   /// Convert an assembly program into tokens.
   std::ostringstream tokHexProgram(const std::string &program,
                                    bool isFilename=false) {
@@ -46,6 +62,8 @@ struct TestContext {
 
   /// Run an assembly program.
   void runHexProgram(const std::string &program,
+                     std::istringstream &simInBuffer,
+                     std::ostringstream &simOutBuffer,
                      bool isFilename=false) {
     // Assemble the program.
     hexasm::Lexer lexer;
@@ -59,8 +77,6 @@ struct TestContext {
     auto codeGen = hexasm::CodeGen(tree);
     codeGen.emitBin("a.bin");
     // Run the program.
-    std::istringstream simInBuffer;
-    std::ostringstream simOutBuffer;
     hexsim::Processor p(simInBuffer, simOutBuffer);
     p.load("a.bin");
     p.run();

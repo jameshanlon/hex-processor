@@ -2,7 +2,6 @@
 #include <iostream>
 #include <boost/filesystem.hpp>
 #include <boost/test/unit_test.hpp>
-#include "definitions.hpp"
 #include "TestContext.hpp"
 
 /// Unit tests for X programs.
@@ -34,9 +33,7 @@ proc newline() is putval('\n')
 }
 
 BOOST_AUTO_TEST_CASE(xhexb_run) {
-  boost::filesystem::path testPath(TEST_SRC_PREFIX);
-  testPath /= "xhexb.x";
-  treeXProgram(testPath.string(), true);
+  treeXProgram(getXTestPath("xhexb.x"), true);
 }
 
 BOOST_AUTO_TEST_SUITE_END();

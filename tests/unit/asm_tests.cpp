@@ -1,5 +1,6 @@
 #include <ostream>
 #include <iostream>
+#include <boost/filesystem.hpp>
 #include <boost/test/unit_test.hpp>
 #include "TestContext.hpp"
 
@@ -50,7 +51,23 @@ BOOST_AUTO_TEST_CASE(exit_run) {
   auto program = ""
 R"(LDAC 0
 OPR SVC)";
-  runHexProgram(program);
+  std::istringstream simInBuffer;
+  std::ostringstream simOutBuffer;
+  runHexProgram(program, simInBuffer, simOutBuffer);
+}
+
+BOOST_AUTO_TEST_CASE(hello_run) {
+  std::istringstream simInBuffer;
+  std::ostringstream simOutBuffer;
+  runHexProgram(getAsmTestPath("hello.S"), simInBuffer, simOutBuffer, true);
+  BOOST_TEST(simOutBuffer.str() == "hello\n");
+}
+
+BOOST_AUTO_TEST_CASE(hello_procedure_run) {
+  std::istringstream simInBuffer;
+  std::ostringstream simOutBuffer;
+  runHexProgram(getAsmTestPath("hello_procedure.S"), simInBuffer, simOutBuffer, true);
+  BOOST_TEST(simOutBuffer.str() == "hello\n");
 }
 
 BOOST_AUTO_TEST_SUITE_END();

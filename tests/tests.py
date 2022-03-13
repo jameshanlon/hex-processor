@@ -11,7 +11,7 @@ CMP_BINARY = os.path.join(defs.INSTALL_PREFIX, 'xcmp')
 class Tests(unittest.TestCase):
 
     def run_asm_program(self, filename, expected_output):
-        test_path = os.path.join(defs.TEST_SRC_PREFIX, filename)
+        test_path = os.path.join(defs.ASM_TEST_SRC_PREFIX, filename)
         subprocess.run([ASM_BINARY, test_path, '-o', 'a.bin'])
         # Sim
         output = subprocess.check_output([SIM_BINARY, 'a.bin'])
@@ -23,7 +23,7 @@ class Tests(unittest.TestCase):
 
     def run_x_program(self, filename, expected_output):
         # Compiler
-        infile = open(os.path.join(defs.TEST_SRC_PREFIX, filename), 'rb')
+        infile = open(os.path.join(defs.X_TEST_SRC_PREFIX, filename), 'rb')
         subprocess.run([SIM_BINARY, 'xhexb.bin'], input=infile.read())
         output = subprocess.check_output([SIM_BINARY, 'simout2'])
         self.assertTrue(output.decode('utf-8') == expected_output)
@@ -37,18 +37,12 @@ class Tests(unittest.TestCase):
         # Create a xhexb compiler binary.
         subprocess.run([ASM_BINARY, defs.XHEXB_SRC, '-o', 'xhexb.bin'])
 
-    def test_asm_hello(self):
-        self.run_asm_program('hello.S', 'hello\n')
-
-    def test_asm_hello_procedure(self):
-        self.run_asm_program('hello_procedure.S', 'hello\n')
-
     def test_x_hello(self):
         self.run_x_program('hello.x', 'hello\n')
 
     def test_x_compiler_sim(self):
         # Compile xhexb.x with xhexb.bin on simulator.
-        infile = open(os.path.join(defs.TEST_SRC_PREFIX, 'xhexb.x'), 'rb')
+        infile = open(os.path.join(defs.X_TEST_SRC_PREFIX, 'xhexb.x'), 'rb')
         output = subprocess.run([SIM_BINARY, 'xhexb.bin'], input=infile.read(), capture_output=True)
         self.assertTrue(output.stdout.decode('utf-8') == 'tree size: 18631\nprogram size: 17101\nsize: 177105\n')
         infile.close()
@@ -56,7 +50,7 @@ class Tests(unittest.TestCase):
     def test_x_compiler_verilator(self):
         # Compile xhexb.x with xhexb.bin on hex RTL.
         if (defs.USE_VERILATOR):
-            infile = open(os.path.join(defs.TEST_SRC_PREFIX, 'xhexb.x'), 'rb')
+            infile = open(os.path.join(defs.X_TEST_SRC_PREFIX, 'xhexb.x'), 'rb')
             output = subprocess.run([VTB_BINARY, 'xhexb.bin'], input=infile.read(), capture_output=True)
             self.assertTrue(output.stdout.decode('utf-8').endswith('tree size: 18631\nprogram size: 17101\nsize: 177105\n'))
             infile.close()
