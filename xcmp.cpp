@@ -92,6 +92,12 @@ int main(int argc, const char *argv[]) {
       return 0;
     }
 
+    xcmp::SymbolTable symbolTable;
+
+    // Constant propagation.
+    xcmp::ConstProp constProp(symbolTable);
+    tree->accept(&constProp);
+
     // Generate assembly code.
     xcmp::CodeGen codeGen;
     tree->accept(&codeGen);

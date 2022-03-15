@@ -8,7 +8,9 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
+#include <stack>
 #include <vector>
 #include <map>
 #include <boost/format.hpp>
@@ -136,7 +138,7 @@ static bool isBinaryOp(Token token) {
   }
 }
 
-class Table {
+class TokenTable {
   std::map<std::string, Token> table;
 
 public:
@@ -147,7 +149,7 @@ public:
   /// Lookup a token type by identifier.
   Token lookup(const std::string &name) {
     auto it = table.find(name);
-    if(it != table.end()) {
+    if (it != table.end()) {
       return it->second;
     }
     table.insert(std::make_pair(name, Token::IDENTIFIER));
@@ -157,7 +159,7 @@ public:
 
 class Lexer {
 
-  Table                         table;
+  TokenTable                    table;
   std::unique_ptr<std::istream> file;
   char                          lastChar;
   std::string                   identifier;
@@ -605,6 +607,7 @@ public:
     visitor->visitPost(*this);
   }
   Token getOp() const { return op; }
+  Expr *getElement() const { return element.get(); }
 };
 
 class BinaryOpExpr : public Expr {
@@ -620,6 +623,8 @@ public:
     visitor->visitPost(*this);
   }
   Token getOp() const { return op; }
+  Expr *getLHS() const { return LHS.get(); }
+  Expr *getRHS() const { return RHS.get(); }
 };
 
 // Declarations ============================================================ //
@@ -633,6 +638,7 @@ public:
 
 class ValDecl : public Decl {
   std::unique_ptr<Expr> expr;
+  int exprValue;
 public:
   ValDecl(std::string name, std::unique_ptr<Expr> expr) :
       Decl(name), expr(std::move(expr)) {}
@@ -641,6 +647,9 @@ public:
     expr->accept(visitor);
     visitor->visitPost(*this);
   }
+  Expr *getExpr() const { return expr.get(); }
+  int getValue() const { return exprValue; }
+  void setValue(int value) { exprValue = value; }
 };
 
 class VarDecl : public Decl {
@@ -1415,11 +1424,159 @@ public:
 };
 
 //===---------------------------------------------------------------------===//
+// Symbol table.
+//===---------------------------------------------------------------------===//
+
+enum class SymbolType {
+  PROC,
+  VAL,
+  VAR,
+  ARRAY
+};
+
+enum class SymbolScope {
+  GLOBAL,
+  LOCAL
+};
+
+class Symbol {
+  SymbolType type;
+  SymbolScope scope;
+  AstNode *node;
+public:
+  Symbol(SymbolType type, SymbolScope scope, AstNode *node) :
+      type(type), scope(scope), node(node) {}
+  SymbolType getType() const { return type; }
+  SymbolScope getScope() const { return scope; }
+  AstNode *getNode() const { return node; }
+};
+
+class SymbolTable {
+  std::map<const std::string, std::unique_ptr<Symbol>> symbolMap;
+
+public:
+  void insert(const std::string &name, std::unique_ptr<Symbol> symbol) {
+    symbolMap[name] = std::move(symbol);
+  }
+
+  /// Lookup a symbol.
+  Symbol* lookup(const std::string &name) {
+    auto it = symbolMap.find(name);
+    if (it != symbolMap.end()) {
+      return it->second.get();
+    }
+    return nullptr;
+  }
+};
+
+//===---------------------------------------------------------------------===//
+// Constant propagation.
+//===---------------------------------------------------------------------===//
+
+class ConstProp : public AstVisitor {
+  SymbolTable &symbolTable;
+  std::stack<SymbolScope> scope;
+  std::map<Expr*, std::optional<int>> valueMap;
+public:
+  ConstProp(SymbolTable &symbolTable) : symbolTable(symbolTable) {}
+  virtual void visitPre(Program&) {
+    scope.push(SymbolScope::GLOBAL);
+  }
+  virtual void visitPost(Program&) {
+    scope.pop();
+  }
+  void visitPre(Proc &proc) {
+    scope.push(SymbolScope::LOCAL);
+    symbolTable.insert(proc.getName(), std::make_unique<Symbol>(SymbolType::PROC, scope.top(), &proc));
+  }
+  void visitPost(Proc &proc) {
+    scope.pop();
+  }
+  void visitPre(ArrayDecl &decl) {
+    symbolTable.insert(decl.getName(), std::make_unique<Symbol>(SymbolType::ARRAY, scope.top(), &decl));
+  }
+  void visitPre(VarDecl &decl) {
+    symbolTable.insert(decl.getName(), std::make_unique<Symbol>(SymbolType::VAR, scope.top(), &decl));
+  }
+  void visitPre(ValDecl &decl) {
+    symbolTable.insert(decl.getName(), std::make_unique<Symbol>(SymbolType::VAL, scope.top(), &decl));
+  }
+  void visitPost(ValDecl &decl) {
+    decl.setValue(valueMap[decl.getExpr()].value());
+  }
+  void visitPre(BinaryOpExpr &expr) {
+    auto LHS = valueMap[expr.getLHS()];
+    auto RHS = valueMap[expr.getRHS()];
+    if (LHS.has_value() &&
+        RHS.has_value()) {
+      // Evaluate expr
+      int result;
+      switch (expr.getOp()) {
+        case Token::PLUS:  result = LHS.value() +  RHS.value(); break;
+        case Token::MINUS: result = LHS.value() -  RHS.value(); break;
+        case Token::OR:    result = LHS.value() |  RHS.value(); break;
+        case Token::AND:   result = LHS.value() &  RHS.value(); break;
+        case Token::EQ:    result = LHS.value() == RHS.value(); break;
+        case Token::NE:    result = LHS.value() != RHS.value(); break;
+        case Token::LS:    result = LHS.value() <  RHS.value(); break;
+        case Token::LE:    result = LHS.value() <= RHS.value(); break;
+        case Token::GR:    result = LHS.value() >  RHS.value(); break;
+        case Token::GE:    result = LHS.value() >= RHS.value(); break;
+        default:
+          throw std::runtime_error("unexpected binary op");
+      }
+      valueMap[&expr] = std::optional<int>(result);
+    }
+  }
+  void visitPre(UnaryOpExpr &expr) {
+    auto element = valueMap[expr.getElement()];
+    if (element.has_value()) {
+      // Evaluate expr
+      int result;
+      switch (expr.getOp()) {
+        case Token::MINUS: result = -element.value();
+        case Token::NOT:   result = ~element.value();
+        default:
+          throw std::runtime_error("unexpected unary op");
+      }
+      valueMap[&expr] = std::optional<int>(result);
+    }
+  }
+  void visitPre(StringExpr &expr) {
+    valueMap[&expr] = std::nullopt;
+  }
+  void visitPre(BooleanExpr &expr) {
+    valueMap[&expr] = std::optional<int>(expr.getValue());
+  }
+  void visitPre(NumberExpr &expr) {
+    valueMap[&expr] = std::optional<int>(expr.getValue());
+  }
+  void visitPre(CallExpr &expr) {
+    valueMap[&expr] = std::nullopt;
+  }
+  void visitPre(ArraySubscriptExpr &expr) {
+    valueMap[&expr] = std::nullopt;
+  }
+  void visitPre(VarRefExpr &expr) {
+    auto symbol = symbolTable.lookup(expr.getName());
+    if (symbol == nullptr) {
+      throw std::runtime_error(std::string("could not find symbol ") + expr.getName());
+    }
+    if (auto valDecl = dynamic_cast<const ValDecl*>(symbol->getNode())) {
+      valueMap[&expr] = valDecl->getValue();
+    } else {
+      valueMap[&expr] = std::nullopt;
+    }
+  }
+};
+
+//===---------------------------------------------------------------------===//
 // Code generation.
 //===---------------------------------------------------------------------===//
 
 class CodeGen : public AstVisitor {
 
+  /// The buffer of instructions.
   std::vector<std::unique_ptr<hexasm::Directive>> instrs;
 
   void genData(uint32_t value) {
