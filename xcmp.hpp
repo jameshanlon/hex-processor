@@ -397,13 +397,13 @@ public:
     while (true) {
       switch (getNextToken()) {
         case Token::IDENTIFIER:
-          out << getIdentifier() << "\n";
+          out << "IDENTIFIER " << getIdentifier() << "\n";
           break;
         case Token::NUMBER:
-          out << getNumber() << "\n";
+          out << "NUMBER " << getNumber() << "\n";
           break;
         case Token::STRING:
-          out << getString() << "\n";
+          out << "STRING " << getString() << "\n";
           break;
         case Token::END_OF_FILE:
           out << "EOF\n";
@@ -517,7 +517,14 @@ public:
 
 // Expressions ============================================================= //
 
-class Expr : public AstNode {};
+class Expr : public AstNode {
+  std::optional<int> constValue;
+public:
+  Expr() : constValue(std::nullopt) {}
+  bool isConst() const { return constValue.has_value(); }
+  int getValue() const { return constValue.value(); }
+  void setValue(int newConstValue) { constValue.emplace(newConstValue); }
+};
 
 class VarRefExpr : public Expr {
   std::string name;
@@ -542,6 +549,7 @@ public:
     expr->accept(visitor);
     visitor->visitPost(*this);
   }
+  const std::string &getName() const { return name; }
 };
 
 class CallExpr : public Expr {
@@ -889,6 +897,9 @@ class AstPrinter : public AstVisitor {
       outs << "  ";
     }
   }
+  std::string exprValString(Expr &expr) {
+    return expr.isConst() ? (boost::format(" [const=%d]") % expr.getValue()).str() : "";
+  }
 public:
   AstPrinter(std::ostream& outs = std::cout) :
       outs(outs.rdbuf()), indentCount(0) {}
@@ -925,25 +936,27 @@ public:
     indentCount--;
   }
   void visitPre(BinaryOpExpr &expr) override {
-    indent(); outs << boost::format("binaryop %s\n") % tokenEnumStr(expr.getOp());
+    indent(); outs << boost::format("binaryop %s%s\n")
+                        % tokenEnumStr(expr.getOp()) % exprValString(expr);
     indentCount++;
   };
   void visitPost(BinaryOpExpr &expr) override {
     indentCount--;
   }
   void visitPre(UnaryOpExpr &expr) override {
-    indent(); outs << boost::format("unaryop %s\n") % tokenEnumStr(expr.getOp());
+    indent(); outs << boost::format("unaryop %s%s\n")
+                        % tokenEnumStr(expr.getOp()) % exprValString(expr);
     indentCount++;
   };
   void visitPost(UnaryOpExpr &expr) override {
     indentCount--;
   }
   void visitPre(StringExpr &expr) override {
-    indent(); outs << "unaryop\n";
+    indent(); outs << boost::format("string %s\n") % expr.getValue();
   };
   void visitPost(StringExpr &expr) override { }
   void visitPre(BooleanExpr &expr) override {
-    indent(); outs << "boolean\n";
+    indent(); outs << boost::format("boolean %d\n") % expr.getValue();
   };
   void visitPost(BooleanExpr &expr) override { }
   void visitPre(NumberExpr &expr) override {
@@ -951,14 +964,14 @@ public:
   };
   void visitPost(NumberExpr &expr) override { }
   void visitPre(CallExpr &expr) override {
-    indent(); outs << boost::format("call %d\n") % expr.getName();
+    indent(); outs << boost::format("call %s\n") % expr.getName();
     indentCount++;
   };
   void visitPost(CallExpr &expr) override {
     indentCount--;
   }
   void visitPre(ArraySubscriptExpr &expr) override {
-    indent(); outs << "arraysubscript\n";
+    indent(); outs << boost::format("arraysubscript %s\n") % expr.getName();
     indentCount++;
   };
   void visitPost(ArraySubscriptExpr &expr) override {
@@ -1036,7 +1049,6 @@ public:
   };
 };
 
-
 //===---------------------------------------------------------------------===//
 // Parser
 //===---------------------------------------------------------------------===//
@@ -1065,8 +1077,9 @@ class Parser {
   /// identifier
   std::string parseIdentifier() {
     if (lexer.getLastToken() == Token::IDENTIFIER) {
+      auto name = lexer.getIdentifier();
       lexer.getNextToken();
-      return lexer.getIdentifier();
+      return name;
     } else {
       throw std::runtime_error("name expected");
     }
@@ -1113,9 +1126,9 @@ class Parser {
       return std::make_unique<UnaryOpExpr>(Token::NOT, std::move(element));
     }
     auto element = parseElement();
-    if (isBinaryOp(lexer.getLastToken())) {
+    auto op = lexer.getLastToken();
+    if (isBinaryOp(op)) {
       // Binary operation.
-      auto op = lexer.getLastToken();
       lexer.getNextToken();
       auto RHS = parseBinOpRHS(op);
       return std::make_unique<BinaryOpExpr>(op, std::move(element), std::move(RHS));
@@ -1428,10 +1441,11 @@ public:
 //===---------------------------------------------------------------------===//
 
 enum class SymbolType {
-  PROC,
   VAL,
   VAR,
-  ARRAY
+  ARRAY,
+  FUNC,
+  PROC
 };
 
 enum class SymbolScope {
@@ -1476,7 +1490,6 @@ public:
 class ConstProp : public AstVisitor {
   SymbolTable &symbolTable;
   std::stack<SymbolScope> scope;
-  std::map<Expr*, std::optional<int>> valueMap;
 public:
   ConstProp(SymbolTable &symbolTable) : symbolTable(symbolTable) {}
   virtual void visitPre(Program&) {
@@ -1502,70 +1515,76 @@ public:
     symbolTable.insert(decl.getName(), std::make_unique<Symbol>(SymbolType::VAL, scope.top(), &decl));
   }
   void visitPost(ValDecl &decl) {
-    decl.setValue(valueMap[decl.getExpr()].value());
+    if (decl.getExpr()->isConst()) {
+      decl.setValue(decl.getExpr()->getValue());
+    }
   }
-  void visitPre(BinaryOpExpr &expr) {
-    auto LHS = valueMap[expr.getLHS()];
-    auto RHS = valueMap[expr.getRHS()];
-    if (LHS.has_value() &&
-        RHS.has_value()) {
-      // Evaluate expr
+  void visitPre(ValFormal &formal) {
+    symbolTable.insert(formal.getName(), std::make_unique<Symbol>(SymbolType::VAL, scope.top(), &formal));
+  }
+  void visitPre(ArrayFormal &formal) {
+    symbolTable.insert(formal.getName(), std::make_unique<Symbol>(SymbolType::ARRAY, scope.top(), &formal));
+  }
+  void visitPre(ProcFormal &formal) {
+    symbolTable.insert(formal.getName(), std::make_unique<Symbol>(SymbolType::PROC, scope.top(), &formal));
+  }
+  void visitPre(FuncFormal &formal) {
+    symbolTable.insert(formal.getName(), std::make_unique<Symbol>(SymbolType::FUNC, scope.top(), &formal));
+  }
+  void visitPost(BinaryOpExpr &expr) {
+    auto LHS = expr.getLHS();
+    auto RHS = expr.getRHS();
+    if (LHS->isConst() &&
+        RHS->isConst()) {
+      // Evaluate binary expression.
       int result;
       switch (expr.getOp()) {
-        case Token::PLUS:  result = LHS.value() +  RHS.value(); break;
-        case Token::MINUS: result = LHS.value() -  RHS.value(); break;
-        case Token::OR:    result = LHS.value() |  RHS.value(); break;
-        case Token::AND:   result = LHS.value() &  RHS.value(); break;
-        case Token::EQ:    result = LHS.value() == RHS.value(); break;
-        case Token::NE:    result = LHS.value() != RHS.value(); break;
-        case Token::LS:    result = LHS.value() <  RHS.value(); break;
-        case Token::LE:    result = LHS.value() <= RHS.value(); break;
-        case Token::GR:    result = LHS.value() >  RHS.value(); break;
-        case Token::GE:    result = LHS.value() >= RHS.value(); break;
+        case Token::PLUS:  result = LHS->getValue() +  RHS->getValue(); break;
+        case Token::MINUS: result = LHS->getValue() -  RHS->getValue(); break;
+        case Token::OR:    result = LHS->getValue() |  RHS->getValue(); break;
+        case Token::AND:   result = LHS->getValue() &  RHS->getValue(); break;
+        case Token::EQ:    result = LHS->getValue() == RHS->getValue(); break;
+        case Token::NE:    result = LHS->getValue() != RHS->getValue(); break;
+        case Token::LS:    result = LHS->getValue() <  RHS->getValue(); break;
+        case Token::LE:    result = LHS->getValue() <= RHS->getValue(); break;
+        case Token::GR:    result = LHS->getValue() >  RHS->getValue(); break;
+        case Token::GE:    result = LHS->getValue() >= RHS->getValue(); break;
         default:
           throw std::runtime_error("unexpected binary op");
       }
-      valueMap[&expr] = std::optional<int>(result);
+      expr.setValue(result);
     }
   }
-  void visitPre(UnaryOpExpr &expr) {
-    auto element = valueMap[expr.getElement()];
-    if (element.has_value()) {
-      // Evaluate expr
+  void visitPost(UnaryOpExpr &expr) {
+    auto element = expr.getElement();
+    if (element->isConst()) {
+      // Evaluate unary expression.
       int result;
       switch (expr.getOp()) {
-        case Token::MINUS: result = -element.value();
-        case Token::NOT:   result = ~element.value();
+        case Token::MINUS: result = -element->getValue();
+        case Token::NOT:   result = ~element->getValue();
         default:
           throw std::runtime_error("unexpected unary op");
       }
-      valueMap[&expr] = std::optional<int>(result);
+      expr.setValue(result);
     }
   }
-  void visitPre(StringExpr &expr) {
-    valueMap[&expr] = std::nullopt;
+  void visitPost(StringExpr &expr) {}
+  void visitPost(BooleanExpr &expr) {
+    expr.setValue(expr.getValue());
   }
-  void visitPre(BooleanExpr &expr) {
-    valueMap[&expr] = std::optional<int>(expr.getValue());
+  void visitPost(NumberExpr &expr) {
+    expr.setValue(expr.getValue());
   }
-  void visitPre(NumberExpr &expr) {
-    valueMap[&expr] = std::optional<int>(expr.getValue());
-  }
-  void visitPre(CallExpr &expr) {
-    valueMap[&expr] = std::nullopt;
-  }
-  void visitPre(ArraySubscriptExpr &expr) {
-    valueMap[&expr] = std::nullopt;
-  }
-  void visitPre(VarRefExpr &expr) {
+  void visitPost(CallExpr &expr) {}
+  void visitPost(ArraySubscriptExpr &expr) {}
+  void visitPost(VarRefExpr &expr) {
     auto symbol = symbolTable.lookup(expr.getName());
     if (symbol == nullptr) {
       throw std::runtime_error(std::string("could not find symbol ") + expr.getName());
     }
     if (auto valDecl = dynamic_cast<const ValDecl*>(symbol->getNode())) {
-      valueMap[&expr] = valDecl->getValue();
-    } else {
-      valueMap[&expr] = std::nullopt;
+      expr.setValue(valDecl->getValue());
     }
   }
 };

@@ -85,18 +85,18 @@ int main(int argc, const char *argv[]) {
     // Parse the program.
     auto tree = parser.parseProgram();
 
+    xcmp::SymbolTable symbolTable;
+
+    // Constant propagation.
+    xcmp::ConstProp constProp(symbolTable);
+    tree->accept(&constProp);
+
     // Parse and print program only.
     if (treeOnly) {
       xcmp::AstPrinter printer;
       tree->accept(&printer);
       return 0;
     }
-
-    xcmp::SymbolTable symbolTable;
-
-    // Constant propagation.
-    xcmp::ConstProp constProp(symbolTable);
-    tree->accept(&constProp);
 
     // Generate assembly code.
     xcmp::CodeGen codeGen;
