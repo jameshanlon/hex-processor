@@ -51,6 +51,7 @@ BOOST_AUTO_TEST_CASE(exit_run) {
   auto program = ""
 R"(BR start
 DATA 16383
+start
 LDAC 0 # areg <- 0
 LDBM 1 # breg <- sp
 STAI 2 # sp[2] <- areg
