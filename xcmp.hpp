@@ -22,13 +22,41 @@
 
 namespace xcmp {
 
+class Location {
+  size_t line, position;
+public:
+  Location(size_t line, size_t position) : line(line), position(position) {}
+  std::string str() const {
+    return (boost::format("%d:%d") % line % position).str();
+  }
+};
+
+/// Lexer error.
 struct LexerError : public std::runtime_error {
   LexerError(const std::string &what) : std::runtime_error(what) {}
   LexerError(const char *what) : std::runtime_error(what) {}
 };
-struct ParserError : public std::runtime_error {
-  ParserError(const std::string &what) : std::runtime_error(what) {}
-  ParserError(const char *what) : std::runtime_error(what) {}
+
+/// Parser error.
+class ParserError : public std::runtime_error {
+  Location location;
+public:
+  ParserError(Location location, const std::string &what) :
+      std::runtime_error(what), location(location) {}
+  ParserError(Location location, const char *what) :
+      std::runtime_error(what), location(location) {}
+  const Location &getLocation() const { return location; }
+};
+
+/// Pass error (during an AST traversal).
+class PassError : public std::runtime_error {
+  Location location;
+public:
+  PassError(Location location, const std::string &what) :
+      std::runtime_error(what), location(location) {}
+  PassError(Location location, const char *what) :
+      std::runtime_error(what), location(location) {}
+  const Location &getLocation() const { return location; }
 };
 
 //===---------------------------------------------------------------------===//
@@ -164,13 +192,6 @@ public:
     table.insert(std::make_pair(name, Token::IDENTIFIER));
     return Token::IDENTIFIER;
   }
-};
-
-class Location {
-  size_t line, position;
-public:
-  Location(size_t line, size_t position) : line(line), position(position) {}
-  std::string str() const { return (boost::format("l%d:c%d") % line % position).str(); }
 };
 
 class Lexer {
@@ -1041,36 +1062,36 @@ public:
   };
   void visitPost(FuncFormal &formal) override {};
   void visitPre(SkipStatement &stmt) override {
-    indent(); outs << boost::format("skipstmt %s\n") % locString(stmt);
+    indent(); outs << boost::format("skipstmt%s\n") % locString(stmt);
   };
   void visitPost(SkipStatement &stmt) override {};
   void visitPre(StopStatement &stmt) override {
-    indent(); outs << boost::format("stopstmt %s\n") % locString(stmt);
+    indent(); outs << boost::format("stopstmt%s\n") % locString(stmt);
   };
   void visitPost(StopStatement &stmt) override {};
   void visitPre(ReturnStatement &stmt) override {
-    indent(); outs << boost::format("returnstmt %s\n") % locString(stmt);
+    indent(); outs << boost::format("returnstmt%s\n") % locString(stmt);
     indentCount++;
   };
   void visitPost(ReturnStatement &stmt) override {
     indentCount--;
   };
   void visitPre(IfStatement &stmt) override {
-    indent(); outs << boost::format("ifstmt %s\n") % locString(stmt);
+    indent(); outs << boost::format("ifstmt%s\n") % locString(stmt);
     indentCount++;
   };
   void visitPost(IfStatement &stmt) override {
     indentCount--;
   };
   void visitPre(WhileStatement &stmt) override {
-    indent(); outs << boost::format("whilestmt %s\n") % locString(stmt);
+    indent(); outs << boost::format("whilestmt%s\n") % locString(stmt);
     indentCount++;
   };
   void visitPost(WhileStatement &stmt) override {
     indentCount--;
   };
   void visitPre(SeqStatement &stmt) override {
-    indent(); outs << boost::format("seqstmt %s\n") % locString(stmt);
+    indent(); outs << boost::format("seqstmt%s\n") % locString(stmt);
     indentCount++;
   };
   void visitPost(SeqStatement &stmt) override {
@@ -1084,7 +1105,7 @@ public:
     indentCount--;
   };
   void visitPre(AssStatement &stmt) override {
-    indent(); outs << boost::format("assstmt %s\n") % locString(stmt);
+    indent(); outs << boost::format("assstmt%s\n") % locString(stmt);
     indentCount++;
   };
   void visitPost(AssStatement &stmt) override {
@@ -1102,7 +1123,7 @@ class Parser {
   /// Expect the given last token, otherwise raise an error.
   void expect(Token token) const {
     if (token != lexer.getLastToken()) {
-      throw std::runtime_error(std::string("expected ")+tokenEnumStr(token));
+      throw ParserError(lexer.getLocation(), std::string("expected ")+tokenEnumStr(token));
     }
     lexer.getNextToken();
   }
@@ -1124,7 +1145,7 @@ class Parser {
       lexer.getNextToken();
       return name;
     } else {
-      throw std::runtime_error("name expected");
+      throw ParserError(lexer.getLocation(), "name expected");
     }
   }
 
@@ -1250,7 +1271,7 @@ class Parser {
       return expr;
     }
     default:
-      throw std::runtime_error("in expression element");
+      throw ParserError(location, "in expression element");
     }
   }
 
@@ -1285,7 +1306,7 @@ class Parser {
       return std::make_unique<ArrayDecl>(location, name, std::move(expr));
     }
     default:
-      throw std::runtime_error("invalid declaration");
+      throw ParserError(location, "invalid declaration");
     }
   }
 
@@ -1356,7 +1377,7 @@ class Parser {
       lexer.getNextToken();
       return std::make_unique<FuncFormal>(location, parseIdentifier());
     default:
-      throw std::runtime_error("invalid formal");
+      throw ParserError(location, "invalid formal");
     }
   }
 
@@ -1431,7 +1452,7 @@ class Parser {
       return std::make_unique<AssStatement>(location, std::move(element), parseExpr());
     }
     default:
-      throw std::runtime_error("invalid statement");
+      throw ParserError(location, "invalid statement");
     }
   }
 
@@ -1603,7 +1624,7 @@ public:
         case Token::GR:    result = LHS->getValue() >  RHS->getValue(); break;
         case Token::GE:    result = LHS->getValue() >= RHS->getValue(); break;
         default:
-          throw std::runtime_error("unexpected binary op");
+          throw PassError(expr.getLocation(), "unexpected binary op");
       }
       expr.setValue(result);
     }
@@ -1617,7 +1638,7 @@ public:
         case Token::MINUS: result = -element->getValue();
         case Token::NOT:   result = ~element->getValue();
         default:
-          throw std::runtime_error("unexpected unary op");
+          throw PassError(expr.getLocation(), "unexpected unary op");
       }
       expr.setValue(result);
     }
@@ -1634,7 +1655,7 @@ public:
   void visitPost(VarRefExpr &expr) {
     auto symbol = symbolTable.lookup(expr.getName());
     if (symbol == nullptr) {
-      throw std::runtime_error(std::string("could not find symbol ") + expr.getName());
+      throw PassError(expr.getLocation(), std::string("could not find symbol ") + expr.getName());
     }
     if (auto valDecl = dynamic_cast<const ValDecl*>(symbol->getNode())) {
       expr.setValue(valDecl->getValue());
