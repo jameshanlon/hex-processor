@@ -117,7 +117,7 @@ int main(int argc, const char *argv[]) {
     std::cerr << boost::format(" Error %s: %s\n") % e.getLocation().str() % e.what();
     std::cerr << "  " << lexer.getLine() << "\n";
     return 1;
-  } catch (xcmp::Error &e) {
+  } catch (const xcmp::Error &e) {
     std::cerr << boost::format("Error %s: %s\n") % e.getLocation().str() % e.what();
     return 1;
   } catch (const std::exception &e) {

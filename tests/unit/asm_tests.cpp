@@ -49,11 +49,31 @@ OPR SVC)";
 
 BOOST_AUTO_TEST_CASE(exit_run) {
   auto program = ""
-R"(LDAC 0
+R"(BR start
+DATA 16383
+LDAC 0 # areg <- 0
+LDBM 1 # breg <- sp
+STAI 2 # sp[2] <- areg
+LDAC 0
 OPR SVC)";
   std::istringstream simInBuffer;
   std::ostringstream simOutBuffer;
-  runHexProgram(program, simInBuffer, simOutBuffer);
+  auto ret = runHexProgram(program, simInBuffer, simOutBuffer);
+  BOOST_TEST(ret == 0);
+}
+
+BOOST_AUTO_TEST_CASE(exit0_run) {
+  std::istringstream simInBuffer;
+  std::ostringstream simOutBuffer;
+  auto ret = runHexProgram(getAsmTestPath("exit0.S"), simInBuffer, simOutBuffer, true);
+  BOOST_TEST(ret == 0);
+}
+
+BOOST_AUTO_TEST_CASE(exit255_run) {
+  std::istringstream simInBuffer;
+  std::ostringstream simOutBuffer;
+  auto ret = runHexProgram(getAsmTestPath("exit255.S"), simInBuffer, simOutBuffer, true);
+  BOOST_TEST(ret == 255);
 }
 
 BOOST_AUTO_TEST_CASE(hello_run) {

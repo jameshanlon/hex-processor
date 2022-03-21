@@ -61,10 +61,10 @@ struct TestContext {
   }
 
   /// Run an assembly program.
-  void runHexProgram(const std::string &program,
-                     std::istringstream &simInBuffer,
-                     std::ostringstream &simOutBuffer,
-                     bool isFilename=false) {
+  int runHexProgram(const std::string &program,
+                    std::istringstream &simInBuffer,
+                    std::ostringstream &simOutBuffer,
+                    bool isFilename=false) {
     // Assemble the program.
     hexasm::Lexer lexer;
     hexasm::Parser parser(lexer);
@@ -79,7 +79,7 @@ struct TestContext {
     // Run the program.
     hexsim::Processor p(simInBuffer, simOutBuffer);
     p.load("a.bin");
-    p.run();
+    return p.run();
   }
 
   /// Convert an X program into tokens.
@@ -138,8 +138,8 @@ struct TestContext {
   }
 
   /// Run an X program.
-  void runXProgram(const std::string &program,
-                   bool isFilename=false) {
+  int runXProgram(const std::string &program,
+                  bool isFilename=false) {
     // Compile and assemble the program.
     xcmp::Lexer lexer;
     xcmp::Parser parser(lexer);
@@ -159,7 +159,7 @@ struct TestContext {
     std::ostringstream simOutBuffer;
     hexsim::Processor p(simInBuffer, simOutBuffer);
     p.load("a.bin");
-    p.run();
+    return p.run();
   }
 
 };
