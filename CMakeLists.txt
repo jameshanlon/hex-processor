@@ -71,17 +71,6 @@ if (USE_VERILATOR)
           DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
-# Yosys
-if (USE_YOSYS)
-  configure_file(synth.in.ys
-                 synth.ys)
-
-  add_custom_target(netlist.v ALL
-                    COMMAND ${YOSYS_BIN} synth.ys
-                    COMMENT "Running Yosys"
-                    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-                    SOURCES verilog/processor.sv)
-endif()
-
 enable_testing()
+add_subdirectory(synth)
 add_subdirectory(tests)
