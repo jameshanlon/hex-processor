@@ -40,6 +40,7 @@ class Processor {
   // Control.
   bool running;
   bool tracing;
+  int exitCode;
 
   // State for tracing.
   uint64_t cycles;
@@ -90,7 +91,7 @@ public:
     out << "spWordIndex="<<spWordIndex<<"\n";
     switch (static_cast<hex::Syscall>(areg)) {
       case hex::Syscall::EXIT:
-        out << "exit\n";
+        out << boost::format("exit %d\n") % memory[spWordIndex+2];
         break;
       case hex::Syscall::WRITE:
         out << boost::format("write %d to simout(%d)\n") % memory[spWordIndex+2] % memory[spWordIndex+3];
@@ -169,6 +170,7 @@ public:
     unsigned spWordIndex = memory[1];
     switch (static_cast<hex::Syscall>(areg)) {
       case hex::Syscall::EXIT:
+        exitCode = memory[spWordIndex+2];
         running = false;
         break;
       case hex::Syscall::WRITE:
@@ -182,7 +184,7 @@ public:
     }
   }
 
-  void run() {
+  int run() {
     while (running) {
       instr = (memory[pc >> 2] >> ((pc & 0x3) << 3)) & 0xFF;
       pc = pc + 1;
@@ -277,6 +279,7 @@ public:
       }
       cycles++;
     }
+    return exitCode;
   }
 };
 

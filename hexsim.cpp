@@ -57,7 +57,7 @@ int main(int argc, const char *argv[]) {
     if (dumpBinary) {
       return 0;
     }
-    p.run();
+    return p.run();
   } catch (std::exception &e) {
     std::cerr << "Error: " << e.what() << "\n";
     return 1;

@@ -25,16 +25,11 @@ namespace xcmp {
 class Location {
   size_t line, position;
 public:
+  Location() : line(0), position(0) {}
   Location(size_t line, size_t position) : line(line), position(position) {}
   std::string str() const {
-    return (boost::format("%d:%d") % line % position).str();
+    return (boost::format("line %d:%d") % line % position).str();
   }
-};
-
-/// Lexer error.
-struct LexerError : public std::runtime_error {
-  LexerError(const std::string &what) : std::runtime_error(what) {}
-  LexerError(const char *what) : std::runtime_error(what) {}
 };
 
 /// Parser error.
@@ -48,13 +43,13 @@ public:
   const Location &getLocation() const { return location; }
 };
 
-/// Pass error (during an AST traversal).
-class PassError : public std::runtime_error {
+/// General error with location information.
+class Error : public std::runtime_error {
   Location location;
 public:
-  PassError(Location location, const std::string &what) :
+  Error(Location location, const std::string &what) :
       std::runtime_error(what), location(location) {}
-  PassError(Location location, const char *what) :
+  Error(Location location, const char *what) :
       std::runtime_error(what), location(location) {}
   const Location &getLocation() const { return location; }
 };
@@ -153,7 +148,7 @@ static const char *tokenEnumStr(Token token) {
   case Token::GE:          return ">=";
   case Token::END_OF_FILE: return "END_OF_FILE";
   default:
-    throw LexerError(std::string("unexpected token: ")+std::to_string(static_cast<int>(token)));
+    throw std::runtime_error(std::string("unexpected token: ")+std::to_string(static_cast<int>(token)));
   }
 };
 
@@ -269,7 +264,7 @@ class Lexer {
       case 'r':  ch = '\r'; break;
       case 'n':  ch = '\n'; break;
       default:
-        throw LexerError("bad character constant");
+        throw ParserError(getLocation(), "bad character constant");
       }
     } else {
       ch = lastChar;
@@ -368,7 +363,7 @@ class Lexer {
         readChar();
         token = Token::ASS;
       } else {
-        throw LexerError("'=' expected");
+        throw ParserError(getLocation(), "'=' expected");
       }
       break;
     case '\'':
@@ -376,7 +371,7 @@ class Lexer {
       value = readCharConst();
       token = Token::NUMBER;
       if (lastChar != '\'') {
-        throw LexerError("expected ' after char constant");
+        throw ParserError(getLocation(), "expected ' after char constant");
       }
       readChar();
       break;
@@ -385,7 +380,7 @@ class Lexer {
       readString();
       token = Token::STRING;
       if (lastChar != '"') {
-        throw LexerError("expected \" after string");
+        throw ParserError(getLocation(), "expected \" after string");
       }
       readChar();
       break;
@@ -397,7 +392,7 @@ class Lexer {
       readChar();
       break;
     default:
-      throw LexerError("unexpected character");
+      throw ParserError(getLocation(), "unexpected character");
     }
     return token;
   }
@@ -931,7 +926,6 @@ public:
 class Program : public AstNode {
   std::vector<std::unique_ptr<Decl>> globalDecls;
   std::vector<std::unique_ptr<Proc>> procDecls;
-
 public:
   Program(std::vector<std::unique_ptr<Decl>> globals,
           std::vector<std::unique_ptr<Proc>> procs) :
@@ -1624,7 +1618,7 @@ public:
         case Token::GR:    result = LHS->getValue() >  RHS->getValue(); break;
         case Token::GE:    result = LHS->getValue() >= RHS->getValue(); break;
         default:
-          throw PassError(expr.getLocation(), "unexpected binary op");
+          throw Error(expr.getLocation(), "unexpected binary op");
       }
       expr.setValue(result);
     }
@@ -1638,7 +1632,7 @@ public:
         case Token::MINUS: result = -element->getValue();
         case Token::NOT:   result = ~element->getValue();
         default:
-          throw PassError(expr.getLocation(), "unexpected unary op");
+          throw Error(expr.getLocation(), "unexpected unary op");
       }
       expr.setValue(result);
     }
@@ -1655,7 +1649,7 @@ public:
   void visitPost(VarRefExpr &expr) {
     auto symbol = symbolTable.lookup(expr.getName());
     if (symbol == nullptr) {
-      throw PassError(expr.getLocation(), std::string("could not find symbol ") + expr.getName());
+      throw Error(expr.getLocation(), std::string("could not find symbol ") + expr.getName());
     }
     if (auto valDecl = dynamic_cast<const ValDecl*>(symbol->getNode())) {
       expr.setValue(valDecl->getValue());

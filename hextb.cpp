@@ -56,12 +56,14 @@ void load(const char *filename,
 
 void handleSyscall(hex::Syscall syscall,
                    const std::unique_ptr<Vhex_pkg> &top,
+                   int &exitCode,
                    bool trace) {
   unsigned spWordIndex = top->hex->u_memory->memory_q[1];
   switch (syscall) {
     case hex::Syscall::EXIT:
+      exitCode = top->hex->u_memory->memory_q[spWordIndex+2];
       if (trace) {
-        std::cout << "exit\n";
+        std::cout << boost::format("exit %d\n") % exitCode;
       }
       break;
     case hex::Syscall::WRITE: {
@@ -86,11 +88,12 @@ void handleSyscall(hex::Syscall syscall,
   }
 }
 
-void run(const std::unique_ptr<VerilatedContext> &contextp,
-         const std::unique_ptr<Vhex_pkg> &top,
-         bool trace,
-         size_t maxCycles) {
+int run(const std::unique_ptr<VerilatedContext> &contextp,
+        const std::unique_ptr<Vhex_pkg> &top,
+        bool trace,
+        size_t maxCycles) {
   uint64_t cycle_count = 0;
+  int exitCode = 0;
 
   // Set input signals
   top->i_rst = 0;
@@ -126,14 +129,15 @@ void run(const std::unique_ptr<VerilatedContext> &contextp,
     // Handle syscalls
     if (top->i_clk && top->o_syscall_valid) {
       auto syscall = static_cast<hex::Syscall>(top->o_syscall);
+      handleSyscall(syscall, top, exitCode, trace);
       if (syscall == hex::Syscall::EXIT) {
         break;
       }
-      handleSyscall(syscall, top, trace);
     }
   }
 
   top->final();
+  return exitCode;
 }
 
 static void help(const char **argv) {
@@ -185,7 +189,7 @@ int main(int argc, const char** argv) {
     const std::unique_ptr<Vhex_pkg> top{new Vhex_pkg{contextp.get(), "TOP"}};
     // Run.
     load(filename, top);
-    run(contextp, top, trace, maxCycles);
+    return run(contextp, top, trace, maxCycles);
   } catch (std::exception &e) {
     std::cerr << "Error: " << e.what() << "\n";
     return 1;

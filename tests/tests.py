@@ -14,23 +14,23 @@ class Tests(unittest.TestCase):
         test_path = os.path.join(defs.ASM_TEST_SRC_PREFIX, filename)
         subprocess.run([ASM_BINARY, test_path, '-o', 'a.bin'])
         # Sim
-        output = subprocess.check_output([SIM_BINARY, 'a.bin'])
-        self.assertTrue(output.decode('utf-8') == expected_output)
+        output = subprocess.run([SIM_BINARY, 'a.bin'], capture_output=True)
+        self.assertTrue(output.stdout.decode('utf-8') == expected_output)
         # Verilator
         if (defs.USE_VERILATOR):
-            output = subprocess.check_output([VTB_BINARY, 'a.bin'])
-            self.assertTrue(output.decode('utf-8').endswith(expected_output))
+            output = subprocess.run([VTB_BINARY, 'a.bin'], capture_output=True)
+            self.assertTrue(output.stdout.decode('utf-8').endswith(expected_output))
 
     def run_x_program(self, filename, expected_output):
         # Compiler
         infile = open(os.path.join(defs.X_TEST_SRC_PREFIX, filename), 'rb')
         subprocess.run([SIM_BINARY, 'xhexb.bin'], input=infile.read())
-        output = subprocess.check_output([SIM_BINARY, 'simout2'])
-        self.assertTrue(output.decode('utf-8') == expected_output)
+        output = subprocess.run([SIM_BINARY, 'simout2'], capture_output=True)
+        self.assertTrue(output.stdout.decode('utf-8') == expected_output)
         # Verilator
         if (defs.USE_VERILATOR):
-            output = subprocess.check_output([VTB_BINARY, 'simout2'])
-            self.assertTrue(output.decode('utf-8').endswith(expected_output))
+            output = subprocess.run([VTB_BINARY, 'simout2'], capture_output=True)
+            self.assertTrue(output.stdout.decode('utf-8').endswith(expected_output))
         infile.close()
 
     def setUp(self):
