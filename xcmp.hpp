@@ -22,6 +22,15 @@
 
 namespace xcmp {
 
+struct LexerError : public std::runtime_error {
+  LexerError(const std::string &what) : std::runtime_error(what) {}
+  LexerError(const char *what) : std::runtime_error(what) {}
+};
+struct ParserError : public std::runtime_error {
+  ParserError(const std::string &what) : std::runtime_error(what) {}
+  ParserError(const char *what) : std::runtime_error(what) {}
+};
+
 //===---------------------------------------------------------------------===//
 // Lexer
 //===---------------------------------------------------------------------===//
@@ -116,7 +125,7 @@ static const char *tokenEnumStr(Token token) {
   case Token::GE:          return ">=";
   case Token::END_OF_FILE: return "END_OF_FILE";
   default:
-    throw std::runtime_error(std::string("unexpected token: ")+std::to_string(static_cast<int>(token)));
+    throw LexerError(std::string("unexpected token: ")+std::to_string(static_cast<int>(token)));
   }
 };
 
@@ -157,6 +166,13 @@ public:
   }
 };
 
+class Location {
+  size_t line, position;
+public:
+  Location(size_t line, size_t position) : line(line), position(position) {}
+  std::string str() const { return (boost::format("l%d:c%d") % line % position).str(); }
+};
+
 class Lexer {
 
   TokenTable                    table;
@@ -167,6 +183,7 @@ class Lexer {
   unsigned                      value;
   Token                         lastToken;
   size_t                        currentLineNumber;
+  size_t                        currentCharNumber;
   std::string                   currentLine;
 
   void declareKeywords() {
@@ -196,6 +213,7 @@ class Lexer {
     if (file->eof()) {
       lastChar = EOF;
     }
+    currentCharNumber++;
     return lastChar;
   }
 
@@ -230,7 +248,7 @@ class Lexer {
       case 'r':  ch = '\r'; break;
       case 'n':  ch = '\n'; break;
       default:
-          throw std::runtime_error("bad character constant");
+        throw LexerError("bad character constant");
       }
     } else {
       ch = lastChar;
@@ -251,6 +269,7 @@ class Lexer {
     while (std::isspace(lastChar)) {
       if (lastChar == '\n') {
         currentLineNumber++;
+        currentCharNumber = 0;
         currentLine.clear();
       }
       readChar();
@@ -262,6 +281,7 @@ class Lexer {
       } while (lastChar != EOF && lastChar != '\n');
       if (lastChar == '\n') {
         currentLineNumber++;
+        currentCharNumber = 0;
         currentLine.clear();
         readChar();
       }
@@ -327,7 +347,7 @@ class Lexer {
         readChar();
         token = Token::ASS;
       } else {
-        throw std::runtime_error("'=' expected");
+        throw LexerError("'=' expected");
       }
       break;
     case '\'':
@@ -335,7 +355,7 @@ class Lexer {
       value = readCharConst();
       token = Token::NUMBER;
       if (lastChar != '\'') {
-        throw std::runtime_error("expected ' after char constant");
+        throw LexerError("expected ' after char constant");
       }
       readChar();
       break;
@@ -344,7 +364,7 @@ class Lexer {
       readString();
       token = Token::STRING;
       if (lastChar != '"') {
-        throw std::runtime_error("expected \" after string");
+        throw LexerError("expected \" after string");
       }
       readChar();
       break;
@@ -356,14 +376,14 @@ class Lexer {
       readChar();
       break;
     default:
-      throw std::runtime_error("unexpected character");
+      throw LexerError("unexpected character");
     }
     return token;
   }
 
 public:
 
-  Lexer() : currentLineNumber(0) {
+  Lexer() : currentLineNumber(0), currentCharNumber(0) {
     declareKeywords();
   }
 
@@ -420,7 +440,10 @@ public:
   const std::string &getString() const { return string; }
   Token getLastToken() const { return lastToken; }
   size_t getLineNumber() const { return currentLineNumber; }
+  size_t getCharNumber() const { return currentCharNumber; }
   const std::string &getLine() const { return currentLine; }
+  const Location getLocation() const { return Location(currentLineNumber,
+                                                       currentCharNumber); }
 };
 
 //===---------------------------------------------------------------------===//
@@ -510,9 +533,13 @@ struct AstVisitor {
 
 /// AST node base class.
 class AstNode {
+  Location location;
 public:
+  AstNode() : location(Location(0,0)) {}
+  AstNode(Location location) : location(location) {}
   virtual ~AstNode() = default;
   virtual void accept(AstVisitor* visitor) = 0;
+  const Location &getLocation() const { return location; }
 };
 
 // Expressions ============================================================= //
@@ -520,7 +547,7 @@ public:
 class Expr : public AstNode {
   std::optional<int> constValue;
 public:
-  Expr() : constValue(std::nullopt) {}
+  Expr(Location location) : AstNode(location), constValue(std::nullopt) {}
   bool isConst() const { return constValue.has_value(); }
   int getValue() const { return constValue.value(); }
   void setValue(int newConstValue) { constValue.emplace(newConstValue); }
@@ -530,7 +557,7 @@ class VarRefExpr : public Expr {
   std::string name;
   std::unique_ptr<Expr> expr;
 public:
-  VarRefExpr(std::string name) : name(name) {}
+  VarRefExpr(Location location, std::string name) : Expr(location), name(name) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -542,8 +569,8 @@ class ArraySubscriptExpr : public Expr {
   std::string name;
   std::unique_ptr<Expr> expr;
 public:
-  ArraySubscriptExpr(std::string name, std::unique_ptr<Expr> expr) :
-      name(name), expr(std::move(expr)) {}
+  ArraySubscriptExpr(Location location, std::string name, std::unique_ptr<Expr> expr) :
+      Expr(location), name(name), expr(std::move(expr)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     expr->accept(visitor);
@@ -556,9 +583,10 @@ class CallExpr : public Expr {
   std::string name;
   std::vector<std::unique_ptr<Expr>> args;
 public:
-  CallExpr(std::string name) : name(name) {}
-  CallExpr(std::string name, std::vector<std::unique_ptr<Expr>> args) :
-      name(name), args(std::move(args)) {}
+  CallExpr(Location location, std::string name) :
+      Expr(location), name(name) {}
+  CallExpr(Location location, std::string name, std::vector<std::unique_ptr<Expr>> args) :
+      Expr(location), name(name), args(std::move(args)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     for (auto &arg : args) {
@@ -573,7 +601,8 @@ public:
 class NumberExpr : public Expr {
   unsigned value;
 public:
-  NumberExpr(unsigned value) : value(value) {}
+  NumberExpr(Location location, unsigned value) :
+      Expr(location), value(value) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -584,7 +613,8 @@ public:
 class BooleanExpr : public Expr {
   bool value;
 public:
-  BooleanExpr(bool value) : value(value) {}
+  BooleanExpr(Location location, bool value) :
+      Expr(location), value(value) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -595,7 +625,8 @@ public:
 class StringExpr : public Expr {
   std::string value;
 public:
-  StringExpr(std::string value) : value(value) {}
+  StringExpr(Location location, std::string value) :
+      Expr(location), value(value) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -607,8 +638,8 @@ class UnaryOpExpr : public Expr {
   Token op;
   std::unique_ptr<Expr> element;
 public:
-  UnaryOpExpr(Token op, std::unique_ptr<Expr> element) :
-      op(op), element(std::move(element)) {}
+  UnaryOpExpr(Location location, Token op, std::unique_ptr<Expr> element) :
+      Expr(location), op(op), element(std::move(element)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     element->accept(visitor);
@@ -622,8 +653,8 @@ class BinaryOpExpr : public Expr {
   Token op;
   std::unique_ptr<Expr> LHS, RHS;
 public:
-  BinaryOpExpr(Token op, std::unique_ptr<Expr> LHS, std::unique_ptr<Expr> RHS) :
-      op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+  BinaryOpExpr(Location location, Token op, std::unique_ptr<Expr> LHS, std::unique_ptr<Expr> RHS) :
+      Expr(location), op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     LHS->accept(visitor);
@@ -640,7 +671,7 @@ public:
 class Decl : public AstNode {
   std::string name;
 public:
-  Decl(std::string name) : name(name) {}
+  Decl(Location location, std::string name) : AstNode(location), name(name) {}
   std::string getName() const { return name; }
 };
 
@@ -648,8 +679,8 @@ class ValDecl : public Decl {
   std::unique_ptr<Expr> expr;
   int exprValue;
 public:
-  ValDecl(std::string name, std::unique_ptr<Expr> expr) :
-      Decl(name), expr(std::move(expr)) {}
+  ValDecl(Location location, std::string name, std::unique_ptr<Expr> expr) :
+      Decl(location, name), expr(std::move(expr)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     expr->accept(visitor);
@@ -662,7 +693,7 @@ public:
 
 class VarDecl : public Decl {
 public:
-  VarDecl(std::string name) : Decl(name) {}
+  VarDecl(Location location, std::string name) : Decl(location, name) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -672,8 +703,8 @@ public:
 class ArrayDecl : public Decl {
   std::unique_ptr<Expr> expr;
 public:
-  ArrayDecl(std::string name, std::unique_ptr<Expr> expr) :
-      Decl(name), expr(std::move(expr)) {}
+  ArrayDecl(Location location, std::string name, std::unique_ptr<Expr> expr) :
+      Decl(location, name), expr(std::move(expr)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     expr->accept(visitor);
@@ -686,13 +717,13 @@ public:
 class Formal : public AstNode {
   std::string name;
 public:
-  Formal(std::string name) : name(name) {}
+  Formal(Location location, std::string name) : AstNode(location), name(name) {}
   std::string getName() const { return name; }
 };
 
 class ValFormal : public Formal {
 public:
-  ValFormal(std::string name) : Formal(name) {}
+  ValFormal(Location location, std::string name) : Formal(location, name) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -701,7 +732,7 @@ public:
 
 class ArrayFormal : public Formal {
 public:
-  ArrayFormal(std::string name) : Formal(name) {}
+  ArrayFormal(Location location, std::string name) : Formal(location, name) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -710,7 +741,7 @@ public:
 
 class ProcFormal : public Formal {
 public:
-  ProcFormal(std::string name) : Formal(name) {}
+  ProcFormal(Location location, std::string name) : Formal(location, name) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -719,7 +750,7 @@ public:
 
 class FuncFormal : public Formal {
 public:
-  FuncFormal(std::string name) : Formal(name) {}
+  FuncFormal(Location location, std::string name) : Formal(location, name) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -728,11 +759,13 @@ public:
 
 // Statement ================================================================ //
 
-class Statement : public AstNode {};
+struct Statement : public AstNode {
+  Statement(Location location) : AstNode(location) {}
+};
 
 class SkipStatement : public Statement {
 public:
-  SkipStatement() {}
+  SkipStatement(Location location) : Statement(location) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -741,7 +774,7 @@ public:
 
 class StopStatement : public Statement {
 public:
-  StopStatement() {}
+  StopStatement(Location location) : Statement(location) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -751,7 +784,8 @@ public:
 class ReturnStatement : public Statement {
   std::unique_ptr<Expr> expr;
 public:
-  ReturnStatement(std::unique_ptr<Expr> expr) : expr(std::move(expr)) {}
+  ReturnStatement(Location location, std::unique_ptr<Expr> expr) :
+      Statement(location), expr(std::move(expr)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     expr->accept(visitor);
@@ -764,9 +798,11 @@ class IfStatement : public Statement {
   std::unique_ptr<Statement> thenStmt;
   std::unique_ptr<Statement> elseStmt;
 public:
-  IfStatement(std::unique_ptr<Expr> condition,
+  IfStatement(Location location,
+              std::unique_ptr<Expr> condition,
               std::unique_ptr<Statement> thenStmt,
               std::unique_ptr<Statement> elseStmt) :
+      Statement(location),
       condition(std::move(condition)),
       thenStmt(std::move(thenStmt)),
       elseStmt(std::move(elseStmt)) {}
@@ -783,8 +819,10 @@ class WhileStatement : public Statement {
   std::unique_ptr<Expr> condition;
   std::unique_ptr<Statement> stmt;
 public:
-  WhileStatement(std::unique_ptr<Expr> condition,
+  WhileStatement(Location location, 
+                 std::unique_ptr<Expr> condition,
                  std::unique_ptr<Statement> stmt) :
+      Statement(location),
       condition(std::move(condition)),
       stmt(std::move(stmt)) {}
   virtual void accept(AstVisitor *visitor) override {
@@ -798,8 +836,8 @@ public:
 class SeqStatement : public Statement {
   std::vector<std::unique_ptr<Statement>> stmts;
 public:
-  SeqStatement(std::vector<std::unique_ptr<Statement>> stmts) :
-      stmts(std::move(stmts)) {}
+  SeqStatement(Location location, std::vector<std::unique_ptr<Statement>> stmts) :
+      Statement(location), stmts(std::move(stmts)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     for (auto &stmt : stmts) {
@@ -813,8 +851,8 @@ class CallStatement : public Statement {
   std::unique_ptr<Expr> call;
   // TODO: work out a better way than dynamically casting.
 public:
-  CallStatement(std::unique_ptr<Expr> call) :
-      call(std::move(call)) {}
+  CallStatement(Location location, std::unique_ptr<Expr> call) :
+      Statement(location), call(std::move(call)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     for (auto &arg : dynamic_cast<CallExpr*>(call.get())->getArgs()) {
@@ -828,9 +866,10 @@ public:
 class AssStatement : public Statement {
   std::unique_ptr<Expr> LHS, RHS;
 public:
-  AssStatement(std::unique_ptr<Expr> LHS,
+  AssStatement(Location location,
+               std::unique_ptr<Expr> LHS,
                std::unique_ptr<Expr> RHS) :
-      LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+      Statement(location), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     LHS->accept(visitor);
@@ -847,11 +886,12 @@ class Proc : public AstNode {
   std::vector<std::unique_ptr<Decl>> decls;
   std::unique_ptr<Statement> statement;
 public:
-  Proc(std::string name,
+  Proc(Location location,
+       std::string name,
        std::vector<std::unique_ptr<Formal>> formals,
        std::vector<std::unique_ptr<Decl>> decls,
        std::unique_ptr<Statement> statement) :
-      name(name), formals(std::move(formals)),
+      AstNode(location), name(name), formals(std::move(formals)),
       decls(std::move(decls)), statement(std::move(statement)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
@@ -897,8 +937,11 @@ class AstPrinter : public AstVisitor {
       outs << "  ";
     }
   }
-  std::string exprValString(Expr &expr) {
+  std::string exprValString(const Expr &expr) {
     return expr.isConst() ? (boost::format(" [const=%d]") % expr.getValue()).str() : "";
+  }
+  std::string locString(const AstNode &node) {
+    return (boost::format(" [loc=%s]") % node.getLocation().str()).str();
   }
 public:
   AstPrinter(std::ostream& outs = std::cout) :
@@ -911,137 +954,137 @@ public:
     indentCount--;
   }
   void visitPre(Proc &decl) override {
-    indent(); outs << boost::format("proc %s\n") % decl.getName();
+    indent(); outs << boost::format("proc %s%s\n") % decl.getName() % locString(decl);
     indentCount++;
   };
   void visitPost(Proc &decl) override {
     indentCount--;
   }
   void visitPre(ArrayDecl &decl) override {
-    indent(); outs << boost::format("arraydecl %s\n") % decl.getName();
+    indent(); outs << boost::format("arraydecl %s%s\n") % decl.getName() % locString(decl);
     indentCount++;
   };
   void visitPost(ArrayDecl &decl) override {
     indentCount--;
   }
   void visitPre(VarDecl &decl) override {
-    indent(); outs << boost::format("vardecl %s\n") % decl.getName();
+    indent(); outs << boost::format("vardecl %s%s\n") % decl.getName() % locString(decl);
   };
   void visitPost(VarDecl &decl) override { }
   void visitPre(ValDecl &decl) override {
-    indent(); outs << boost::format("valdecl %s\n") % decl.getName();
+    indent(); outs << boost::format("valdecl %s%s\n") % decl.getName() % locString(decl);
     indentCount++;
   };
   void visitPost(ValDecl &decl) override {
     indentCount--;
   }
   void visitPre(BinaryOpExpr &expr) override {
-    indent(); outs << boost::format("binaryop %s%s\n")
-                        % tokenEnumStr(expr.getOp()) % exprValString(expr);
+    indent(); outs << boost::format("binaryop %s%s%s\n")
+                        % tokenEnumStr(expr.getOp()) % exprValString(expr) % locString(expr);
     indentCount++;
   };
   void visitPost(BinaryOpExpr &expr) override {
     indentCount--;
   }
   void visitPre(UnaryOpExpr &expr) override {
-    indent(); outs << boost::format("unaryop %s%s\n")
-                        % tokenEnumStr(expr.getOp()) % exprValString(expr);
+    indent(); outs << boost::format("unaryop %s%s%s\n")
+                        % tokenEnumStr(expr.getOp()) % exprValString(expr) % locString(expr);
     indentCount++;
   };
   void visitPost(UnaryOpExpr &expr) override {
     indentCount--;
   }
   void visitPre(StringExpr &expr) override {
-    indent(); outs << boost::format("string %s\n") % expr.getValue();
+    indent(); outs << boost::format("string %s%s\n") % expr.getValue() % locString(expr);
   };
   void visitPost(StringExpr &expr) override { }
   void visitPre(BooleanExpr &expr) override {
-    indent(); outs << boost::format("boolean %d\n") % expr.getValue();
+    indent(); outs << boost::format("boolean %d%s\n") % expr.getValue() % locString(expr);
   };
   void visitPost(BooleanExpr &expr) override { }
   void visitPre(NumberExpr &expr) override {
-    indent(); outs << boost::format("number %d\n") % expr.getValue();
+    indent(); outs << boost::format("number %d%s\n") % expr.getValue() % locString(expr);
   };
   void visitPost(NumberExpr &expr) override { }
   void visitPre(CallExpr &expr) override {
-    indent(); outs << boost::format("call %s\n") % expr.getName();
+    indent(); outs << boost::format("call %s%s\n") % expr.getName() % locString(expr);
     indentCount++;
   };
   void visitPost(CallExpr &expr) override {
     indentCount--;
   }
   void visitPre(ArraySubscriptExpr &expr) override {
-    indent(); outs << boost::format("arraysubscript %s\n") % expr.getName();
+    indent(); outs << boost::format("arraysubscript %s%s\n") % expr.getName() % locString(expr);
     indentCount++;
   };
   void visitPost(ArraySubscriptExpr &expr) override {
     indentCount--;
   }
   void visitPre(VarRefExpr &expr) override {
-    indent(); outs << boost::format("varref %s\n") % expr.getName();
+    indent(); outs << boost::format("varref %s%s\n") % expr.getName() % locString(expr);
   };
   void visitPost(VarRefExpr &expr) override { }
   void visitPre(ValFormal &formal) override {
-    indent(); outs << boost::format("valformal %s\n") % formal.getName();
+    indent(); outs << boost::format("valformal %s%s\n") % formal.getName() % locString(formal);
   };
   void visitPost(ValFormal &formal) override {};
   void visitPre(ArrayFormal &formal) override {
-    indent(); outs << boost::format("arrayformal %s\n") % formal.getName();
+    indent(); outs << boost::format("arrayformal %s%s\n") % formal.getName() % locString(formal);
   };
   void visitPost(ArrayFormal &formal) override {};
   void visitPre(ProcFormal &formal) override {
-    indent(); outs << boost::format("procformal %s\n") % formal.getName();
+    indent(); outs << boost::format("procformal %s%s\n") % formal.getName() % locString(formal);
   };
   void visitPost(ProcFormal &formal) override {};
   void visitPre(FuncFormal &formal) override {
-    indent(); outs << boost::format("funcformal %s\n") % formal.getName();
+    indent(); outs << boost::format("funcformal %s%s\n") % formal.getName() % locString(formal);
   };
   void visitPost(FuncFormal &formal) override {};
   void visitPre(SkipStatement &stmt) override {
-    indent(); outs << "skipstmt\n";
+    indent(); outs << boost::format("skipstmt %s\n") % locString(stmt);
   };
   void visitPost(SkipStatement &stmt) override {};
   void visitPre(StopStatement &stmt) override {
-    indent(); outs << "stopstmt\n";
+    indent(); outs << boost::format("stopstmt %s\n") % locString(stmt);
   };
   void visitPost(StopStatement &stmt) override {};
   void visitPre(ReturnStatement &stmt) override {
-    indent(); outs << "returnstmt\n";
+    indent(); outs << boost::format("returnstmt %s\n") % locString(stmt);
     indentCount++;
   };
   void visitPost(ReturnStatement &stmt) override {
     indentCount--;
   };
   void visitPre(IfStatement &stmt) override {
-    indent(); outs << "ifstmt\n";
+    indent(); outs << boost::format("ifstmt %s\n") % locString(stmt);
     indentCount++;
   };
   void visitPost(IfStatement &stmt) override {
     indentCount--;
   };
   void visitPre(WhileStatement &stmt) override {
-    indent(); outs << "whilestmt\n";
+    indent(); outs << boost::format("whilestmt %s\n") % locString(stmt);
     indentCount++;
   };
   void visitPost(WhileStatement &stmt) override {
     indentCount--;
   };
   void visitPre(SeqStatement &stmt) override {
-    indent(); outs << "seqstmt\n";
+    indent(); outs << boost::format("seqstmt %s\n") % locString(stmt);
     indentCount++;
   };
   void visitPost(SeqStatement &stmt) override {
     indentCount--;
   };
   void visitPre(CallStatement &stmt) override {
-    indent(); outs << boost::format("callstmt %s\n") % stmt.getName();
+    indent(); outs << boost::format("callstmt %s%s\n") % stmt.getName() % locString(stmt);
     indentCount++;
   };
   void visitPost(CallStatement &stmt) override {
     indentCount--;
   };
   void visitPre(AssStatement &stmt) override {
-    indent(); outs << "assstmt\n";
+    indent(); outs << boost::format("assstmt %s\n") % locString(stmt);
     indentCount++;
   };
   void visitPost(AssStatement &stmt) override {
@@ -1098,11 +1141,12 @@ class Parser {
   ///   <binary-op> <element> <binary-op>
   ///   <element>
   std::unique_ptr<Expr> parseBinOpRHS(Token op) {
+    auto location = lexer.getLocation();
     auto element = parseElement();
     if (isAssociative(op) && op == lexer.getLastToken()) {
       lexer.getNextToken();
       auto RHS = parseBinOpRHS(op);
-      return std::make_unique<BinaryOpExpr>(op, std::move(element), std::move(RHS));
+      return std::make_unique<BinaryOpExpr>(location, op, std::move(element), std::move(RHS));
     } else {
       return element;
     }
@@ -1114,16 +1158,18 @@ class Parser {
   ///   <element> <binary-op-RHS>
   ///   <element>
   std::unique_ptr<Expr> parseExpr() {
+    auto location = lexer.getLocation();
     // Unary operations.
     if (lexer.getLastToken() == Token::MINUS) {
+      auto location = lexer.getLocation();
       lexer.getNextToken();
       auto element = parseElement();
-      return std::make_unique<UnaryOpExpr>(Token::MINUS, std::move(element));
+      return std::make_unique<UnaryOpExpr>(location, Token::MINUS, std::move(element));
     }
     if (lexer.getLastToken() == Token::NOT) {
       lexer.getNextToken();
       auto element = parseElement();
-      return std::make_unique<UnaryOpExpr>(Token::NOT, std::move(element));
+      return std::make_unique<UnaryOpExpr>(location, Token::NOT, std::move(element));
     }
     auto element = parseElement();
     auto op = lexer.getLastToken();
@@ -1131,7 +1177,7 @@ class Parser {
       // Binary operation.
       lexer.getNextToken();
       auto RHS = parseBinOpRHS(op);
-      return std::make_unique<BinaryOpExpr>(op, std::move(element), std::move(RHS));
+      return std::make_unique<BinaryOpExpr>(location, op, std::move(element), std::move(RHS));
     }
     // Otherwise just return an element.
     return element;
@@ -1160,6 +1206,7 @@ class Parser {
   ///   "(" ")"
   ///   "(" <expr> ")"
   std::unique_ptr<Expr> parseElement() {
+    auto location = lexer.getLocation();
     switch (lexer.getLastToken()) {
     case Token::IDENTIFIER: {
       auto name = parseIdentifier();
@@ -1168,34 +1215,34 @@ class Parser {
         lexer.getNextToken();
         auto expr = parseExpr();
         expect(Token::RBRACKET);
-        return std::make_unique<ArraySubscriptExpr>(name, std::move(expr));
+        return std::make_unique<ArraySubscriptExpr>(location, name, std::move(expr));
       // Procedure call.
       } else if (lexer.getLastToken() == Token::LPAREN) {
         if (lexer.getNextToken() == Token::RPAREN) {
           lexer.getNextToken();
-          return std::make_unique<CallExpr>(name);
+          return std::make_unique<CallExpr>(location, name);
         } else {
           auto exprList = parseExprList();
           expect(Token::RPAREN);
-          return std::make_unique<CallExpr>(name, std::move(exprList));
+          return std::make_unique<CallExpr>(location, name, std::move(exprList));
         }
       // Variable reference.
       } else {
-        return std::make_unique<VarRefExpr>(name);
+        return std::make_unique<VarRefExpr>(location, name);
       }
     }
     case Token::NUMBER:
       lexer.getNextToken();
-      return std::make_unique<NumberExpr>(lexer.getNumber());
+      return std::make_unique<NumberExpr>(location, lexer.getNumber());
     case Token::STRING:
       lexer.getNextToken();
-      return std::make_unique<StringExpr>(lexer.getString());
+      return std::make_unique<StringExpr>(location, lexer.getString());
     case Token::TRUE:
       lexer.getNextToken();
-      return std::make_unique<BooleanExpr>(true);
+      return std::make_unique<BooleanExpr>(location, true);
     case Token::FALSE:
       lexer.getNextToken();
-      return std::make_unique<BooleanExpr>(false);
+      return std::make_unique<BooleanExpr>(location, false);
     case Token::LPAREN: {
       lexer.getNextToken();
       auto expr = parseExpr();
@@ -1203,7 +1250,6 @@ class Parser {
       return expr;
     }
     default:
-      std::cout << tokenEnumStr(lexer.getLastToken()) << "\n";
       throw std::runtime_error("in expression element");
     }
   }
@@ -1213,6 +1259,7 @@ class Parser {
   ///   "var" <identifier> ";"
   ///   "array" <identifier> "[" <expr> "]" ";"
   std::unique_ptr<Decl> parseDecl() {
+    auto location = lexer.getLocation();
     switch (lexer.getLastToken()) {
     case Token::VAL: {
       lexer.getNextToken();
@@ -1220,13 +1267,13 @@ class Parser {
       expect(Token::EQ);
       auto expr = parseExpr();
       expect(Token::SEMICOLON);
-      return std::make_unique<ValDecl>(name, std::move(expr));
+      return std::make_unique<ValDecl>(location, name, std::move(expr));
     }
     case Token::VAR: {
       lexer.getNextToken();
       auto name = parseIdentifier();
       expect(Token::SEMICOLON);
-      return std::make_unique<VarDecl>(name);
+      return std::make_unique<VarDecl>(location, name);
     }
     case Token::ARRAY: {
       lexer.getNextToken();
@@ -1235,7 +1282,7 @@ class Parser {
       auto expr = parseExpr();
       expect(Token::RBRACKET);
       expect(Token::SEMICOLON);
-      return std::make_unique<ArrayDecl>(name, std::move(expr));
+      return std::make_unique<ArrayDecl>(location, name, std::move(expr));
     }
     default:
       throw std::runtime_error("invalid declaration");
@@ -1294,19 +1341,20 @@ class Parser {
   ///   "proc" <name>
   ///   "func" <name>
   std::unique_ptr<Formal> parseFormal() {
+    auto location = lexer.getLocation();
     switch (lexer.getLastToken()) {
     case Token::VAL:
       lexer.getNextToken();
-      return std::make_unique<ValFormal>(parseIdentifier());
+      return std::make_unique<ValFormal>(location, parseIdentifier());
     case Token::ARRAY:
       lexer.getNextToken();
-      return std::make_unique<ArrayFormal>(parseIdentifier());
+      return std::make_unique<ArrayFormal>(location, parseIdentifier());
     case Token::PROC:
       lexer.getNextToken();
-      return std::make_unique<ProcFormal>(parseIdentifier());
+      return std::make_unique<ProcFormal>(location, parseIdentifier());
     case Token::FUNC:
       lexer.getNextToken();
-      return std::make_unique<FuncFormal>(parseIdentifier());
+      return std::make_unique<FuncFormal>(location, parseIdentifier());
     default:
       throw std::runtime_error("invalid formal");
     }
@@ -1334,16 +1382,17 @@ class Parser {
   ///   <identifier> ":=" <expr>
   ///   <identifier> "(" [ <expr> "," ] ")"
   std::unique_ptr<Statement> parseStatement() {
+    auto location = lexer.getLocation();
     switch (lexer.getLastToken()) {
     case Token::SKIP:
       lexer.getNextToken();
-      return std::make_unique<SkipStatement>();
+      return std::make_unique<SkipStatement>(location);
     case Token::STOP:
       lexer.getNextToken();
-      return std::make_unique<StopStatement>();
+      return std::make_unique<StopStatement>(location);
     case Token::RETURN:
       lexer.getNextToken();
-      return std::make_unique<ReturnStatement>(parseExpr());
+      return std::make_unique<ReturnStatement>(location, parseExpr());
     case Token::IF: {
       lexer.getNextToken();
       auto condition = parseExpr();
@@ -1351,7 +1400,8 @@ class Parser {
       auto thenStmt = parseStatement();
       expect(Token::ELSE);
       auto elseStmt = parseStatement();
-      return std::make_unique<IfStatement>(std::move(condition),
+      return std::make_unique<IfStatement>(location,
+                                           std::move(condition),
                                            std::move(thenStmt),
                                            std::move(elseStmt));
     }
@@ -1360,23 +1410,25 @@ class Parser {
       auto condition = parseExpr();
       expect(Token::DO);
       auto stmt = parseStatement();
-      return std::make_unique<WhileStatement>(std::move(condition), std::move(stmt));
+      return std::make_unique<WhileStatement>(location,
+                                              std::move(condition),
+                                              std::move(stmt));
     }
     case Token::BEGIN: {
       lexer.getNextToken();
       auto body = parseStatements();
       expect(Token::END);
-      return std::make_unique<SeqStatement>(std::move(body));
+      return std::make_unique<SeqStatement>(location, std::move(body));
     }
     case Token::IDENTIFIER: {
       auto element = parseElement();
       // Procedure call
       if (dynamic_cast<CallExpr*>(element.get())) {
-        return std::make_unique<CallStatement>(std::move(element));
+        return std::make_unique<CallStatement>(location, std::move(element));
       }
       // Assignment
       expect(Token::ASS);
-      return std::make_unique<AssStatement>(std::move(element), parseExpr());
+      return std::make_unique<AssStatement>(location, std::move(element), parseExpr());
     }
     default:
       throw std::runtime_error("invalid statement");
@@ -1386,6 +1438,7 @@ class Parser {
   /// proc-decl :=
   ///  "proc" <name> "(" <formals> ")" "is" [0 <var-decl> ] <statement>
   std::unique_ptr<Proc> parseProcDecl() {
+    auto location = lexer.getLocation();
     lexer.getNextToken();
     // Name
     auto name = parseIdentifier();
@@ -1407,7 +1460,7 @@ class Parser {
       decls = parseLocalDecls();
     }
     auto statement = parseStatement();
-    return std::make_unique<Proc>(name, std::move(formals),
+    return std::make_unique<Proc>(location, name, std::move(formals),
                                   std::move(decls), std::move(statement));
   }
 

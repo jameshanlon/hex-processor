@@ -113,10 +113,17 @@ int main(int argc, const char *argv[]) {
 
     asmCodeGen.emitBin(outputFilename);
 
-  } catch (std::exception &e) {
+  } catch (const xcmp::LexerError &e) {
     std::cerr << "Error: " << e.what() << "\n";
-    std::cerr << "  " << lexer.getLineNumber() << ": " << lexer.getLine() << "\n";
-    std::exit(1);
+    std::cerr << boost::format("  %d:%d %s\n")
+                   % lexer.getLineNumber()
+                   % lexer.getCharNumber()
+                   % lexer.getLine();
+    return 1;
+  } catch (const xcmp::ParserError &e) {
+    std::cerr << "Error: " << e.what() << "\n";
+  } catch (const std::exception &e) {
+    std::cerr << "Error: " << e.what() << "\n";
   }
   return 0;
 }
