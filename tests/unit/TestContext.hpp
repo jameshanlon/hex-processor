@@ -7,6 +7,9 @@
 #include "xcmp.hpp"
 
 struct TestContext {
+  std::istringstream simInBuffer;
+  std::ostringstream simOutBuffer;
+
   TestContext() {}
 
   /// Return the path to a test filename.
@@ -62,8 +65,6 @@ struct TestContext {
 
   /// Run an assembly program.
   int runHexProgram(const std::string &program,
-                    std::istringstream &simInBuffer,
-                    std::ostringstream &simOutBuffer,
                     bool isFilename=false) {
     // Assemble the program.
     hexasm::Lexer lexer;

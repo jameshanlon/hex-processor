@@ -1,7 +1,5 @@
 BR start
-
 DATA 16383 # sp
-
 start
 LDAC 0 # areg <- 0
 LDBM 1 # breg <- sp

@@ -374,7 +374,7 @@ public:
         opcode != Token::ADD &&
         opcode != Token::SUB &&
         opcode != Token::SVC) {
-      throw Error(location, std::string("unexpected operand to OPR ")+tokenEnumStr(opcode));
+      throw ParserError(location, std::string("unexpected operand to OPR ")+tokenEnumStr(opcode));
     }
   }
   bool operandIsLabel() const { return false; }
