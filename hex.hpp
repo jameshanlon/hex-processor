@@ -1,6 +1,10 @@
 #ifndef HEX_HPP
 #define HEX_HPP
 
+//===---------------------------------------------------------------------===//
+// Hex enumeration definitions and conversion functions.
+//===---------------------------------------------------------------------===//
+
 namespace hex {
 
 enum Instr {

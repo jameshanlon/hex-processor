@@ -4,7 +4,9 @@
 #include <boost/test/unit_test.hpp>
 #include "TestContext.hpp"
 
-/// Unit tests for assembly programs.
+//===---------------------------------------------------------------------===//
+// Unit tests for assembly programs.
+//===---------------------------------------------------------------------===//
 
 BOOST_FIXTURE_TEST_SUITE(asm_tests, TestContext);
 
@@ -80,27 +82,27 @@ BOOST_AUTO_TEST_CASE(hello_procedure_run) {
 
 BOOST_AUTO_TEST_CASE(error_unexpected_opr_operand) {
   auto program = "OPR OPR";
-  BOOST_CHECK_THROW(asmHexProgram(program), hexasm::ParserError);
+  BOOST_CHECK_THROW(asmHexProgram(program), hexasm::InvalidOprError);
 }
 
 BOOST_AUTO_TEST_CASE(error_unrecognised_token) {
   auto program = "123";
-  BOOST_CHECK_THROW(asmHexProgram(program), hexasm::ParserError);
+  BOOST_CHECK_THROW(asmHexProgram(program), hexasm::UnrecognisedTokenError);
 }
 
 BOOST_AUTO_TEST_CASE(error_expected_number) {
   auto program = "BR .";
-  BOOST_CHECK_THROW(asmHexProgram(program), hexasm::ParserError);
+  BOOST_CHECK_THROW(asmHexProgram(program), hexasm::UnexpectedTokenError);
 }
 
 BOOST_AUTO_TEST_CASE(error_expected_negative_integer) {
   auto program = "BR -foo";
-  BOOST_CHECK_THROW(asmHexProgram(program), hexasm::ParserError);
+  BOOST_CHECK_THROW(asmHexProgram(program), hexasm::UnexpectedTokenError);
 }
 
 BOOST_AUTO_TEST_CASE(error_unknown_label) {
   auto program = "BR foo";
-  BOOST_CHECK_THROW(asmHexProgram(program), hexasm::Error);
+  BOOST_CHECK_THROW(asmHexProgram(program), hexasm::UnknownLabelError);
 }
 
 BOOST_AUTO_TEST_SUITE_END();

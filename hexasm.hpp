@@ -16,6 +16,7 @@
 #include <boost/format.hpp>
 
 #include "hex.hpp"
+#include "util.hpp"
 
 // An assembler for the Hex instruction set, based on xhexb.x and with
 // inspiration from the LLVM Kaleidoscope tutorial:
@@ -45,39 +46,10 @@
 //
 // Comments start with '#' and continue to the end of the line.
 
+using Location = hexutil::Location;
+using Error = hexutil::Error;
+
 namespace hexasm {
-
-class Location {
-  size_t line, position;
-public:
-  Location() : line(0), position(0) {}
-  Location(size_t line, size_t position) : line(line), position(position) {}
-  std::string str() const {
-    return (boost::format("line %d:%d") % line % position).str();
-  }
-};
-
-/// Lexer/parser error.
-class ParserError : public std::runtime_error {
-  Location location;
-public:
-  ParserError(Location location, const std::string &what) :
-      std::runtime_error(what), location(location) {}
-  ParserError(Location location, const char *what) :
-      std::runtime_error(what), location(location) {}
-  const Location &getLocation() const { return location; }
-};
-
-/// General error with location information.
-class Error : public std::runtime_error {
-  Location location;
-public:
-  Error(Location location, const std::string &what) :
-      std::runtime_error(what), location(location) {}
-  Error(Location location, const char *what) :
-      std::runtime_error(what), location(location) {}
-  const Location &getLocation() const { return location; }
-};
 
 //===---------------------------------------------------------------------===//
 // Token enumeration and helper functions
@@ -187,6 +159,32 @@ static int tokenToInstrOpc(Token token) {
 static int tokenToOprInstrOpc(Token token) {
   return static_cast<int>(tokenToOprInstr(token));
 }
+
+//===---------------------------------------------------------------------===//
+// Exceptions.
+//===---------------------------------------------------------------------===//
+
+struct UnrecognisedTokenError : public Error {
+  UnrecognisedTokenError(Location location, Token token) :
+      Error(location, (boost::format("unrecognised token %s") % tokenEnumStr(token)).str()) {}
+};
+
+struct UnexpectedTokenError : public Error {
+  UnexpectedTokenError(Location location, Token token) :
+      Error(location, (boost::format("unexpected token %s") % tokenEnumStr(token)).str()) {}
+};
+
+struct InvalidOprError : public Error {
+  InvalidOprError(Token token) :
+      Error((boost::format("unexpected operand to OPR %s") % tokenEnumStr(token)).str()) {}
+  InvalidOprError(Location location, Token token) :
+      Error(location, (boost::format("unexpected operand to OPR %s") % tokenEnumStr(token)).str()) {}
+};
+
+struct UnknownLabelError : public Error {
+  UnknownLabelError(Location location, std::string label) :
+      Error(location, (boost::format("unknown label %s") % label).str()) {}
+};
 
 //===---------------------------------------------------------------------===//
 // Functions for determining instruction encoding sizes.
@@ -365,7 +363,7 @@ public:
         opcode != Token::ADD &&
         opcode != Token::SUB &&
         opcode != Token::SVC) {
-      throw std::runtime_error(std::string("unexpected operand to OPR ")+tokenEnumStr(opcode));
+      throw InvalidOprError(opcode);
     }
   }
   InstrOp(Location location, Token token, Token opcode) :
@@ -374,7 +372,7 @@ public:
         opcode != Token::ADD &&
         opcode != Token::SUB &&
         opcode != Token::SVC) {
-      throw ParserError(location, std::string("unexpected operand to OPR ")+tokenEnumStr(opcode));
+      throw InvalidOprError(location, opcode);
     }
   }
   bool operandIsLabel() const { return false; }
@@ -515,6 +513,7 @@ class Lexer {
       if (auto ifstream = dynamic_cast<std::ifstream*>(file.get())) {
         ifstream->close();
       }
+      currentLine.clear();
       return Token::END_OF_FILE;
     }
     readChar();
@@ -576,6 +575,7 @@ public:
   unsigned getNumber() const { return value; }
   Token getLastToken() const { return lastToken; }
   size_t getLineNumber() const { return currentLineNumber; }
+  bool hasLine() const { return !currentLine.empty(); }
   const std::string &getLine() const { return currentLine; }
   const Location getLocation() const { return Location(currentLineNumber,
                                                        currentCharNumber); }
@@ -590,7 +590,7 @@ class Parser {
 
   void expectLast(Token token) const {
     if (token != lexer.getLastToken()) {
-      throw ParserError(lexer.getLocation(), std::string("expected ")+tokenEnumStr(token));
+      throw UnexpectedTokenError(lexer.getLocation(), token);
     }
   }
 
@@ -654,7 +654,7 @@ class Parser {
         }
       }
       default:
-        throw ParserError(location, std::string("unrecognised token ")+tokenEnumStr(lexer.getLastToken()));
+        throw UnrecognisedTokenError(location, lexer.getLastToken());
     }
   }
 
@@ -716,7 +716,7 @@ class CodeGen {
         if (directive->operandIsLabel()) {
           auto instrLabel = dynamic_cast<InstrLabel*>(directive.get());
           if (labelMap.count(instrLabel->getLabel()) == 0) {
-            throw Error(directive->getLocation(), std::string("unknown label ")+instrLabel->getLabel());
+            throw UnknownLabelError(directive->getLocation(), instrLabel->getLabel());
           }
           int labelValue = labelMap[instrLabel->getLabel()]->getValue();
           if (instrLabel->isRelative()) {

@@ -4,7 +4,9 @@
 #include <boost/test/unit_test.hpp>
 #include "TestContext.hpp"
 
-/// Unit tests for X programs.
+//===---------------------------------------------------------------------===//
+// Unit tests for X programs.
+//===---------------------------------------------------------------------===//
 
 BOOST_FIXTURE_TEST_SUITE(x_tests, TestContext);
 

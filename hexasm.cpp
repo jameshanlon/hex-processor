@@ -80,13 +80,15 @@ int main(int argc, const char *argv[]) {
     // Emit the binary file.
     codeGen.emitBin(outputFilename);
 
-  } catch (const hexasm::ParserError &e) {
-    std::cerr << boost::format("Error %s: %s\n") % e.getLocation().str() % e.what();
-    std::cerr << "  " << lexer.getLine() << "\n";
-    return 1;
-  } catch (const hexasm::Error &e) {
-    std::cerr << boost::format("Error %s: %s\n") % e.getLocation().str() % e.what();
-    return 1;
+  } catch (const hexutil::Error &e) {
+    if (e.hasLocation()) {
+      std::cerr << boost::format("Error %s: %s\n") % e.getLocation().str() % e.what();
+    } else {
+      std::cerr << boost::format("Error: %s\n") % e.what();
+    }
+    if (lexer.hasLine()) {
+      std::cerr << "  " << lexer.getLine() << "\n";
+    }
   } catch (const std::exception &e) {
     std::cerr << "Error: " << e.what() << "\n";
     return 1;

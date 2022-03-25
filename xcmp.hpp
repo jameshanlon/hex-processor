@@ -15,47 +15,20 @@
 #include <map>
 #include <boost/format.hpp>
 
+#include "util.hpp"
+
 // A compiler for the X language, based on xhexb.x and with inspiration from
 // the LLVM Kaleidoscope tutorial.
 //   http://people.cs.bris.ac.uk/~dave/xarmdoc.pdf
 //   https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl02.html
 
+using Location = hexutil::Location;
+using Error = hexutil::Error;
+
 namespace xcmp {
 
-class Location {
-  size_t line, position;
-public:
-  Location() : line(0), position(0) {}
-  Location(size_t line, size_t position) : line(line), position(position) {}
-  std::string str() const {
-    return (boost::format("line %d:%d") % line % position).str();
-  }
-};
-
-/// Parser error.
-class ParserError : public std::runtime_error {
-  Location location;
-public:
-  ParserError(Location location, const std::string &what) :
-      std::runtime_error(what), location(location) {}
-  ParserError(Location location, const char *what) :
-      std::runtime_error(what), location(location) {}
-  const Location &getLocation() const { return location; }
-};
-
-/// General error with location information.
-class Error : public std::runtime_error {
-  Location location;
-public:
-  Error(Location location, const std::string &what) :
-      std::runtime_error(what), location(location) {}
-  Error(Location location, const char *what) :
-      std::runtime_error(what), location(location) {}
-  const Location &getLocation() const { return location; }
-};
-
 //===---------------------------------------------------------------------===//
-// Lexer
+// Lexer tokens
 //===---------------------------------------------------------------------===//
 
 enum class Token {
@@ -170,6 +143,47 @@ static bool isBinaryOp(Token token) {
   }
 }
 
+//===---------------------------------------------------------------------===//
+// Exceptions
+//===---------------------------------------------------------------------===//
+
+struct CharConstError : public Error {
+  CharConstError(Location location) : Error(location, "bad character constant") {}
+};
+
+struct TokenError : public Error {
+  TokenError(Location location, std::string message) : Error(location, message) {}
+};
+
+struct UnexpectedTokenError : public Error {
+  UnexpectedTokenError(Location location, Token token) :
+      Error(location, (boost::format("unexpected token %s") % tokenEnumStr(token)).str()) {}
+};
+
+struct ExpectedNameError : public Error {
+  ExpectedNameError(Location location, Token token) :
+    Error(location, (boost::format("expected name but got %s") % tokenEnumStr(token)).str()) {}
+};
+
+struct ParserTokenError : public Error {
+  ParserTokenError(Location location, std::string message, Token token) :
+    Error(location, (boost::format("%s, got %s") % message % tokenEnumStr(token)).str()) {}
+};
+
+struct SemanticTokenError : public Error {
+  SemanticTokenError(Location location, std::string message, Token token) :
+    Error(location, (boost::format("%s, got %s") % message % tokenEnumStr(token)).str()) {}
+};
+
+struct UnknownSymbolError : public Error {
+  UnknownSymbolError(Location location, std::string name) :
+    Error(location, (boost::format("could not find symbol %s") % name).str()) {}
+};
+
+//===---------------------------------------------------------------------===//
+// Lexer
+//===---------------------------------------------------------------------===//
+
 class TokenTable {
   std::map<std::string, Token> table;
 
@@ -264,7 +278,7 @@ class Lexer {
       case 'r':  ch = '\r'; break;
       case 'n':  ch = '\n'; break;
       default:
-        throw ParserError(getLocation(), "bad character constant");
+        throw CharConstError(getLocation());
       }
     } else {
       ch = lastChar;
@@ -363,7 +377,7 @@ class Lexer {
         readChar();
         token = Token::ASS;
       } else {
-        throw ParserError(getLocation(), "'=' expected");
+        throw TokenError(getLocation(), "'=' expected");
       }
       break;
     case '\'':
@@ -371,7 +385,7 @@ class Lexer {
       value = readCharConst();
       token = Token::NUMBER;
       if (lastChar != '\'') {
-        throw ParserError(getLocation(), "expected ' after char constant");
+        throw TokenError(getLocation(), "expected ' after char constant");
       }
       readChar();
       break;
@@ -380,7 +394,7 @@ class Lexer {
       readString();
       token = Token::STRING;
       if (lastChar != '"') {
-        throw ParserError(getLocation(), "expected \" after string");
+        throw TokenError(getLocation(), "expected \" after string");
       }
       readChar();
       break;
@@ -390,9 +404,10 @@ class Lexer {
       }
       token = Token::END_OF_FILE;
       readChar();
+      currentLine.clear();
       break;
     default:
-      throw ParserError(getLocation(), "unexpected character");
+      throw TokenError(getLocation(), std::string("unexpected character ")+lastChar);
     }
     return token;
   }
@@ -457,6 +472,7 @@ public:
   Token getLastToken() const { return lastToken; }
   size_t getLineNumber() const { return currentLineNumber; }
   size_t getCharNumber() const { return currentCharNumber; }
+  bool hasLine() const { return !currentLine.empty(); }
   const std::string &getLine() const { return currentLine; }
   const Location getLocation() const { return Location(currentLineNumber,
                                                        currentCharNumber); }
@@ -1117,7 +1133,7 @@ class Parser {
   /// Expect the given last token, otherwise raise an error.
   void expect(Token token) const {
     if (token != lexer.getLastToken()) {
-      throw ParserError(lexer.getLocation(), std::string("expected ")+tokenEnumStr(token));
+      throw UnexpectedTokenError(lexer.getLocation(), token);
     }
     lexer.getNextToken();
   }
@@ -1139,7 +1155,7 @@ class Parser {
       lexer.getNextToken();
       return name;
     } else {
-      throw ParserError(lexer.getLocation(), "name expected");
+      throw ExpectedNameError(lexer.getLocation(), lexer.getLastToken());
     }
   }
 
@@ -1265,7 +1281,7 @@ class Parser {
       return expr;
     }
     default:
-      throw ParserError(location, "in expression element");
+      throw ParserTokenError(location, "in expression element", lexer.getLastToken());
     }
   }
 
@@ -1300,7 +1316,7 @@ class Parser {
       return std::make_unique<ArrayDecl>(location, name, std::move(expr));
     }
     default:
-      throw ParserError(location, "invalid declaration");
+      throw ParserTokenError(location, "invalid declaration", lexer.getLastToken());
     }
   }
 
@@ -1371,7 +1387,7 @@ class Parser {
       lexer.getNextToken();
       return std::make_unique<FuncFormal>(location, parseIdentifier());
     default:
-      throw ParserError(location, "invalid formal");
+      throw ParserTokenError(location, "invalid formal", lexer.getLastToken());
     }
   }
 
@@ -1446,7 +1462,7 @@ class Parser {
       return std::make_unique<AssStatement>(location, std::move(element), parseExpr());
     }
     default:
-      throw ParserError(location, "invalid statement");
+      throw ParserTokenError(location, "invalid statement", lexer.getLastToken());
     }
   }
 
@@ -1618,7 +1634,7 @@ public:
         case Token::GR:    result = LHS->getValue() >  RHS->getValue(); break;
         case Token::GE:    result = LHS->getValue() >= RHS->getValue(); break;
         default:
-          throw Error(expr.getLocation(), "unexpected binary op");
+          throw SemanticTokenError(expr.getLocation(), "unexpected binary op", expr.getOp());
       }
       expr.setValue(result);
     }
@@ -1632,7 +1648,7 @@ public:
         case Token::MINUS: result = -element->getValue();
         case Token::NOT:   result = ~element->getValue();
         default:
-          throw Error(expr.getLocation(), "unexpected unary op");
+          throw SemanticTokenError(expr.getLocation(), "unexpected unary op", expr.getOp());
       }
       expr.setValue(result);
     }
@@ -1649,7 +1665,7 @@ public:
   void visitPost(VarRefExpr &expr) {
     auto symbol = symbolTable.lookup(expr.getName());
     if (symbol == nullptr) {
-      throw Error(expr.getLocation(), std::string("could not find symbol ") + expr.getName());
+      throw UnknownSymbolError(expr.getLocation(), expr.getName());
     }
     if (auto valDecl = dynamic_cast<const ValDecl*>(symbol->getNode())) {
       expr.setValue(valDecl->getValue());

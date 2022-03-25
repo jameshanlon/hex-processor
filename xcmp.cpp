@@ -113,12 +113,15 @@ int main(int argc, const char *argv[]) {
 
     asmCodeGen.emitBin(outputFilename);
 
-  } catch (const xcmp::ParserError &e) {
-    std::cerr << boost::format(" Error %s: %s\n") % e.getLocation().str() % e.what();
-    std::cerr << "  " << lexer.getLine() << "\n";
-    return 1;
-  } catch (const xcmp::Error &e) {
-    std::cerr << boost::format("Error %s: %s\n") % e.getLocation().str() % e.what();
+  } catch (const hexutil::Error &e) {
+    if (e.hasLocation()) {
+      std::cerr << boost::format("Error %s: %s\n") % e.getLocation().str() % e.what();
+    } else {
+      std::cerr << boost::format("Error: %s\n") % e.what();
+    }
+    if (lexer.hasLine()) {
+      std::cerr << "  " << lexer.getLine() << "\n";
+    }
     return 1;
   } catch (const std::exception &e) {
     std::cerr << boost::format("Error: %s\n") % e.what();
