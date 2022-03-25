@@ -156,8 +156,8 @@ struct TokenError : public Error {
 };
 
 struct UnexpectedTokenError : public Error {
-  UnexpectedTokenError(Location location, Token token) :
-      Error(location, (boost::format("unexpected token %s") % tokenEnumStr(token)).str()) {}
+  UnexpectedTokenError(Location location, Token expectedToken, Token gotToken) :
+      Error(location, (boost::format("expected token %s, got %s") % tokenEnumStr(expectedToken) % tokenEnumStr(gotToken)).str()) {}
 };
 
 struct ExpectedNameError : public Error {
@@ -1133,19 +1133,9 @@ class Parser {
   /// Expect the given last token, otherwise raise an error.
   void expect(Token token) const {
     if (token != lexer.getLastToken()) {
-      throw UnexpectedTokenError(lexer.getLocation(), token);
+      throw UnexpectedTokenError(lexer.getLocation(), token, lexer.getLastToken());
     }
     lexer.getNextToken();
-  }
-
-  int parseInteger() {
-    if (lexer.getLastToken() == Token::MINUS) {
-       lexer.getNextToken();
-       expect(Token::NUMBER);
-       return -lexer.getNumber();
-    }
-    expect(Token::NUMBER);
-    return lexer.getNumber();
   }
 
   /// identifier
@@ -1354,13 +1344,12 @@ class Parser {
   ///   [0 <formal> "," ]
   std::vector<std::unique_ptr<Formal>> parseFormals() {
     std::vector<std::unique_ptr<Formal>> formals;
-      while (lexer.getLastToken() == Token::VAL ||
-             lexer.getLastToken() == Token::ARRAY ||
-             lexer.getLastToken() == Token::PROC ||
-             lexer.getLastToken() == Token::FUNC) {
+      while (true) {
       formals.push_back(parseFormal());
       if (lexer.getLastToken() == Token::COMMA) {
         lexer.getNextToken();
+      } else {
+        break;
       }
     }
     return formals;
