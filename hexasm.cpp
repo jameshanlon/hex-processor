@@ -12,7 +12,7 @@ static void help(const char *argv[]) {
   std::cout << "Optional arguments:\n";
   std::cout << "  -h,--help         Display this message\n";
   std::cout << "  --tokens          Tokenise the input only\n";
-  std::cout << "  --tree            Display the syntax tree only\n";
+  std::cout << "  --instrs          Display the instruction sequence only\n";
   std::cout << "  -o,--output file  Specify a file for binary output (default a.out)\n";
 }
 

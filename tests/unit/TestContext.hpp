@@ -126,7 +126,10 @@ struct TestContext {
       lexer.loadBuffer(program);
     }
     auto tree = parser.parseProgram();
-    xcmp::CodeGen xCodeGen;
+    xcmp::SymbolTable symbolTable;
+    xcmp::ConstProp constProp(symbolTable);
+    tree->accept(&constProp);
+    xcmp::CodeGen xCodeGen(symbolTable);
     tree->accept(&xCodeGen);
     hexasm::CodeGen hexCodeGen(xCodeGen.getInstrs());
     std::ostringstream outBuffer;
@@ -150,7 +153,10 @@ struct TestContext {
       lexer.loadBuffer(program);
     }
     auto tree = parser.parseProgram();
-    xcmp::CodeGen xCodeGen;
+    xcmp::SymbolTable symbolTable;
+    xcmp::ConstProp constProp(symbolTable);
+    tree->accept(&constProp);
+    xcmp::CodeGen xCodeGen(symbolTable);
     tree->accept(&xCodeGen);
     // Assemble.
     hexasm::CodeGen hexCodeGen(xCodeGen.getInstrs());

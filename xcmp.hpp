@@ -880,19 +880,19 @@ public:
 };
 
 class CallStatement : public Statement {
-  std::unique_ptr<Expr> call;
-  // TODO: work out a better way than dynamically casting.
+  std::unique_ptr<CallExpr> call;
 public:
-  CallStatement(Location location, std::unique_ptr<Expr> call) :
+  CallStatement(Location location, std::unique_ptr<CallExpr> call) :
       Statement(location), call(std::move(call)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    for (auto &arg : dynamic_cast<CallExpr*>(call.get())->getArgs()) {
+    for (auto &arg : call.get()->getArgs()) {
       arg->accept(visitor);
     }
     visitor->visitPost(*this);
   }
-  const std::string &getName() const { return dynamic_cast<CallExpr*>(call.get())->getName(); }
+  const std::string &getName() const { return call.get()->getName(); }
+  const std::vector<std::unique_ptr<Expr>> &getArgs() { return call->getArgs(); }
 };
 
 class AssStatement : public Statement {
@@ -936,7 +936,10 @@ public:
     statement->accept(visitor);
     visitor->visitPost(*this);
   }
-  std::string getName() const { return name; }
+  const std::string &getName() const { return name; }
+  std::vector<std::unique_ptr<Formal>> &getFormals() { return formals; }
+  std::vector<std::unique_ptr<Decl>> &getDecls() { return decls; }
+  Statement *getStatement() { return statement.get(); }
 };
 
 class Program : public AstNode {
@@ -1444,7 +1447,8 @@ class Parser {
       auto element = parseElement();
       // Procedure call
       if (dynamic_cast<CallExpr*>(element.get())) {
-        return std::make_unique<CallStatement>(location, std::move(element));
+        auto callExpr = std::unique_ptr<CallExpr>(static_cast<CallExpr*>(element.release()));
+        return std::make_unique<CallStatement>(location, std::move(callExpr));
       }
       // Assignment
       expect(Token::ASS);
@@ -1526,16 +1530,31 @@ enum class SymbolScope {
   LOCAL
 };
 
+class Frame {
+public:
+  Frame() {}
+};
+
+/// A class to represent a symbol in the program, recording type, scope, AST
+/// declaration and Frame infromation where applicable.
 class Symbol {
   SymbolType type;
   SymbolScope scope;
   AstNode *node;
+  //std::unique_ptr<Frame> frame;
+  int stackOffset;
+  std::string globalLabel;
 public:
   Symbol(SymbolType type, SymbolScope scope, AstNode *node) :
       type(type), scope(scope), node(node) {}
   SymbolType getType() const { return type; }
   SymbolScope getScope() const { return scope; }
   AstNode *getNode() const { return node; }
+  //void setFrame(std::unique_ptr<Frame> newFrame) { frame = std::move(newFrame); }
+  int getStackOffset() const { return stackOffset; }
+  void setStackOffset(int value) { stackOffset = value; }
+  const std::string &getGlobalLabel() const { return globalLabel; }
+  void setGlobalLabel(const std::string &value) { globalLabel = value; }
 };
 
 class SymbolTable {
@@ -1546,13 +1565,13 @@ public:
     symbolMap[name] = std::move(symbol);
   }
 
-  /// Lookup a symbol.
-  Symbol* lookup(const std::string &name) {
+  /// Lookup a symbol, and throw an exception if not found.
+  Symbol* lookup(const std::string &name, const Location &location) {
     auto it = symbolMap.find(name);
     if (it != symbolMap.end()) {
       return it->second.get();
     }
-    return nullptr;
+    throw UnknownSymbolError(location, name);
   }
 };
 
@@ -1652,10 +1671,7 @@ public:
   void visitPost(CallExpr &expr) {}
   void visitPost(ArraySubscriptExpr &expr) {}
   void visitPost(VarRefExpr &expr) {
-    auto symbol = symbolTable.lookup(expr.getName());
-    if (symbol == nullptr) {
-      throw UnknownSymbolError(expr.getLocation(), expr.getName());
-    }
+    auto symbol = symbolTable.lookup(expr.getName(), expr.getLocation());
     if (auto valDecl = dynamic_cast<const ValDecl*>(symbol->getNode())) {
       expr.setValue(valDecl->getValue());
     }
@@ -1666,46 +1682,177 @@ public:
 // Code generation.
 //===---------------------------------------------------------------------===//
 
-class CodeGen : public AstVisitor {
+enum class Reg { A, B };
 
-  /// The buffer of instructions.
+class CodeBuffer {
   std::vector<std::unique_ptr<hexasm::Directive>> instrs;
 
-  void genData(uint32_t value) {
-    instrs.push_back(std::make_unique<hexasm::Data>(hexasm::Token::DATA, value));
+public:
+  CodeBuffer() {}
+
+  // Directive generation.
+  void genData(uint32_t value) { instrs.push_back(std::make_unique<hexasm::Data>(hexasm::Token::DATA, value)); }
+  void genLabel(std::string name) { instrs.push_back(std::make_unique<hexasm::Label>(hexasm::Token::IDENTIFIER, name)); }
+
+  // Instruction generation.
+  void genLDAM(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAM, value)); }
+  void genLDBM(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDBM, value)); }
+  void genSTAM(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::STAM, value)); }
+  void genLDAM(std::string label) { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDAM, label, false)); }
+  void genLDBM(std::string label) { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDBM, label, false)); }
+  void genSTAM(std::string label) { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::STAM, label, false)); }
+  void genLDAC(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAC, value)); }
+  void genLDBC(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDBC, value)); }
+  void genLDAP(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAP, value)); }
+  void genLDAP(std::string label) { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDAP, label, true)); }
+  void genLDAI(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAI, value)); }
+  void genLDBI(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDBI, value)); }
+  void genSTAI(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::STAI, value)); }
+  void genBR(std::string label)   { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::BR, label, true)); }
+  void genBRZ(std::string label)  { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::BRZ, label, true)); }
+  void genBRN(std::string label)  { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::BRN, label, true)); }
+  void genOPR(hexasm::Token op)   { instrs.push_back(std::make_unique<hexasm::InstrOp>(hexasm::Token::OPR, op)); }
+
+  // Helpers.
+  void genLDSPB() { genLDBM(1); } // Load SP into breg
+
+  void genConst(Reg reg, int value) {
+    switch (reg) {
+    case Reg::A: genLDAC(value); break;
+    case Reg::B: genLDBC(value); break;
+    }
+    // Can optimise by storing values outside of the range -(1<<16)..(1<<16)
+    // in a constant pool and LD[AB]M from there.
   }
 
-  void genLabel(std::string name) {
-    instrs.push_back(std::make_unique<hexasm::Label>(hexasm::Token::IDENTIFIER, name));
+  void genVar(Reg reg, Symbol *symbol) {
+    switch (symbol->getScope()) {
+    // Load from stack.
+    case SymbolScope::LOCAL: {
+      switch (reg) {
+      case Reg::A:
+        genLDAM(1);
+        genLDAI(symbol->getStackOffset());
+        break;
+      case Reg::B:
+        genLDBM(1);
+        genLDBI(symbol->getStackOffset());
+        break;
+      }
+    }
+    // Load from globals.
+    case SymbolScope::GLOBAL: {
+      switch (reg) {
+      case Reg::A:
+        genLDAM(symbol->getGlobalLabel());
+        break;
+      case Reg::B:
+        genLDBM(symbol->getGlobalLabel());
+        break;
+      }
+      break;
+    }
+    }
   }
 
-  void genBR(std::string label) {
-    instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::BR, label, true));
-  }
+  void genBRB() { genOPR(hexasm::Token::OPR); }
+  void genADD() { genOPR(hexasm::Token::ADD); }
+  void genSUB() { genOPR(hexasm::Token::SUB); }
+  void genSVC() { genOPR(hexasm::Token::SVC); }
 
-  void genLDAC(int value) {
-    instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAC, value));
-  }
+  std::vector<std::unique_ptr<hexasm::Directive>> &getInstrs() { return instrs; }
+};
 
-  void genOPR(hexasm::Token op) {
-    instrs.push_back(std::make_unique<hexasm::InstrOp>(hexasm::Token::OPR, op));
-  }
+class ExprCodeGen : public AstVisitor {
+  SymbolTable &symbolTable;
+  CodeBuffer &cb;
+  std::vector<std::unique_ptr<hexasm::Directive>> instrs;
 
 public:
-  CodeGen() {
-    genBR("start");
-    genData(1<<16);
-    genLabel("start");
-    genBR("exit");
-    genLabel("exit");
-    genLDAC(0);
-    genOPR(hexasm::Token::SVC);
+  ExprCodeGen(SymbolTable &symbolTable, CodeBuffer &codeBuffer) :
+      symbolTable(symbolTable), cb(codeBuffer) {}
+  void visitPost(BinaryOpExpr&) {}
+  void visitPost(UnaryOpExpr&) {}
+  void visitPost(StringExpr&) {}
+  void visitPost(BooleanExpr &expr) { cb.genConst(Reg::A, expr.getValue()); }
+  void visitPost(NumberExpr &expr) { cb.genConst(Reg::A, expr.getValue()); }
+  void visitPost(CallExpr&) {}
+  void visitPost(ArraySubscriptExpr&) {}
+  void visitPost(VarRefExpr &expr) { cb.genVar(Reg::A, symbolTable.lookup(expr.getName(), expr.getLocation())); }
+  std::vector<std::unique_ptr<hexasm::Directive>> &getInstrs() { return instrs; }
+};
+
+class CodeGen : public AstVisitor {
+  SymbolTable &symbolTable;
+  CodeBuffer cb;
+
+public:
+  CodeGen(SymbolTable &symbolTable) : symbolTable(symbolTable) {
+    // Setup.
+    cb.genBR("start"); // Branch to the start.
+    cb.genData(1<<16); // Initialise the stack pointer
   }
   void visitPre(Program &tree) {}
-  void visitPost(Program &tree) {}
-  std::vector<std::unique_ptr<hexasm::Directive>> &getInstrs() {
-    return instrs;
+  void visitPost(Program &tree) {
+    // Exit procedure.
+    cb.genLabel("exit");
+    cb.genLDAC(0);
+    cb.genSVC();
   }
+
+  void visitPre(Proc &proc) {
+    // Setup a frame object for the proc.
+    //auto symbol = symbolTable.lookup(proc.getName(), proc.getLocation());
+    //symbol->setFrame(std::make_unique<Frame>());
+    // Special handling for 'main'.
+    if (proc.getName() == "main") {
+      cb.genLabel("start");
+      // ...
+      // Main ends with an exit.
+      cb.genLDSPB(); // breg = sp
+      cb.genLDAC(0); // areg = 0
+      cb.genSTAI(2); // sp[2] = areg
+      cb.genBR("exit");
+    }
+  }
+  void visitPost(Proc&) {}
+
+  void visitPre(ArrayDecl&) {}
+  void visitPost(ArrayDecl&) {}
+  void visitPre(VarDecl&) {}
+  void visitPost(VarDecl&) {}
+  void visitPre(ValDecl&) {}
+  void visitPost(ValDecl&) {}
+  //void visitPre(ValFormal&) {}
+  //void visitPost(ValFormal&) {}
+  //void visitPre(ArrayFormal&) {}
+  //void visitPost(ArrayFormal&) {}
+  //void visitPre(ProcFormal&) {}
+  //void visitPost(ProcFormal&) {}
+  //void visitPre(FuncFormal&) {}
+  //void visitPost(FuncFormal&) {}
+  void visitPre(SkipStatement&) {}
+  void visitPost(SkipStatement&) {}
+  void visitPre(StopStatement&) {}
+  void visitPost(StopStatement&) {}
+  void visitPre(ReturnStatement&) {}
+  void visitPost(ReturnStatement&) {}
+  void visitPre(IfStatement&) {}
+  void visitPost(IfStatement&) {}
+  void visitPre(WhileStatement&) {}
+  void visitPost(WhileStatement&) {}
+  void visitPre(SeqStatement&) {}
+  void visitPost(SeqStatement&) {}
+  void visitPre(CallStatement&) {}
+  void visitPost(CallStatement &stmt) {
+    //for (auto &formal : stmt.getArgs()) {
+    //}
+    cb.genBR(stmt.getName());
+  }
+  void visitPre(AssStatement&) {}
+  void visitPost(AssStatement&) {}
+
+  std::vector<std::unique_ptr<hexasm::Directive>> &getInstrs() { return cb.getInstrs(); }
 };
 
 } // End namespace xcmp.

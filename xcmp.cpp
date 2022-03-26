@@ -27,6 +27,7 @@ static void help(const char *argv[]) {
   std::cout << "  -h,--help         Display this message\n";
   std::cout << "  --tokens          Tokenise the input only\n";
   std::cout << "  --tree            Display the syntax tree only\n";
+  std::cout << "  -S                Display the generated assembly code only\n";
   std::cout << "  -o,--output file  Specify a file for output (default a.S)\n";
 }
 
@@ -51,7 +52,7 @@ int main(int argc, const char *argv[]) {
         tokensOnly = true;
       } else if (std::strcmp(argv[i], "--tree") == 0) {
         treeOnly = true;
-      } else if (std::strcmp(argv[i], "--asm") == 0) {
+      } else if (std::strcmp(argv[i], "-S") == 0) {
         asmOnly = true;
       } else if (std::strcmp(argv[i], "--output") == 0 ||
                  std::strcmp(argv[i], "-o") == 0) {
@@ -99,7 +100,7 @@ int main(int argc, const char *argv[]) {
     }
 
     // Generate assembly code.
-    xcmp::CodeGen codeGen;
+    xcmp::CodeGen codeGen(symbolTable);
     tree->accept(&codeGen);
 
     // Assemble the instructions.
