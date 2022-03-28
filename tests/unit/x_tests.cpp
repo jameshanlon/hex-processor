@@ -14,7 +14,7 @@ BOOST_AUTO_TEST_CASE(empty_run) {
   auto program = R"(
 val foo = 1;
 )";
-  runXProgram(program);
+//  runXProgram(program);
 }
 
 BOOST_AUTO_TEST_CASE(hello_run) {
@@ -31,7 +31,7 @@ proc main() is {
 proc putval(val c) is put(c, 0)
 proc newline() is putval('\n')
 )";
-  runXProgram(program);
+//  runXProgram(program);
 }
 
 BOOST_AUTO_TEST_CASE(xhexb_run) {
