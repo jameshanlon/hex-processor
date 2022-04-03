@@ -56,6 +56,7 @@ namespace hexasm {
 //===---------------------------------------------------------------------===//
 
 enum class Token {
+  // Lexer tokens.
   NUMBER,
   MINUS,
   DATA,
@@ -79,9 +80,16 @@ enum class Token {
   SUB,
   OPR,
   IDENTIFIER,
+  END_OF_FILE,
+  // Lowering.
   PADDING,
-  NONE,
-  END_OF_FILE
+  PROLOGUE,
+  EPILOGUE,
+  LDAI_FB,
+  LDBI_FB,
+  STAI_FB,
+  // Error/unexpected.
+  NONE
 };
 
 static const char *tokenEnumStr(Token token) {
@@ -109,9 +117,14 @@ static const char *tokenEnumStr(Token token) {
   case Token::SUB:         return "SUB";
   case Token::OPR:         return "OPR";
   case Token::IDENTIFIER:  return "IDENTIFIER";
-  case Token::PADDING:     return "PADDING";
-  case Token::NONE:        return "NONE";
   case Token::END_OF_FILE: return "END_OF_FILE";
+  case Token::PADDING:     return "PADDING";
+  case Token::PROLOGUE:    return "PROLOGUE";
+  case Token::EPILOGUE:    return "EPILOGUE";
+  case Token::LDAI_FB:     return "LDAI_FB";
+  case Token::LDBI_FB:     return "LDBI_FB";
+  case Token::STAI_FB:     return "STAI_FB";
+  case Token::NONE:        return "NONE";
   default:
     throw std::runtime_error(std::string("unexpected token: ")+std::to_string(static_cast<int>(token)));
   }
@@ -650,9 +663,14 @@ class Parser {
         if (lexer.getNextToken() == Token::IDENTIFIER) {
           return std::make_unique<InstrLabel>(location, opcode, lexer.getIdentifier(), true);
         } else {
-          return std::make_unique<InstrImm>(location, opcode, parseInteger());\
+          return std::make_unique<InstrImm>(location, opcode, parseInteger());
         }
       }
+      case Token::PROLOGUE:
+      case Token::EPILOGUE:
+      case Token::LDAI_FB:
+      case Token::LDBI_FB:
+      case Token::STAI_FB:
       default:
         throw UnrecognisedTokenError(location, lexer.getLastToken());
     }

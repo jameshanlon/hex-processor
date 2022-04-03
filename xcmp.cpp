@@ -99,12 +99,15 @@ int main(int argc, const char *argv[]) {
       return 0;
     }
 
-    // Generate assembly code.
+    // Perform code generation.
     xcmp::CodeGen codeGen(symbolTable);
     tree->accept(&codeGen);
 
+    // Lower the generated (intermediate code) to assembly directives.
+    xcmp::LowerDirectives lowerDirectives(codeGen);
+
     // Assemble the instructions.
-    hexasm::CodeGen asmCodeGen(codeGen.getInstrs());
+    hexasm::CodeGen asmCodeGen(lowerDirectives.getInstrs());
 
     // Print the assembly instructions only.
     if (asmOnly) {
