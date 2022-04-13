@@ -1540,11 +1540,14 @@ enum class SymbolScope {
 };
 
 class Frame {
-  size_t size;
+  size_t size; // The size of the frame.
+  size_t offset;   // The current stack pointer offset value.
 public:
   Frame() : size(0) {}
-  void setMaxSize(int newSize) { size = newSize > size ? newSize : size; }
+  void setSize(int newSize) { size = newSize > size ? newSize : size; }
   int getSize() { return size; }
+  void incOffset(int amount) { offset += amount; }
+  size_t getOffset() { return offset; }
 };
 
 /// A class to represent a symbol in the program, recording type, scope, AST
@@ -1739,21 +1742,27 @@ public:
 };
 
 class CodeBuffer {
+  SymbolTable &symbolTable;
   std::vector<std::unique_ptr<hexasm::Directive>> instrs;
   std::vector<std::unique_ptr<hexasm::Directive>> data;
   std::map<int, std::string> constMap;
   size_t constCount;
   size_t stringCount;
+  size_t labelCount;
+  Frame *currentFrame;
+
 
 public:
-  CodeBuffer() : constCount(0), stringCount(0) {}
+  CodeBuffer(SymbolTable &symbolTable) : symbolTable(symbolTable), constCount(0), stringCount(0) {}
 
-  // Directive generation.
+  const std::string getLabel() { return std::string("lab") + std::to_string(labelCount++); }
+
+  /// Directive generation -------------------------------------------------///
   void genData(uint32_t value) { data.push_back(std::make_unique<hexasm::Data>(hexasm::Token::DATA, value)); }
   void genDataLabel(std::string name) { data.push_back(std::make_unique<hexasm::Label>(hexasm::Token::IDENTIFIER, name)); }
   void genLabel(std::string name) { instrs.push_back(std::make_unique<hexasm::Label>(hexasm::Token::IDENTIFIER, name)); }
 
-  // Instruction generation.
+  /// Instruction generation -----------------------------------------------///
   void genLDAM(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAM, value)); }
   void genLDBM(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDBM, value)); }
   void genSTAM(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::STAM, value)); }
@@ -1774,15 +1783,81 @@ public:
   void genBRN(std::string label)  { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::BRN, label, true)); }
   void genOPR(hexasm::Token op)   { instrs.push_back(std::make_unique<hexasm::InstrOp>(hexasm::Token::OPR, op)); }
 
-  // Procedure calling and frame-base relative accesses.
+  /// Procedure calling and frame-base relative accesses -------------------///
   void genPrologue(Symbol *symbol) { instrs.push_back(std::make_unique<Epilogue>(symbol)); }
   void genEpilogue(Symbol *symbol) { instrs.push_back(std::make_unique<Prologue>(symbol)); }
-  void genFBLoadA(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::LDAI_FB, frame, offset)); }
-  void genFBLoadB(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::LDBI_FB, frame, offset)); }
-  void genFBStore(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::STAI_FB, frame, offset)); }
+  void genLDAI_FB(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::LDAI_FB, frame, offset)); }
+  void genLDBI_FB(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::LDBI_FB, frame, offset)); }
+  void genSTAI_FB(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::STAI_FB, frame, offset)); }
 
-  // Helpers.
+  /// Helpers --------------------------------------------------------------///
   void genLDSPB() { genLDBM(SP_OFFSET); } // Load SP into breg
+  void genBRB() { genOPR(hexasm::Token::OPR); }
+  void genADD() { genOPR(hexasm::Token::ADD); }
+  void genSUB() { genOPR(hexasm::Token::SUB); }
+  void genSVC() { genOPR(hexasm::Token::SVC); }
+
+  /// Code generation visitors ---------------------------------------------///
+
+  class ContainsCall : public AstVisitor {
+    bool flag;
+  public:
+    ContainsCall() : flag(false) {}
+    void visitPost(CallExpr&) { flag = true; }
+    bool getFlag() { return flag; }
+  };
+
+  class ExprCodeGen : public AstVisitor {
+    SymbolTable &st;
+    CodeBuffer &cb;
+  public:
+    ExprCodeGen(SymbolTable &st, CodeBuffer &cb) : st(st), cb(cb) {}
+    void visitPost(BinaryOpExpr &expr) {
+      if (expr.isConst()) {
+        cb.genConst(Reg::A, expr.getValue());
+      } else {
+        // generate binary op
+        // generate bool for not, and, or, eq, ls
+      }
+    }
+    void visitPost(UnaryOpExpr &expr) {
+      if (expr.isConst()) {
+        cb.genConst(Reg::A, expr.getValue());
+      } else {
+        // generate unary op
+      }
+    }
+    void visitPost(StringExpr &expr) {
+      cb.genString(Reg::A, expr.getValue());
+    }
+    void visitPost(BooleanExpr &expr) {
+      cb.genConst(Reg::A, expr.getValue());
+    }
+    void visitPost(NumberExpr &expr) {
+      cb.genConst(Reg::A, expr.getValue());
+    }
+    void visitPost(CallExpr &expr) {
+      auto symbol = st.lookup(expr.getName(), expr.getLocation());
+      cb.genCall(expr.getName(), expr.getArgs(), symbol->getType() == SymbolType::FUNC);
+    }
+    void visitPost(ArraySubscriptExpr &expr) {
+      // generate array subscript
+    }
+    void visitPost(VarRefExpr &expr) {
+      if (expr.isConst()) {
+        cb.genConst(Reg::A, expr.getValue());
+      } else {
+        cb.genVar(Reg::A, st.lookup(expr.getName(), expr.getLocation()));
+      }
+    }
+  };
+
+  /// Code generation ------------------------------------------------------///
+
+  void genExpr(Expr *expr) {
+    ExprCodeGen visitor(symbolTable, *this);
+    expr->accept(&visitor);
+  }
 
   /// Generate a constant pool entry if required, return the label to it.
   const std::string genConstPool(int value) {
@@ -1869,117 +1944,106 @@ public:
     }
   }
 
-  void genBRB() { genOPR(hexasm::Token::OPR); }
-  void genADD() { genOPR(hexasm::Token::ADD); }
-  void genSUB() { genOPR(hexasm::Token::SUB); }
-  void genSVC() { genOPR(hexasm::Token::SVC); }
+  /// Return true if the expression contains a call.
+  bool containsCall(Expr *expr) {
+    ContainsCall visitor;
+    expr->accept(&visitor);
+    return visitor.getFlag();
+  }
 
+  /// Generate actual parameter to a call.
+  /// Translate all expressions with calls
+  ///
+  void genActuals(const std::vector<std::unique_ptr<Expr>> &args) {
+    // Generate actuals.
+    for (auto &arg : args) {
+      if (containsCall(arg.get())) {
+        // For each actual expression containing one or more calls, allocate a stack word (FB relative) for the result of that call.
+        genExpr(arg.get());
+        genLDBM(SP_OFFSET);
+        genSTAI_FB(currentFrame, currentFrame->getOffset());
+        currentFrame->incOffset(1);
+      } else {
+        // For each actual not containing a call, load the the value into stack actual position.
+      }
+    }
+  }
+
+  /// Generate instructions to branch and link to a procedure.
+  void genBranchAndLink(const std::string &name) {
+    auto linkLabel = getLabel();
+    genLDAP(linkLabel);
+    genBR(name);
+    genLabel(linkLabel);
+  }
+
+  /// Generate a procedure call.
+  /// syscalls
+  /// functions
+  /// processes
+  void genCall(const std::string &name, const std::vector<std::unique_ptr<Expr>> &args, bool isFunction) {
+    size_t stackPointer = currentFrame->getSize();
+    if (isFunction) {
+      genActuals(args);
+      genBranchAndLink(name);
+      genLDAI(1);
+    } else {
+      genActuals(args);
+      genBranchAndLink(name);
+    }
+    currentFrame->setSize(stackPointer);
+  }
+
+  /// Member access --------------------------------------------------------//
   std::vector<std::unique_ptr<hexasm::Directive>> &getInstrs() { return instrs; }
   std::vector<std::unique_ptr<hexasm::Directive>> &getData() { return data; }
-};
-
-class ExprCodeGen : public AstVisitor {
-  SymbolTable &symbolTable;
-  CodeBuffer &cb;
-
-public:
-  ExprCodeGen(SymbolTable &symbolTable, CodeBuffer &codeBuffer) :
-      symbolTable(symbolTable), cb(codeBuffer) {}
-  void visitPost(BinaryOpExpr &expr) {
-    if (expr.isConst()) {
-      cb.genConst(Reg::A, expr.getValue());
-    } else {
-      // generate binary op
-      // generate bool for not, and, or, eq, ls
-    }
-  }
-  void visitPost(UnaryOpExpr &expr) {
-    if (expr.isConst()) {
-      cb.genConst(Reg::A, expr.getValue());
-    } else {
-      // generate unary op
-    }
-  }
-  void visitPost(StringExpr &expr) {
-    cb.genString(Reg::A, expr.getValue());
-  }
-  void visitPost(BooleanExpr &expr) {
-    cb.genConst(Reg::A, expr.getValue());
-  }
-  void visitPost(NumberExpr &expr) {
-    cb.genConst(Reg::A, expr.getValue());
-  }
-  void visitPost(CallExpr &expr) {
-    // generate call
-  }
-  void visitPost(ArraySubscriptExpr &expr) {
-    // generate array subscript
-  }
-  void visitPost(VarRefExpr &expr) {
-    if (expr.isConst()) {
-      cb.genConst(Reg::A, expr.getValue());
-    } else {
-      cb.genVar(Reg::A, symbolTable.lookup(expr.getName(), expr.getLocation()));
-    }
-  }
+  void setCurrentFrame(Frame *frame) { currentFrame = frame; }
+  void setCurrentFrameSize(size_t size) { currentFrame->setSize(size); }
 };
 
 /// Walk the AST and generate intermediate code.
 class CodeGen : public AstVisitor {
   SymbolTable &symbolTable;
   CodeBuffer cb;
-  Frame *currentFrame;
 
 public:
-  CodeGen(SymbolTable &symbolTable) : symbolTable(symbolTable) {
+  CodeGen(SymbolTable &symbolTable) : symbolTable(symbolTable), cb(symbolTable) {}
+
+  void visitPre(Program &tree) {
     // Setup.
     cb.genBR("start"); // Branch to the start.
     cb.genData(SP_INIT_VALUE); // Initialise the stack pointer
-  }
-  void visitPre(Program &tree) {}
-  void visitPost(Program &tree) {
-    // Exit procedure.
-    cb.genLabel("exit");
+    cb.genLabel("start");
+    // Branch and link to main().
+    cb.genLDAP("_exit");
+    cb.genBR("main");
+    // Exit.
+    cb.genLabel("_exit");
+    cb.genLDSPB(); // breg = sp
+    cb.genLDAC(0); // areg = 0
+    cb.genSTAI(2); // sp[2] = areg
     cb.genLDAC(0);
     cb.genSVC();
   }
+
+  void visitPost(Program &tree) {}
 
   void visitPre(Proc &proc) {
     // Setup a frame object for the proc/func.
     auto symbol = symbolTable.lookup(proc.getName(), proc.getLocation());
     symbol->setFrame(std::make_unique<Frame>());
-    currentFrame = symbol->getFramePtr();
+    cb.setCurrentFrame(symbol->getFramePtr());
+    // Minimum frame size: link + return for a function, link for a process.
+    cb.setCurrentFrameSize(proc.isFunction() ? 2 : 1);
+    cb.genLabel(proc.getName());
     cb.genPrologue(symbol);
-    // Special handling for 'main'.
-    if (proc.getName() == "main") {
-      cb.genLabel("start");
-      // ...
-      // Main ends with an exit.
-      cb.genLDSPB(); // breg = sp
-      cb.genLDAC(0); // areg = 0
-      cb.genSTAI(2); // sp[2] = areg
-      cb.genBR("exit");
-    }
   }
+
   void visitPost(Proc &proc) {
     auto symbol = symbolTable.lookup(proc.getName(), proc.getLocation());
     cb.genEpilogue(symbol);
   }
 
-  void visitPre(ArrayDecl&) {}
-  void visitPost(ArrayDecl&) {}
-  void visitPre(VarDecl&) {}
-  void visitPost(VarDecl&) {}
-  void visitPre(ValDecl&) {}
-  void visitPost(ValDecl&) {}
-  //void visitPre(ValFormal&) {}
-  //void visitPost(ValFormal&) {}
-  //void visitPre(ArrayFormal&) {}
-  //void visitPost(ArrayFormal&) {}
-  //void visitPre(ProcFormal&) {}
-  //void visitPost(ProcFormal&) {}
-  //void visitPre(FuncFormal&) {}
-  //void visitPost(FuncFormal&) {}
   void visitPre(SkipStatement&) {}
   void visitPost(SkipStatement&) {}
   void visitPre(StopStatement&) {}
@@ -1994,17 +2058,17 @@ public:
   void visitPost(SeqStatement&) {}
   void visitPre(CallStatement&) {}
   void visitPost(CallStatement &stmt) {
-    // Generate actuals.
-    //for (auto &formal : stmt.getArgs()) {
-    //}
-    // Generate branch.
-    cb.genBR(stmt.getName());
+    cb.genCall(stmt.getName(), stmt.getArgs(), false);
   }
   void visitPre(AssStatement&) {}
   void visitPost(AssStatement&) {}
 
   CodeBuffer &getCodeBuffer() { return cb; }
 };
+
+//===---------------------------------------------------------------------===//
+// Lower directives.
+//===---------------------------------------------------------------------===//
 
 /// Lower the intermediate output produced by code generation into assembly
 /// directives that can be consumed by hexasm.
