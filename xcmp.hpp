@@ -612,13 +612,18 @@ public:
 };
 
 class CallExpr : public Expr {
+  int sysCallId;
   std::string name;
   std::vector<std::unique_ptr<Expr>> args;
 public:
+  CallExpr(Location location, int sysCallId) :
+      Expr(location), sysCallId(sysCallId) {}
+  CallExpr(Location location, int sysCallId, std::vector<std::unique_ptr<Expr>> args) :
+      Expr(location), sysCallId(sysCallId), args(std::move(args)) {}
   CallExpr(Location location, std::string name) :
-      Expr(location), name(name) {}
+      Expr(location), sysCallId(-1) {}
   CallExpr(Location location, std::string name, std::vector<std::unique_ptr<Expr>> args) :
-      Expr(location), name(name), args(std::move(args)) {}
+      Expr(location), sysCallId(-1), name(name), args(std::move(args)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     for (auto &arg : args) {
@@ -626,6 +631,8 @@ public:
     }
     visitor->visitPost(*this);
   }
+  bool isSysCall() const { return sysCallId != -1; }
+  int getSysCallId() const { return sysCallId; }
   const std::string &getName() const { return name; }
   const std::vector<std::unique_ptr<Expr>> &getArgs() const { return args; }
 };
@@ -895,6 +902,8 @@ public:
     }
     visitor->visitPost(*this);
   }
+  bool isSysCall() const { return call.get()->isSysCall(); }
+  int getSysCallId() const { return call.get()->getSysCallId(); }
   const std::string &getName() const { return call.get()->getName(); }
   const std::vector<std::unique_ptr<Expr>> &getArgs() { return call->getArgs(); }
 };
@@ -1119,7 +1128,11 @@ public:
     indentCount--;
   };
   void visitPre(CallStatement &stmt) override {
-    indent(); outs << boost::format("callstmt %s%s\n") % stmt.getName() % locString(stmt);
+    if (stmt.isSysCall()) {
+      indent(); outs << boost::format("syscallstmt %d%s\n") % stmt.getSysCallId() % locString(stmt);
+    } else {
+      indent(); outs << boost::format("callstmt %s%s\n") % stmt.getName() % locString(stmt);
+    }
     indentCount++;
   };
   void visitPost(CallStatement &stmt) override {
@@ -1230,6 +1243,7 @@ class Parser {
   /// element :=
   ///   <identifier>
   ///   <identifier> "[" <expr> "]"
+  ///   <number> "(" <expr-list> ")"
   ///   <identifier> "(" <expr-list> ")"
   ///   <number>
   ///   <string>
@@ -1263,9 +1277,24 @@ class Parser {
         return std::make_unique<VarRefExpr>(location, name);
       }
     }
-    case Token::NUMBER:
+    case Token::NUMBER: {
+      auto value = lexer.getNumber();
       lexer.getNextToken();
-      return std::make_unique<NumberExpr>(location, lexer.getNumber());
+      // System call.
+      if (lexer.getLastToken() == Token::LPAREN) {
+        if (lexer.getNextToken() == Token::RPAREN) {
+          lexer.getNextToken();
+          return std::make_unique<CallExpr>(location, value);
+        } else {
+          auto exprList = parseExprList();
+          expect(Token::RPAREN);
+          return std::make_unique<CallExpr>(location, value, std::move(exprList));
+        }
+      } else {
+        // Number.
+        return std::make_unique<NumberExpr>(location, value);
+      }
+    }
     case Token::STRING:
       lexer.getNextToken();
       return std::make_unique<StringExpr>(location, lexer.getString());
@@ -1462,6 +1491,16 @@ class Parser {
       expect(Token::ASS);
       return std::make_unique<AssStatement>(location, std::move(element), parseExpr());
     }
+    case Token::NUMBER: {
+      auto element = parseElement();
+      // System call
+      if (dynamic_cast<CallExpr*>(element.get())) {
+        auto callExpr = std::unique_ptr<CallExpr>(static_cast<CallExpr*>(element.release()));
+        return std::make_unique<CallStatement>(location, std::move(callExpr));
+      } else {
+        throw ParserTokenError(location, "invalid statement beginning with number", lexer.getLastToken());
+      }
+    }
     default:
       throw ParserTokenError(location, "invalid statement", lexer.getLastToken());
     }
@@ -1547,6 +1586,7 @@ public:
   void setSize(int newSize) { size = newSize > size ? newSize : size; }
   int getSize() { return size; }
   void incOffset(int amount) { offset += amount; }
+  void setOffset(int value) { offset = value; }
   size_t getOffset() { return offset; }
 };
 
@@ -1703,6 +1743,8 @@ public:
 
 const int SP_OFFSET = 1;
 const int SP_INIT_VALUE = 1 << 16;
+const int SP_LINK_VALUE_OFFSET = 0;
+const int SP_RETURN_VALUE_OFFSET = 1;
 
 enum class Reg { A, B };
 
@@ -1791,7 +1833,7 @@ public:
   void genSTAI_FB(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::STAI_FB, frame, offset)); }
 
   /// Helpers --------------------------------------------------------------///
-  void genLDSPB() { genLDBM(SP_OFFSET); } // Load SP into breg
+  void genLDSPB() {  } // Load SP into breg
   void genBRB() { genOPR(hexasm::Token::OPR); }
   void genADD() { genOPR(hexasm::Token::ADD); }
   void genSUB() { genOPR(hexasm::Token::SUB); }
@@ -1852,12 +1894,20 @@ public:
     }
   };
 
-  /// Code generation ------------------------------------------------------///
-
+  /// Generate code for an expression using the Expr visitor.
   void genExpr(Expr *expr) {
     ExprCodeGen visitor(symbolTable, *this);
     expr->accept(&visitor);
   }
+
+  /// Return true if the expression contains a call.
+  bool containsCall(Expr *expr) {
+    ContainsCall visitor;
+    expr->accept(&visitor);
+    return visitor.getFlag();
+  }
+
+  /// Code generation ------------------------------------------------------///
 
   /// Generate a constant pool entry if required, return the label to it.
   const std::string genConstPool(int value) {
@@ -1944,37 +1994,47 @@ public:
     }
   }
 
-  /// Return true if the expression contains a call.
-  bool containsCall(Expr *expr) {
-    ContainsCall visitor;
-    expr->accept(&visitor);
-    return visitor.getFlag();
-  }
-
-  /// Generate actual parameter to a call.
-  /// Translate all expressions with calls
-  ///
-  void genActuals(const std::vector<std::unique_ptr<Expr>> &args) {
-    // Generate actuals.
+  /// Generate actual parameters that contain calls.
+  void genCallActuals(const std::vector<std::unique_ptr<Expr>> &args) {
+    size_t stackOffset = currentFrame->getOffset();
     for (auto &arg : args) {
       if (containsCall(arg.get())) {
-        // For each actual expression containing one or more calls, allocate a stack word (FB relative) for the result of that call.
+        // For each actual expression containing one or more calls, allocate a
+        // stack word (FB relative) for the result of that call since it cannot
+        // be written directly into the parameter slots until all calls have
+        // been resolved.
         genExpr(arg.get());
         genLDBM(SP_OFFSET);
         genSTAI_FB(currentFrame, currentFrame->getOffset());
         currentFrame->incOffset(1);
-      } else {
-        // For each actual not containing a call, load the the value into stack actual position.
       }
     }
+    currentFrame->setOffset(stackOffset);
   }
 
-  /// Generate instructions to branch and link to a procedure.
-  void genBranchAndLink(const std::string &name) {
-    auto linkLabel = getLabel();
-    genLDAP(linkLabel);
-    genBR(name);
-    genLabel(linkLabel);
+  void loadActuals(const std::vector<std::unique_ptr<Expr>> &args) {
+    size_t stackOffset = currentFrame->getOffset();
+    size_t parameterIndex = 0;
+    for (auto &arg : args) {
+      if (containsCall(arg.get())) {
+        // For each actual expression containing one or more calls, load the
+        // expression value saved to a temporary stack location and store it
+        // to the actual parameter location.
+        genLDAM(SP_OFFSET);
+        genLDAI_FB(currentFrame, currentFrame->getOffset());
+        genLDBM(SP_OFFSET);
+        genSTAI(parameterIndex);
+        currentFrame->incOffset(1);
+      } else {
+        // For all other actual expressions, generate the value and store it to
+        // the actual parameter location.
+        genExpr(arg.get());
+        genLDBM(SP_OFFSET);
+        genSTAI(parameterIndex);
+      }
+      parameterIndex++;
+    }
+    currentFrame->setOffset(stackOffset);
   }
 
   /// Generate a procedure call.
@@ -1982,16 +2042,29 @@ public:
   /// functions
   /// processes
   void genCall(const std::string &name, const std::vector<std::unique_ptr<Expr>> &args, bool isFunction) {
-    size_t stackPointer = currentFrame->getSize();
+    auto stackOffset = currentFrame->getOffset();
     if (isFunction) {
-      genActuals(args);
-      genBranchAndLink(name);
-      genLDAI(1);
+      // Actual parameters.
+      genCallActuals(args);
+      loadActuals(args);
+      // Branch and link.
+      auto linkLabel = getLabel();
+      genLDAP(linkLabel);
+      genBR(name);
+      genLabel(linkLabel);
+      // Load the result of the function call into areg.
+      genLDAI(SP_RETURN_VALUE_OFFSET);
     } else {
-      genActuals(args);
-      genBranchAndLink(name);
+      // Actual parameters.
+      genCallActuals(args);
+      loadActuals(args);
+      // Branch and link.
+      auto linkLabel = getLabel();
+      genLDAP(linkLabel);
+      genBR(name);
+      genLabel(linkLabel);
     }
-    currentFrame->setSize(stackPointer);
+    currentFrame->setOffset(stackOffset);
   }
 
   /// Member access --------------------------------------------------------//
@@ -2019,10 +2092,9 @@ public:
     cb.genBR("main");
     // Exit.
     cb.genLabel("_exit");
-    cb.genLDSPB(); // breg = sp
+    cb.genLDBM(SP_OFFSET); // breg = sp
     cb.genLDAC(0); // areg = 0
-    cb.genSTAI(2); // sp[2] = areg
-    cb.genLDAC(0);
+    cb.genSTAI(2); // sp[2] = areg (actual param 0)
     cb.genSVC();
   }
 
@@ -2033,8 +2105,6 @@ public:
     auto symbol = symbolTable.lookup(proc.getName(), proc.getLocation());
     symbol->setFrame(std::make_unique<Frame>());
     cb.setCurrentFrame(symbol->getFramePtr());
-    // Minimum frame size: link + return for a function, link for a process.
-    cb.setCurrentFrameSize(proc.isFunction() ? 2 : 1);
     cb.genLabel(proc.getName());
     cb.genPrologue(symbol);
   }
