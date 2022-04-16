@@ -246,16 +246,18 @@ class Directive {
   Location location;
   Token token;
   int byteOffset;
+  bool assembled;
 public:
   Directive(Token token) :
-      token(token), byteOffset(0) {}
+      token(token), byteOffset(0), assembled(false) {}
   Directive(Location location, Token token) :
-      location(location), token(token), byteOffset(0) {}
+      location(location), token(token), byteOffset(0), assembled(false) {}
   virtual ~Directive() = default;
   const Location &getLocation() const { return location; }
   Token getToken() const { return token; }
-  void setByteOffset(unsigned value) { byteOffset = value; }
+  void setByteOffset(unsigned value) { assembled = true; byteOffset = value; }
   unsigned getByteOffset() const { return byteOffset; }
+  bool isAssembled() const { return assembled; }
   virtual bool operandIsLabel() const = 0;
   virtual size_t getSize() const = 0;
   virtual int getValue() const = 0;
@@ -363,7 +365,11 @@ public:
   int getValue() const { return labelValue; }
   std::string getLabel() const { return label; }
   std::string toString() const {
-    return std::string(tokenEnumStr(getToken())) + " " + label + " (" + std::to_string(labelValue) + ")";
+    auto str = std::string(tokenEnumStr(getToken())) + " " + label;
+    if (isAssembled()) {
+      str += " (" + std::to_string(labelValue) + ")";
+    }
+    return str;
   }
 };
 

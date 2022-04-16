@@ -27,8 +27,11 @@ static void help(const char *argv[]) {
   std::cout << "  -h,--help         Display this message\n";
   std::cout << "  --tokens          Tokenise the input only\n";
   std::cout << "  --tree            Display the syntax tree only\n";
-  std::cout << "  -S                Display the generated assembly code only\n";
-  std::cout << "  -o,--output file  Specify a file for output (default a.S)\n";
+  std::cout << "  --insts           Display the intermediate instructions only\n";
+  std::cout << "  --insts-lowered   Display the lowered instructions only\n";
+  std::cout << "  -S                Emit the assembly program\n";
+  std::cout << "  --insts-asm       Display the assembled instructions only\n";
+  std::cout << "  -o,--output file  Specify a file for output (default a.out)\n";
 }
 
 int main(int argc, const char *argv[]) {
@@ -40,6 +43,9 @@ int main(int argc, const char *argv[]) {
     // Handle arguments.
     bool tokensOnly = false;
     bool treeOnly = false;
+    bool instsOnly = false;
+    bool instsLoweredOnly = false;
+    bool instsAsmOnly = false;
     bool asmOnly = false;
     const char *filename = nullptr;
     const char *outputFilename = "a.out";
@@ -52,8 +58,14 @@ int main(int argc, const char *argv[]) {
         tokensOnly = true;
       } else if (std::strcmp(argv[i], "--tree") == 0) {
         treeOnly = true;
+      } else if (std::strcmp(argv[i], "--insts") == 0) {
+        instsOnly = true;
+      } else if (std::strcmp(argv[i], "--insts-lowered") == 0) {
+        instsLoweredOnly = true;
       } else if (std::strcmp(argv[i], "-S") == 0) {
         asmOnly = true;
+      } else if (std::strcmp(argv[i], "--insts-asm") == 0) {
+        instsAsmOnly = true;
       } else if (std::strcmp(argv[i], "--output") == 0 ||
                  std::strcmp(argv[i], "-o") == 0) {
         outputFilename = argv[++i];
@@ -103,14 +115,26 @@ int main(int argc, const char *argv[]) {
     xcmp::CodeGen codeGen(symbolTable);
     tree->accept(&codeGen);
 
+    // Emit the generated intermediate instructions only.
+    if (instsOnly) {
+      codeGen.emitInstrs(std::cout);
+      return 0;
+    }
+
     // Lower the generated (intermediate code) to assembly directives.
     xcmp::LowerDirectives lowerDirectives(codeGen);
 
+    // Emit the generated intermediate instructions only.
+    if (instsLoweredOnly || asmOnly) {
+      codeGen.emitInstrs(std::cout);
+      return 0;
+    }
+
     // Assemble the instructions.
-    hexasm::CodeGen asmCodeGen(lowerDirectives.getInstrs());
+    hexasm::CodeGen asmCodeGen(codeGen.getFinalInstrs());
 
     // Print the assembly instructions only.
-    if (asmOnly) {
+    if (instsAsmOnly) {
       asmCodeGen.emitProgramText(std::cout);
       return 0;
     }

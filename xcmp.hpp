@@ -2067,6 +2067,23 @@ public:
     currentFrame->setOffset(stackOffset);
   }
 
+  /// Merge the instruction and data vectors.
+  void mergeData() {
+    instrs.insert(instrs.end(),
+                  std::make_move_iterator(data.begin()),
+                  std::make_move_iterator(data.end()));
+  }
+
+  /// Reporting -------------------------------------------------------------//
+  void emitInstrs(std::ostream &out) {
+    for (auto &directive : instrs) {
+      out << boost::format("%-20s\n") % directive->toString();
+    }
+    for (auto &directive : data) {
+      out << boost::format("%-20s\n") % directive->toString();
+    }
+  }
+
   /// Member access --------------------------------------------------------//
   std::vector<std::unique_ptr<hexasm::Directive>> &getInstrs() { return instrs; }
   std::vector<std::unique_ptr<hexasm::Directive>> &getData() { return data; }
@@ -2133,7 +2150,14 @@ public:
   void visitPre(AssStatement&) {}
   void visitPost(AssStatement&) {}
 
+  /// Return the final list of compiled instructions.
+  std::vector<std::unique_ptr<hexasm::Directive>> &getFinalInstrs() {
+    cb.mergeData();
+    return cb.getInstrs();
+  }
+  /// Member access --------------------------------------------------------//
   CodeBuffer &getCodeBuffer() { return cb; }
+  void emitInstrs(std::ostream &out) { cb.emitInstrs(out); }
 };
 
 //===---------------------------------------------------------------------===//
@@ -2143,18 +2167,12 @@ public:
 /// Lower the intermediate output produced by code generation into assembly
 /// directives that can be consumed by hexasm.
 class LowerDirectives {
-  std::vector<std::unique_ptr<hexasm::Directive>> instrs;
 public:
-  LowerDirectives(CodeGen &codeGen) {
-    // Merge the instruction and data vectors.
-    instrs.insert(instrs.end(),
-                  std::make_move_iterator(codeGen.getCodeBuffer().getInstrs().begin()),
-                  std::make_move_iterator(codeGen.getCodeBuffer().getInstrs().end()));
-    instrs.insert(instrs.end(),
-                  std::make_move_iterator(codeGen.getCodeBuffer().getData().begin()),
-                  std::make_move_iterator(codeGen.getCodeBuffer().getData().end()));
+  LowerDirectives(CodeGen &cg) {
     // Lower any intermediate directives.
-    for (auto it = instrs.begin(); it != instrs.end(); it++) {
+    for (auto it = cg.getCodeBuffer().getInstrs().begin();
+              it != cg.getCodeBuffer().getInstrs().end();
+              it++) {
       // Lower directive.
       auto token = (*it)->getToken();
       switch (token) {
@@ -2178,7 +2196,6 @@ public:
       }
     }
   }
-  std::vector<std::unique_ptr<hexasm::Directive>> &getInstrs() { return instrs; }
 };
 
 } // End namespace xcmp.
