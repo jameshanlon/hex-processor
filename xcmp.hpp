@@ -1579,8 +1579,8 @@ enum class SymbolScope {
 };
 
 class Frame {
-  size_t size; // The size of the frame.
-  size_t offset;   // The current stack pointer offset value.
+  size_t size;   // The size of the frame.
+  size_t offset; // The current stack pointer offset value.
 public:
   Frame() : size(0) {}
   void setSize(int newSize) { size = newSize > size ? newSize : size; }
@@ -1635,7 +1635,7 @@ public:
 };
 
 //===---------------------------------------------------------------------===//
-// Constant propagation.
+// Symbol table construction adn constant propagation.
 //===---------------------------------------------------------------------===//
 
 class ConstProp : public AstVisitor {
@@ -1651,7 +1651,8 @@ public:
   }
   void visitPre(Proc &proc) {
     scope.push(SymbolScope::LOCAL);
-    symbolTable.insert(proc.getName(), std::make_unique<Symbol>(SymbolType::PROC, scope.top(), &proc, proc.getName()));
+    auto symbolType = proc.isFunction() ? SymbolType::FUNC : SymbolType::PROC;
+    symbolTable.insert(proc.getName(), std::make_unique<Symbol>(symbolType, scope.top(), &proc, proc.getName()));
   }
   void visitPost(Proc &proc) {
     scope.pop();
@@ -1793,7 +1794,6 @@ class CodeBuffer {
   size_t labelCount;
   Frame *currentFrame;
 
-
 public:
   CodeBuffer(SymbolTable &symbolTable) : symbolTable(symbolTable), constCount(0), stringCount(0) {}
 
@@ -1880,7 +1880,13 @@ public:
     }
     void visitPost(CallExpr &expr) {
       auto symbol = st.lookup(expr.getName(), expr.getLocation());
-      cb.genCall(expr.getName(), expr.getArgs(), symbol->getType() == SymbolType::FUNC);
+      if (expr.isSysCall()) {
+        cb.genSysCall(expr.getSysCallId(), expr.getArgs());
+      } else if (symbol->getType() == SymbolType::FUNC) {
+        cb.genFuncCall(expr.getName(), expr.getArgs());
+      } else {
+        cb.genProcCall(expr.getName(), expr.getArgs());
+      }
     }
     void visitPost(ArraySubscriptExpr &expr) {
       // generate array subscript
@@ -2037,33 +2043,46 @@ public:
     currentFrame->setOffset(stackOffset);
   }
 
-  /// Generate a procedure call.
-  /// syscalls
-  /// functions
-  /// processes
-  void genCall(const std::string &name, const std::vector<std::unique_ptr<Expr>> &args, bool isFunction) {
+  void genSysCall(int syscallId, const std::vector<std::unique_ptr<Expr>> &args) {
     auto stackOffset = currentFrame->getOffset();
-    if (isFunction) {
-      // Actual parameters.
-      genCallActuals(args);
-      loadActuals(args);
-      // Branch and link.
-      auto linkLabel = getLabel();
-      genLDAP(linkLabel);
-      genBR(name);
-      genLabel(linkLabel);
-      // Load the result of the function call into areg.
-      genLDAI(SP_RETURN_VALUE_OFFSET);
-    } else {
-      // Actual parameters.
-      genCallActuals(args);
-      loadActuals(args);
-      // Branch and link.
-      auto linkLabel = getLabel();
-      genLDAP(linkLabel);
-      genBR(name);
-      genLabel(linkLabel);
-    }
+    // Actual parameters.
+    genCallActuals(args);
+    loadActuals(args);
+    // Perform syscall.
+    genLDAC(syscallId);
+    genOPR(hexasm::Token::SVC);
+    // Load any return value.
+    genLDAM(SP_OFFSET);
+    genLDAI(SP_RETURN_VALUE_OFFSET);
+    currentFrame->setOffset(stackOffset);
+  }
+
+  void genFuncCall(const std::string &name, const std::vector<std::unique_ptr<Expr>> &args) {
+    auto stackOffset = currentFrame->getOffset();
+    // Actual parameters.
+    genCallActuals(args);
+    loadActuals(args);
+    // Branch and link.
+    auto linkLabel = getLabel();
+    genLDAP(linkLabel);
+    genBR(name);
+    genLabel(linkLabel);
+    // Load the result of the function call into areg.
+    genLDAM(SP_OFFSET);
+    genLDAI(SP_RETURN_VALUE_OFFSET);
+    currentFrame->setOffset(stackOffset);
+  }
+
+  void genProcCall(const std::string &name, const std::vector<std::unique_ptr<Expr>> &args) {
+    auto stackOffset = currentFrame->getOffset();
+    // Actual parameters.
+    genCallActuals(args);
+    loadActuals(args);
+    // Branch and link.
+    auto linkLabel = getLabel();
+    genLDAP(linkLabel);
+    genBR(name);
+    genLabel(linkLabel);
     currentFrame->setOffset(stackOffset);
   }
 
@@ -2145,7 +2164,11 @@ public:
   void visitPost(SeqStatement&) {}
   void visitPre(CallStatement&) {}
   void visitPost(CallStatement &stmt) {
-    cb.genCall(stmt.getName(), stmt.getArgs(), false);
+    if (stmt.isSysCall()) {
+      cb.genSysCall(stmt.getSysCallId(), stmt.getArgs());
+    } else {
+      cb.genProcCall(stmt.getName(), stmt.getArgs());
+    }
   }
   void visitPre(AssStatement&) {}
   void visitPost(AssStatement&) {}
