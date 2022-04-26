@@ -131,8 +131,8 @@ struct TestContext {
     tree->accept(&constProp);
     xcmp::CodeGen xCodeGen(symbolTable);
     tree->accept(&xCodeGen);
-    xcmp::LowerDirectives lowerDirectives(xCodeGen);
-    hexasm::CodeGen hexCodeGen(xCodeGen.getFinalInstrs());
+    xcmp::LowerDirectives lowerDirectives(symbolTable, xCodeGen);
+    hexasm::CodeGen hexCodeGen(lowerDirectives.getInstrs());
     std::ostringstream outBuffer;
     if (text) {
       hexCodeGen.emitProgramText(outBuffer);
@@ -159,13 +159,11 @@ struct TestContext {
     tree->accept(&constProp);
     xcmp::CodeGen xCodeGen(symbolTable);
     tree->accept(&xCodeGen);
-    xcmp::LowerDirectives lowerDirectives(xCodeGen);
+    xcmp::LowerDirectives lowerDirectives(symbolTable, xCodeGen);
     // Assemble.
-    hexasm::CodeGen hexCodeGen(xCodeGen.getFinalInstrs());
+    hexasm::CodeGen hexCodeGen(lowerDirectives.getInstrs());
     hexCodeGen.emitBin("a.bin");
     // Run the program.
-    std::istringstream simInBuffer;
-    std::ostringstream simOutBuffer;
     hexsim::Processor p(simInBuffer, simOutBuffer);
     p.load("a.bin");
     return p.run();

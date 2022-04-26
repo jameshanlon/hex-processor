@@ -122,16 +122,16 @@ int main(int argc, const char *argv[]) {
     }
 
     // Lower the generated (intermediate code) to assembly directives.
-    xcmp::LowerDirectives lowerDirectives(codeGen);
+    xcmp::LowerDirectives lowerDirectives(symbolTable, codeGen);
 
     // Emit the generated intermediate instructions only.
     if (instsLoweredOnly || asmOnly) {
-      codeGen.emitInstrs(std::cout);
+      lowerDirectives.emitInstrs(std::cout);
       return 0;
     }
 
     // Assemble the instructions.
-    hexasm::CodeGen asmCodeGen(codeGen.getFinalInstrs());
+    hexasm::CodeGen asmCodeGen(lowerDirectives.getInstrs());
 
     // Print the assembly instructions only.
     if (instsAsmOnly) {

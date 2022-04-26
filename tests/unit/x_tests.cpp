@@ -11,27 +11,32 @@
 BOOST_FIXTURE_TEST_SUITE(x_tests, TestContext);
 
 BOOST_AUTO_TEST_CASE(empty_run) {
-//  auto program = R"(
-//val foo = 1;
-//)";
-//  runXProgram(program);
+  auto program = R"(
+proc main () is skip
+)";
+  runXProgram(program);
 }
 
 BOOST_AUTO_TEST_CASE(hello_run) {
-//  auto program = R"(
-//val put = 1;
-//proc main() is {
-//  putval('h');
-//  putval('e');
-//  putval('l');
-//  putval('l');
-//  putval('o');
-//  newline()
-//}
-//proc putval(val c) is put(c, 0)
-//proc newline() is putval('\n')
-//)";
-//  runXProgram(program);
+  auto program = R"(
+val put = 1;
+proc main () is {
+  put('h', 0);
+  put('e', 0);
+  put('l', 0);
+  put('l', 0);
+  put('o', 0);
+  put(' ', 0);
+  put('w', 0);
+  put('o', 0);
+  put('r', 0);
+  put('l', 0);
+  put('d', 0);
+  put('\n', 0)
+}
+)";
+  runXProgram(program);
+  BOOST_TEST(simOutBuffer.str() == "hello world\n");
 }
 
 BOOST_AUTO_TEST_CASE(xhexb_run) {

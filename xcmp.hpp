@@ -633,6 +633,7 @@ public:
   }
   bool isSysCall() const { return sysCallId != -1; }
   int getSysCallId() const { return sysCallId; }
+  void setSysCallId(int value) { sysCallId = value; }
   const std::string &getName() const { return name; }
   const std::vector<std::unique_ptr<Expr>> &getArgs() const { return args; }
 };
@@ -897,15 +898,10 @@ public:
       Statement(location), call(std::move(call)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    for (auto &arg : call.get()->getArgs()) {
-      arg->accept(visitor);
-    }
+    call->accept(visitor);
     visitor->visitPost(*this);
   }
-  bool isSysCall() const { return call.get()->isSysCall(); }
-  int getSysCallId() const { return call.get()->getSysCallId(); }
-  const std::string &getName() const { return call.get()->getName(); }
-  const std::vector<std::unique_ptr<Expr>> &getArgs() { return call->getArgs(); }
+  CallExpr *getCall() { return call.get(); }
 };
 
 class AssStatement : public Statement {
@@ -1058,7 +1054,11 @@ public:
   };
   void visitPost(NumberExpr &expr) override { }
   void visitPre(CallExpr &expr) override {
-    indent(); outs << boost::format("call %s%s\n") % expr.getName() % locString(expr);
+    if (expr.isSysCall()) {
+      indent(); outs << boost::format("syscallstmt %d%s\n") % expr.getSysCallId() % locString(expr);
+    } else {
+      indent(); outs << boost::format("call %s%s\n") % expr.getName() % locString(expr);
+    }
     indentCount++;
   };
   void visitPost(CallExpr &expr) override {
@@ -1128,11 +1128,7 @@ public:
     indentCount--;
   };
   void visitPre(CallStatement &stmt) override {
-    if (stmt.isSysCall()) {
-      indent(); outs << boost::format("syscallstmt %d%s\n") % stmt.getSysCallId() % locString(stmt);
-    } else {
-      indent(); outs << boost::format("callstmt %s%s\n") % stmt.getName() % locString(stmt);
-    }
+    indent(); outs << boost::format("callstmt %s\n") % locString(stmt);
     indentCount++;
   };
   void visitPost(CallStatement &stmt) override {
@@ -1243,7 +1239,7 @@ class Parser {
   /// element :=
   ///   <identifier>
   ///   <identifier> "[" <expr> "]"
-  ///   <number> "(" <expr-list> ")"
+  ///   <expr> "(" <expr-list> ")"
   ///   <identifier> "(" <expr-list> ")"
   ///   <number>
   ///   <string>
@@ -1728,12 +1724,19 @@ public:
   void visitPost(NumberExpr &expr) {
     expr.setValue(expr.getValue());
   }
-  void visitPost(CallExpr &expr) {}
+  void visitPost(CallExpr &expr) {
+    // Propagate constant values for syscalls.
+    auto symbol = symbolTable.lookup(expr.getName(), expr.getLocation());
+    if (auto symbolExpr = dynamic_cast<const ValDecl*>(symbol->getNode())) {
+      expr.setSysCallId(symbolExpr->getValue());
+    }
+  }
   void visitPost(ArraySubscriptExpr &expr) {}
   void visitPost(VarRefExpr &expr) {
+    // Propagate constant values to variable references.
     auto symbol = symbolTable.lookup(expr.getName(), expr.getLocation());
-    if (auto valDecl = dynamic_cast<const ValDecl*>(symbol->getNode())) {
-      expr.setValue(valDecl->getValue());
+    if (auto symbolExpr = dynamic_cast<const ValDecl*>(symbol->getNode())) {
+      expr.setValue(symbolExpr->getValue());
     }
   }
 };
@@ -1763,6 +1766,8 @@ class Prologue : public IntermediateDirective {
 public:
   Prologue(Symbol *symbol) : IntermediateDirective(hexasm::Token::PROLOGUE), symbol(symbol) {}
   std::string toString() const { return "PROLOGUE " + symbol->getName(); }
+  Symbol *getSymbol() { return symbol; }
+  Frame *getFrame() { return symbol->getFramePtr(); }
 };
 
 /// Procedure/function epilogue.
@@ -1771,6 +1776,8 @@ class Epilogue : public IntermediateDirective {
 public:
   Epilogue(Symbol *symbol) : IntermediateDirective(hexasm::Token::EPILOGUE), symbol(symbol) {}
   std::string toString() const { return "EPILOGUE " + symbol->getName(); }
+  Symbol *getSymbol() { return symbol; }
+  Frame *getFrame() { return symbol->getFramePtr(); }
 };
 
 /// Instruction relative offset to stack frame base.
@@ -1798,11 +1805,14 @@ public:
   CodeBuffer(SymbolTable &symbolTable) : symbolTable(symbolTable), constCount(0), stringCount(0) {}
 
   const std::string getLabel() { return std::string("lab") + std::to_string(labelCount++); }
+  void insertInstr(std::unique_ptr<hexasm::Directive> instr) { instrs.push_back(std::move(instr)); }
+  void insertData(std::unique_ptr<hexasm::Directive> data) { instrs.push_back(std::move(data)); }
 
   /// Directive generation -------------------------------------------------///
-  void genData(uint32_t value) { data.push_back(std::make_unique<hexasm::Data>(hexasm::Token::DATA, value)); }
+  void genData(uint32_t value)        { data.push_back(std::make_unique<hexasm::Data>(hexasm::Token::DATA, value)); }
   void genDataLabel(std::string name) { data.push_back(std::make_unique<hexasm::Label>(hexasm::Token::IDENTIFIER, name)); }
-  void genLabel(std::string name) { instrs.push_back(std::make_unique<hexasm::Label>(hexasm::Token::IDENTIFIER, name)); }
+  void genInstrData(uint32_t value)   { instrs.push_back(std::make_unique<hexasm::Data>(hexasm::Token::DATA, value)); }
+  void genLabel(std::string name)     { instrs.push_back(std::make_unique<hexasm::Label>(hexasm::Token::IDENTIFIER, name)); }
 
   /// Instruction generation -----------------------------------------------///
   void genLDAM(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAM, value)); }
@@ -1826,8 +1836,8 @@ public:
   void genOPR(hexasm::Token op)   { instrs.push_back(std::make_unique<hexasm::InstrOp>(hexasm::Token::OPR, op)); }
 
   /// Procedure calling and frame-base relative accesses -------------------///
-  void genPrologue(Symbol *symbol) { instrs.push_back(std::make_unique<Epilogue>(symbol)); }
-  void genEpilogue(Symbol *symbol) { instrs.push_back(std::make_unique<Prologue>(symbol)); }
+  void genPrologue(Symbol *symbol) { instrs.push_back(std::make_unique<Prologue>(symbol)); }
+  void genEpilogue(Symbol *symbol) { instrs.push_back(std::make_unique<Epilogue>(symbol)); }
   void genLDAI_FB(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::LDAI_FB, frame, offset)); }
   void genLDBI_FB(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::LDBI_FB, frame, offset)); }
   void genSTAI_FB(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::STAI_FB, frame, offset)); }
@@ -2020,7 +2030,8 @@ public:
 
   void loadActuals(const std::vector<std::unique_ptr<Expr>> &args) {
     size_t stackOffset = currentFrame->getOffset();
-    size_t parameterIndex = 0;
+    size_t parameterIndex = 2;
+    currentFrame->setOffset(0); // Parameters follow return value.
     for (auto &arg : args) {
       if (containsCall(arg.get())) {
         // For each actual expression containing one or more calls, load the
@@ -2086,13 +2097,6 @@ public:
     currentFrame->setOffset(stackOffset);
   }
 
-  /// Merge the instruction and data vectors.
-  void mergeData() {
-    instrs.insert(instrs.end(),
-                  std::make_move_iterator(data.begin()),
-                  std::make_move_iterator(data.end()));
-  }
-
   /// Reporting -------------------------------------------------------------//
   void emitInstrs(std::ostream &out) {
     for (auto &directive : instrs) {
@@ -2121,7 +2125,7 @@ public:
   void visitPre(Program &tree) {
     // Setup.
     cb.genBR("start"); // Branch to the start.
-    cb.genData(SP_INIT_VALUE); // Initialise the stack pointer
+    cb.genInstrData(SP_INIT_VALUE); // Initialise the stack pointer
     cb.genLabel("start");
     // Branch and link to main().
     cb.genLDAP("_exit");
@@ -2164,20 +2168,15 @@ public:
   void visitPost(SeqStatement&) {}
   void visitPre(CallStatement&) {}
   void visitPost(CallStatement &stmt) {
-    if (stmt.isSysCall()) {
-      cb.genSysCall(stmt.getSysCallId(), stmt.getArgs());
+    if (stmt.getCall()->isSysCall()) {
+      cb.genSysCall(stmt.getCall()->getSysCallId(), stmt.getCall()->getArgs());
     } else {
-      cb.genProcCall(stmt.getName(), stmt.getArgs());
+      cb.genProcCall(stmt.getCall()->getName(), stmt.getCall()->getArgs());
     }
   }
   void visitPre(AssStatement&) {}
   void visitPost(AssStatement&) {}
 
-  /// Return the final list of compiled instructions.
-  std::vector<std::unique_ptr<hexasm::Directive>> &getFinalInstrs() {
-    cb.mergeData();
-    return cb.getInstrs();
-  }
   /// Member access --------------------------------------------------------//
   CodeBuffer &getCodeBuffer() { return cb; }
   void emitInstrs(std::ostream &out) { cb.emitInstrs(out); }
@@ -2190,34 +2189,86 @@ public:
 /// Lower the intermediate output produced by code generation into assembly
 /// directives that can be consumed by hexasm.
 class LowerDirectives {
+  CodeBuffer cb;
+
 public:
-  LowerDirectives(CodeGen &cg) {
-    // Lower any intermediate directives.
-    for (auto it = cg.getCodeBuffer().getInstrs().begin();
-              it != cg.getCodeBuffer().getInstrs().end();
-              it++) {
-      // Lower directive.
-      auto token = (*it)->getToken();
+  LowerDirectives(SymbolTable &symbolTable, CodeGen &cg) : cb(symbolTable) {
+    // Lower intermediate instruction directives.
+    for (auto &instr : cg.getCodeBuffer().getInstrs()) {
+      auto token = instr->getToken();
       switch (token) {
-      case hexasm::Token::PROLOGUE:
+      case hexasm::Token::PROLOGUE: {
+        auto prologue = dynamic_cast<Prologue*>(instr.get());
+        // Save current stack pointer.
+        cb.genLDBM(SP_OFFSET);
+        cb.genSTAI(0);
+        // Extend the stack pointer by the frame size.
+        cb.genLDAC(-prologue->getFrame()->getSize());
+        cb.genOPR(hexasm::Token::ADD);
+        cb.genSTAM(SP_OFFSET);
         break;
-      case hexasm::Token::EPILOGUE:
-        break;
+      }
+      case hexasm::Token::EPILOGUE: {
+        auto epilogue = dynamic_cast<Epilogue*>(instr.get());
+        auto frameSize = epilogue->getFrame()->getSize();
+        // Function
+        if (epilogue->getSymbol()->getType() == SymbolType::FUNC) {
+          // Store return value in areg.
+          cb.genLDBM(SP_OFFSET);
+          cb.genSTAI(frameSize + 1);
+          // Contract the stack poiner.
+          cb.genLDAC(frameSize);
+          cb.genOPR(hexasm::Token::ADD);
+          cb.genSTAM(SP_OFFSET);
+          // Branch back to the caller.
+          cb.genLDBI(frameSize);
+          cb.genOPR(hexasm::Token::BRB);
+          break;
+        }
+        // Process
+        if (epilogue->getSymbol()->getType() == SymbolType::PROC) {
+          // Contract the stack poiner.
+          cb.genLDBM(SP_OFFSET);
+          cb.genLDAC(frameSize);
+          cb.genOPR(hexasm::Token::ADD);
+          cb.genSTAM(SP_OFFSET);
+          // Branch back to the caller.
+          cb.genLDBI(frameSize);
+          cb.genOPR(hexasm::Token::BRB);
+          break;
+        }
+      }
       case hexasm::Token::LDAI_FB:
       case hexasm::Token::LDBI_FB:
       case hexasm::Token::STAI_FB: {
-        auto oldInstr = dynamic_cast<InstrStackOffset*>((*it).get());
+        auto oldInstr = dynamic_cast<InstrStackOffset*>(instr.get());
         int newOffset = oldInstr->getFrame()->getSize() - oldInstr->getOffset();
-        auto opcode = token == hexasm::Token::LDAI_FB ? hexasm::Token::LDAI :
-                      token == hexasm::Token::LDBI_FB ? hexasm::Token::LDBI :
-                                                        hexasm::Token::STAI;
-        auto newInstr = std::make_unique<hexasm::InstrImm>(opcode, newOffset);
-        *it = std::move(newInstr);
+        switch (token) {
+        case hexasm::Token::LDAI_FB: cb.genLDAI(newOffset); break;
+        case hexasm::Token::LDBI_FB: cb.genLDBI(newOffset); break;
+        case hexasm::Token::STAI_FB: cb.genSTAI(newOffset); break;
+        default: break;
+        }
         break;
       }
-      default: break; // Skip.
+      default:
+        // Otherwise just copy the directive.
+        cb.insertInstr(std::move(instr));
+        break;
       }
     }
+    // Copy data directives.
+    for (auto &data : cg.getCodeBuffer().getData()) {
+      cb.insertInstr(std::move(data));
+    }
+  }
+
+  /// Reporting -------------------------------------------------------------//
+  void emitInstrs(std::ostream &out) { cb.emitInstrs(out); }
+
+  /// Member reporting ------------------------------------------------------//
+  std::vector<std::unique_ptr<hexasm::Directive>> &getInstrs() {
+    return cb.getInstrs();
   }
 };
 
