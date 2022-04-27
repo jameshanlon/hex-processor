@@ -180,6 +180,11 @@ struct UnknownSymbolError : public Error {
     Error(location, (boost::format("could not find symbol %s") % name).str()) {}
 };
 
+struct NonConstArrayLengthError : public Error {
+  NonConstArrayLengthError(Location location, std::string name) :
+    Error(location, (boost::format("array %s length is not constant") % name).str()) {}
+};
+
 //===---------------------------------------------------------------------===//
 // Lexer
 //===---------------------------------------------------------------------===//
@@ -621,7 +626,7 @@ public:
   CallExpr(Location location, int sysCallId, std::vector<std::unique_ptr<Expr>> args) :
       Expr(location), sysCallId(sysCallId), args(std::move(args)) {}
   CallExpr(Location location, std::string name) :
-      Expr(location), sysCallId(-1) {}
+      Expr(location), sysCallId(-1), name(name) {}
   CallExpr(Location location, std::string name, std::vector<std::unique_ptr<Expr>> args) :
       Expr(location), sysCallId(-1), name(name), args(std::move(args)) {}
   virtual void accept(AstVisitor *visitor) override {
@@ -753,6 +758,12 @@ public:
     visitor->visitPre(*this);
     expr->accept(visitor);
     visitor->visitPost(*this);
+  }
+  int getSize() {
+    if (!expr->isConst()) {
+      throw NonConstArrayLengthError(getLocation(), getName());
+    }
+    return expr->getValue();
   }
 };
 
@@ -1239,7 +1250,7 @@ class Parser {
   /// element :=
   ///   <identifier>
   ///   <identifier> "[" <expr> "]"
-  ///   <expr> "(" <expr-list> ")"
+  ///   <number> "(" <expr-list> ")"
   ///   <identifier> "(" <expr-list> ")"
   ///   <number>
   ///   <string>
@@ -1436,7 +1447,8 @@ class Parser {
   ///   "while" <expr> "do" <stmt>
   ///   "{" [1 <stmt> "," ] "}"
   ///   <identifier> ":=" <expr>
-  ///   <identifier> "(" [ <expr> "," ] ")"
+  ///   <identifier> "(" <expr-list> ")"
+  ///   <number> "(" [ <expr-list> ")"
   std::unique_ptr<Statement> parseStatement() {
     auto location = lexer.getLocation();
     switch (lexer.getLastToken()) {
@@ -1787,6 +1799,9 @@ class InstrStackOffset : public hexasm::InstrImm {
 public:
   InstrStackOffset(hexasm::Token token, Frame *frame, int offset) :
       InstrImm(token, 0), frame(frame), offset(offset) {}
+  std::string toString() const {
+    return (boost::format("%s %d") % hexasm::tokenEnumStr(getToken()) % offset).str();
+  }
   Frame *getFrame() { return frame; }
   int getOffset() { return offset; }
 };
@@ -1843,7 +1858,6 @@ public:
   void genSTAI_FB(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::STAI_FB, frame, offset)); }
 
   /// Helpers --------------------------------------------------------------///
-  void genLDSPB() {  } // Load SP into breg
   void genBRB() { genOPR(hexasm::Token::OPR); }
   void genADD() { genOPR(hexasm::Token::ADD); }
   void genSUB() { genOPR(hexasm::Token::SUB); }
@@ -2114,6 +2128,38 @@ public:
   void setCurrentFrameSize(size_t size) { currentFrame->setSize(size); }
 };
 
+/// Assign stack locations to function/process formal parameters.
+class FormalLocations : public AstVisitor {
+  SymbolTable &st;
+  size_t count;
+  void assignLocation(Formal &formal) {
+    auto symbol = st.lookup(formal.getName(), formal.getLocation());
+    symbol->setStackOffset(count++);
+  }
+public:
+  FormalLocations(SymbolTable &st, bool isFunction) : st(st), count(isFunction ? 2 : 1) {}
+  void visitPost(ValFormal &formal) { assignLocation(formal); }
+  void visitPost(ArrayFormal &formal) { assignLocation(formal); }
+  void visitPost(ProcFormal &formal) { assignLocation(formal); }
+  void visitPost(FuncFormal &formal) { assignLocation(formal); }
+};
+
+/// Assign stack locations to local variables.
+class LocalDeclLocations : public AstVisitor {
+  SymbolTable &st;
+  size_t count;
+  void assignLocation(Decl &decl, size_t size) {
+    auto symbol = st.lookup(decl.getName(), decl.getLocation());
+    symbol->setStackOffset(count);
+    count += size;
+  }
+public:
+  LocalDeclLocations(SymbolTable &st) : st(st), count(0) {}
+  void visitPost(ArrayDecl &decl) { assignLocation(decl, decl.getSize()); }
+  void visitPost(VarDecl &decl) { assignLocation(decl, 1); }
+  void visitPost(ValDecl &decl) { assignLocation(decl, 1); }
+};
+
 /// Walk the AST and generate intermediate code.
 class CodeGen : public AstVisitor {
   SymbolTable &symbolTable;
@@ -2145,6 +2191,13 @@ public:
     auto symbol = symbolTable.lookup(proc.getName(), proc.getLocation());
     symbol->setFrame(std::make_unique<Frame>());
     cb.setCurrentFrame(symbol->getFramePtr());
+    // Allocate storage locations to formals.
+    FormalLocations formalLocations(symbolTable, proc.isFunction());
+    proc.accept(&formalLocations);
+    // Allocate storage locations to declarations.
+    LocalDeclLocations localDeclLocations(symbolTable);
+    proc.accept(&localDeclLocations);
+    // Generate the prologue.
     cb.genLabel(proc.getName());
     cb.genPrologue(symbol);
   }
