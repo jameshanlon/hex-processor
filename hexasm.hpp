@@ -279,36 +279,6 @@ public:
   }
 };
 
-class Func : public Directive {
-  std::string identifier;
-public:
-  Func(Token token, std::string identifier) :
-      Directive(token), identifier(identifier) {}
-  Func(Location location, Token token, std::string identifier) :
-      Directive(location, token), identifier(identifier) {}
-  bool operandIsLabel() const { return false; }
-  size_t getSize() const { return 0; }
-  int getValue() const { return 0; }
-  std::string toString() const {
-    return "FUNC " + identifier;
-  }
-};
-
-class Proc : public Directive {
-  std::string identifier;
-public:
-  Proc(Token token, std::string identifier) :
-      Directive(token), identifier(identifier) {}
-  Proc(Location location, Token token, std::string identifier) :
-      Directive(location, token), identifier(identifier) {}
-  bool operandIsLabel() const { return false; }
-  size_t getSize() const { return 0; }
-  int getValue() const { return 0; }
-  std::string toString() const {
-    return "PROC " + identifier;
-  }
-};
-
 class Label : public Directive {
   std::string label;
   int labelValue;
@@ -326,8 +296,34 @@ public:
     return oldValue != newValue;
   }
   int getValue() const { return labelValue; }
-  std::string getLabel() const { return label; }
+  const std::string &getLabel() const { return label; }
   std::string toString() const { return label; }
+};
+
+class Func : public Label {
+  std::string identifier;
+public:
+  Func(Token token, std::string identifier) :
+      Label(token, identifier) {}
+  Func(Location location, Token token, std::string identifier) :
+      Label(location, token, identifier) {}
+  const std::string &getName() const { return getLabel(); }
+  std::string toString() const {
+    return "FUNC " + getLabel();
+  }
+};
+
+class Proc : public Label {
+  std::string identifier;
+public:
+  Proc(Token token, std::string identifier) :
+      Label(token, identifier) {}
+  Proc(Location location, Token token, std::string identifier) :
+      Label(location, token, identifier) {}
+  const std::string &getName() const { return getLabel(); }
+  std::string toString() const {
+    return "PROC " + getLabel();
+  }
 };
 
 class InstrImm : public Directive {
@@ -702,14 +698,29 @@ class CodeGen {
 
   std::vector<std::unique_ptr<Directive>> &program;
   std::map<std::string, Label*> labelMap;
+  std::vector<std::pair<std::string, unsigned>> debugInfo;
   size_t programSizeBytes;
 
   /// Create a map of label strings to label Directives.
   void createLabelMap() {
     for (auto &directive : program) {
-      if (directive->getToken() == Token::IDENTIFIER) {
+      switch (directive->getToken()) {
+      case Token::FUNC: {
+        auto func = dynamic_cast<Func*>(directive.get());
+        labelMap[func->getName()] = func;
+        break;
+      }
+      case Token::PROC: {
+        auto proc = dynamic_cast<Proc*>(directive.get());
+        labelMap[proc->getName()] = proc;
+        break;
+      }
+      case Token::IDENTIFIER: {
         auto label = dynamic_cast<Label*>(directive.get());
         labelMap[label->getLabel()] = label;
+        break;
+      }
+      default: break;
       }
     }
   }
@@ -732,7 +743,9 @@ class CodeGen {
           }
         }
         // Update the label value.
-        if (directive->getToken() == Token::IDENTIFIER) {
+        if (directive->getToken() == Token::IDENTIFIER ||
+            directive->getToken() == Token::FUNC ||
+            directive->getToken() == Token::PROC) {
           dynamic_cast<Label*>(directive.get())->setLabelValue(byteOffset);
         }
         // Update the label operand value of an instruction, accounting for
@@ -805,8 +818,16 @@ public:
     int byteOffset = 0;
     for (auto &directive : program) {
       size_t size = directive->getSize();
+      // Func
+      if (directive->getToken() == Token::FUNC) {
+        auto funcDirective = dynamic_cast<Func*>(directive.get());
+        debugInfo.push_back(std::make_pair(funcDirective->getLabel(), byteOffset));
+      // Proc
+      } else if (directive->getToken() == Token::PROC) {
+        auto procDirective = dynamic_cast<Proc*>(directive.get());
+        debugInfo.push_back(std::make_pair(procDirective->getLabel(), byteOffset));
       // Padding
-      if (directive->getToken() == Token::PADDING) {
+      } else if (directive->getToken() == Token::PADDING) {
         for (size_t i=0; i<directive->getSize(); i++) {
           outputFile.put(0);
         }
@@ -850,14 +871,35 @@ public:
     }
   }
 
+  /// Emit debug information.
+  void emitDebugInfo(std::ostream &outputFile) {
+    uint32_t tableSize = debugInfo.size();
+    // Symbol string table (concatenate null-terminated strings).
+    outputFile.write(reinterpret_cast<const char*>(&tableSize), sizeof(uint32_t));
+    for (const auto &pair : debugInfo) {
+      auto name = pair.first;
+      outputFile.write(name.c_str(), name.length()+1);
+    }
+    // Symbols -> address map (index, byte offset) in ascending offsets.
+    outputFile.write(reinterpret_cast<const char*>(&tableSize), sizeof(uint32_t));
+    uint32_t tableIndex = 0;
+    for (const auto &pair : debugInfo) {
+      uint32_t byteOffset = pair.second;
+      outputFile.write(reinterpret_cast<const char*>(&tableIndex), sizeof(uint32_t));
+      outputFile.write(reinterpret_cast<const char*>(&byteOffset), sizeof(uint32_t));
+      tableIndex++;
+    }
+  }
+
   /// Emit the binary.
   void emitBin(std::string outputFilename) {
     std::fstream outputFile(outputFilename, std::ios::out | std::ios::binary);
     // The first four bytes are the remaining binary size.
-    auto programSizeWords = programSizeBytes >> 2;
-    outputFile.write(reinterpret_cast<const char*>(&programSizeWords), sizeof(unsigned));
+    uint32_t programSizeWords = programSizeBytes >> 2;
+    outputFile.write(reinterpret_cast<const char*>(&programSizeWords), sizeof(uint32_t));
     // Emit the program.
     emitProgramBin(outputFile);
+    emitDebugInfo(outputFile);
     // Done.
     outputFile.close();
   }

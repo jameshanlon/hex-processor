@@ -45,6 +45,23 @@ class Processor {
   // State for tracing.
   uint64_t cycles;
   hex::Instr instrEnum;
+  std::vector<std::pair<std::string, unsigned>> debugInfo;
+
+  /// Lookup a symbol name given the current PC.
+  const char *lookupSymbol() {
+    if (pc < debugInfo[0].second) {
+      return "";
+    }
+    for (size_t i=0; i<debugInfo.size(); i++) {
+      if (i == debugInfo.size() - 1 && pc >= debugInfo[i].second) {
+        return debugInfo[i].first.c_str();
+      }
+      if (pc >= debugInfo[i].second && pc < debugInfo[i+1].second) {
+        return debugInfo[i].first.c_str();
+      }
+    }
+    return "";
+  }
 
 public:
 
@@ -69,13 +86,45 @@ public:
     unsigned programSize;
     file.read(reinterpret_cast<char*>(&programSize), 4);
     programSize <<= 2;
-    if (programSize != remainingFileSize) {
-      std::cerr << boost::format("Warning: mismatching program size %d != %d\n")
-                     % programSize % remainingFileSize;
-    }
+    //if (programSize != remainingFileSize) {
+    //  std::cerr << boost::format("Warning: mismatching program size %d != %d\n")
+    //                 % programSize % remainingFileSize;
+    //}
 
-    // Read the contents.
-    file.read(reinterpret_cast<char*>(memory.data()), remainingFileSize);
+    // Read the instructions into memory.
+    file.read(reinterpret_cast<char*>(memory.data()), programSize);
+
+    // Read debug data (if present).
+    if (remainingFileSize > programSize) {
+      //std::cout << "Reading debug data\n";
+      // Strings.
+      uint32_t numStrings;
+      file.read(reinterpret_cast<char*>(&numStrings), sizeof(uint32_t));
+      //std::cout << std::to_string(numStrings) << " strings\n";
+      std::vector<std::string> strings;
+      for (size_t i=0; i<numStrings; i++) {
+        char c = file.get();
+        std::string s;
+        while (c != '\0') {
+          //std::cout << c << "\n";
+          s += c;
+          c = file.get();
+        }
+        strings.push_back(s);
+      }
+      // Symbols
+      uint32_t numSymbols;
+      file.read(reinterpret_cast<char*>(&numSymbols), sizeof(uint32_t));
+      //std::cout << std::to_string(numSymbols) << " symbols\n";
+      for (size_t i=0; i<numSymbols; i++) {
+        uint32_t strIndex;
+        uint32_t byteOffset;
+        file.read(reinterpret_cast<char*>(&strIndex), sizeof(uint32_t));
+        file.read(reinterpret_cast<char*>(&byteOffset), sizeof(uint32_t));
+        //std::cout << "symbol " << strings[strIndex] << " " << std::to_string(byteOffset) << "\n";
+        debugInfo.push_back(std::make_pair(strings[strIndex], byteOffset));
+      }
+    }
 
     // Print the contents of the binary.
     if (dumpContents) {
@@ -103,7 +152,11 @@ public:
   }
 
   void trace(uint32_t instr, hex::Instr instrEnum) {
-    out << boost::format("%-6d %-6s %-4d") % pc % instrEnumToStr(instrEnum) % (instr & 0xF);
+    if (debugInfo.size()) {
+      out << boost::format("%-6d %-16s %-6s %-4d") % pc % lookupSymbol() % instrEnumToStr(instrEnum) % (instr & 0xF);
+    } else {
+      out << boost::format("%-6d %-6s %-4d") % pc % instrEnumToStr(instrEnum) % (instr & 0xF);
+    }
     switch (instrEnum) {
       case hex::Instr::LDAM:
         out << boost::format("areg = mem[oreg (%#08x)] (%d)\n") % oreg % memory[oreg];

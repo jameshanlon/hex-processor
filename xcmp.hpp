@@ -1605,7 +1605,7 @@ class Symbol {
   SymbolScope scope;
   AstNode *node;
   std::string name;
-  std::unique_ptr<Frame> frame;
+  std::shared_ptr<Frame> frame;
   int stackOffset;
   std::string globalLabel;
 
@@ -1616,10 +1616,10 @@ public:
   SymbolScope getScope() const { return scope; }
   AstNode *getNode() const { return node; }
   const std::string &getName() const { return name; }
-  void setFrame(std::unique_ptr<Frame> newFrame) { frame = std::move(newFrame); }
+  void setFrame(std::shared_ptr<Frame> newFrame) { frame = newFrame; }
+  Frame *getFrame() { return frame.get(); }
   int getStackOffset() const { return stackOffset; }
   void setStackOffset(int value) { stackOffset = value; }
-  Frame *getFramePtr() { return frame.get(); }
   const std::string &getGlobalLabel() const { return globalLabel; }
   void setGlobalLabel(const std::string &value) { globalLabel = value; }
 };
@@ -1779,7 +1779,7 @@ public:
   Prologue(Symbol *symbol) : IntermediateDirective(hexasm::Token::PROLOGUE), symbol(symbol) {}
   std::string toString() const { return "PROLOGUE " + symbol->getName(); }
   Symbol *getSymbol() { return symbol; }
-  Frame *getFrame() { return symbol->getFramePtr(); }
+  Frame *getFrame() { return symbol->getFrame(); }
 };
 
 /// Procedure/function epilogue.
@@ -1789,7 +1789,7 @@ public:
   Epilogue(Symbol *symbol) : IntermediateDirective(hexasm::Token::EPILOGUE), symbol(symbol) {}
   std::string toString() const { return "EPILOGUE " + symbol->getName(); }
   Symbol *getSymbol() { return symbol; }
-  Frame *getFrame() { return symbol->getFramePtr(); }
+  Frame *getFrame() { return symbol->getFrame(); }
 };
 
 /// Instruction relative offset to stack frame base.
@@ -1828,6 +1828,8 @@ public:
   void genDataLabel(std::string name) { data.push_back(std::make_unique<hexasm::Label>(hexasm::Token::IDENTIFIER, name)); }
   void genInstrData(uint32_t value)   { instrs.push_back(std::make_unique<hexasm::Data>(hexasm::Token::DATA, value)); }
   void genLabel(std::string name)     { instrs.push_back(std::make_unique<hexasm::Label>(hexasm::Token::IDENTIFIER, name)); }
+  void genFunc(std::string name)      { instrs.push_back(std::make_unique<hexasm::Func>(hexasm::Token::FUNC, name)); }
+  void genProc(std::string name)      { instrs.push_back(std::make_unique<hexasm::Proc>(hexasm::Token::PROC, name)); }
 
   /// Instruction generation -----------------------------------------------///
   void genLDAM(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAM, value)); }
@@ -2001,13 +2003,14 @@ public:
       switch (reg) {
       case Reg::A:
         genLDAM(SP_OFFSET);
-        genLDAI(symbol->getStackOffset());
+        genLDAI_FB(symbol->getFrame(), symbol->getStackOffset());
         break;
       case Reg::B:
         genLDBM(SP_OFFSET);
-        genLDBI(symbol->getStackOffset());
+        genLDBI_FB(symbol->getFrame(), symbol->getStackOffset());
         break;
       }
+      break;
     }
     // Load from globals.
     case SymbolScope::GLOBAL: {
@@ -2073,6 +2076,7 @@ public:
     // Actual parameters.
     genCallActuals(args);
     loadActuals(args);
+    currentFrame->setSize(args.size() + 2);
     // Perform syscall.
     genLDAC(syscallId);
     genOPR(hexasm::Token::SVC);
@@ -2087,6 +2091,7 @@ public:
     // Actual parameters.
     genCallActuals(args);
     loadActuals(args);
+    currentFrame->setSize(args.size() + 2);
     // Branch and link.
     auto linkLabel = getLabel();
     genLDAP(linkLabel);
@@ -2103,6 +2108,7 @@ public:
     // Actual parameters.
     genCallActuals(args);
     loadActuals(args);
+    currentFrame->setSize(args.size() + 1);
     // Branch and link.
     auto linkLabel = getLabel();
     genLDAP(linkLabel);
@@ -2131,13 +2137,16 @@ public:
 /// Assign stack locations to function/process formal parameters.
 class FormalLocations : public AstVisitor {
   SymbolTable &st;
+  std::shared_ptr<Frame> &frame;
   size_t count;
   void assignLocation(Formal &formal) {
     auto symbol = st.lookup(formal.getName(), formal.getLocation());
     symbol->setStackOffset(count++);
+    symbol->setFrame(frame);
   }
 public:
-  FormalLocations(SymbolTable &st, bool isFunction) : st(st), count(isFunction ? 2 : 1) {}
+  FormalLocations(SymbolTable &st, std::shared_ptr<Frame> &frame, bool isFunction) :
+    st(st), frame(frame), count(isFunction ? 2 : 1) {}
   void visitPost(ValFormal &formal) { assignLocation(formal); }
   void visitPost(ArrayFormal &formal) { assignLocation(formal); }
   void visitPost(ProcFormal &formal) { assignLocation(formal); }
@@ -2147,14 +2156,17 @@ public:
 /// Assign stack locations to local variables.
 class LocalDeclLocations : public AstVisitor {
   SymbolTable &st;
+  std::shared_ptr<Frame> &frame;
   size_t count;
   void assignLocation(Decl &decl, size_t size) {
     auto symbol = st.lookup(decl.getName(), decl.getLocation());
     symbol->setStackOffset(count);
+    symbol->setFrame(frame);
     count += size;
   }
 public:
-  LocalDeclLocations(SymbolTable &st) : st(st), count(0) {}
+  LocalDeclLocations(SymbolTable &st, std::shared_ptr<Frame> &frame) :
+    st(st), frame(frame), count(0) {}
   void visitPost(ArrayDecl &decl) { assignLocation(decl, decl.getSize()); }
   void visitPost(VarDecl &decl) { assignLocation(decl, 1); }
   void visitPost(ValDecl &decl) { assignLocation(decl, 1); }
@@ -2189,16 +2201,16 @@ public:
   void visitPre(Proc &proc) {
     // Setup a frame object for the proc/func.
     auto symbol = symbolTable.lookup(proc.getName(), proc.getLocation());
-    symbol->setFrame(std::make_unique<Frame>());
-    cb.setCurrentFrame(symbol->getFramePtr());
+    auto frame = std::make_shared<Frame>();
+    symbol->setFrame(frame);
+    cb.setCurrentFrame(symbol->getFrame());
     // Allocate storage locations to formals.
-    FormalLocations formalLocations(symbolTable, proc.isFunction());
+    FormalLocations formalLocations(symbolTable, frame, proc.isFunction());
     proc.accept(&formalLocations);
-    // Allocate storage locations to declarations.
-    LocalDeclLocations localDeclLocations(symbolTable);
+    // Allocate storage locations to local declarations.
+    LocalDeclLocations localDeclLocations(symbolTable, frame);
     proc.accept(&localDeclLocations);
     // Generate the prologue.
-    cb.genLabel(proc.getName());
     cb.genPrologue(symbol);
   }
 
@@ -2252,6 +2264,13 @@ public:
       switch (token) {
       case hexasm::Token::PROLOGUE: {
         auto prologue = dynamic_cast<Prologue*>(instr.get());
+        auto name = prologue->getSymbol()->getName();
+        if (prologue->getSymbol()->getType() == SymbolType::FUNC) {
+          cb.genFunc(name);
+        }
+        if (prologue->getSymbol()->getType() == SymbolType::PROC) {
+          cb.genProc(name);
+        }
         // Save current stack pointer.
         cb.genLDBM(SP_OFFSET);
         cb.genSTAI(0);
