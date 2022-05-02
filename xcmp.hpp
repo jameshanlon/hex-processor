@@ -1771,6 +1771,8 @@ const int SP_OFFSET = 1;
 const int SP_INIT_VALUE = 1 << 16;
 const int SP_LINK_VALUE_OFFSET = 0;
 const int SP_RETURN_VALUE_OFFSET = 1;
+const int FB_PARAM_OFFSET_FUNC = 2;
+const int FB_PARAM_OFFSET_PROC = 1;
 
 enum class Reg { A, B };
 
@@ -2055,9 +2057,9 @@ public:
     currentFrame->setOffset(stackOffset);
   }
 
-  void loadActuals(const std::vector<std::unique_ptr<Expr>> &args) {
+  void loadActuals(const std::vector<std::unique_ptr<Expr>> &args, size_t parameterOffset) {
     size_t stackOffset = currentFrame->getOffset();
-    size_t parameterIndex = 2;
+    size_t parameterIndex = parameterOffset;
     currentFrame->setOffset(0); // Parameters follow return value.
     for (auto &arg : args) {
       if (containsCall(arg.get())) {
@@ -2085,8 +2087,8 @@ public:
     auto stackOffset = currentFrame->getOffset();
     // Actual parameters.
     genCallActuals(args);
-    loadActuals(args);
-    currentFrame->setSize(args.size() + 2);
+    loadActuals(args, FB_PARAM_OFFSET_FUNC);
+    currentFrame->setSize(args.size() + FB_PARAM_OFFSET_FUNC);
     // Perform syscall.
     genLDAC(syscallId);
     genOPR(hexasm::Token::SVC);
@@ -2100,8 +2102,8 @@ public:
     auto stackOffset = currentFrame->getOffset();
     // Actual parameters.
     genCallActuals(args);
-    loadActuals(args);
-    currentFrame->setSize(args.size() + 2);
+    loadActuals(args, FB_PARAM_OFFSET_FUNC);
+    currentFrame->setSize(args.size() + FB_PARAM_OFFSET_FUNC);
     // Branch and link.
     auto linkLabel = getLabel();
     genLDAP(linkLabel);
@@ -2117,8 +2119,8 @@ public:
     auto stackOffset = currentFrame->getOffset();
     // Actual parameters.
     genCallActuals(args);
-    loadActuals(args);
-    currentFrame->setSize(args.size() + 1);
+    loadActuals(args, FB_PARAM_OFFSET_PROC);
+    currentFrame->setSize(args.size() + FB_PARAM_OFFSET_PROC);
     // Branch and link.
     auto linkLabel = getLabel();
     genLDAP(linkLabel);
@@ -2149,7 +2151,9 @@ public:
   void setCurrentFrameSize(size_t size) { currentFrame->setSize(size); }
 };
 
-/// Assign stack locations to function/process formal parameters.
+/// Assign stack locations to function/process formal parameters, represented
+/// by frame-base offsets into the previous (caller) frame. Offset by 1 for
+/// procs for the saved PC slot, and 2 for funcs for the return value slot.
 class FormalLocations : public AstVisitor {
   SymbolTable &st;
   std::shared_ptr<Frame> &frame;
@@ -2329,7 +2333,7 @@ public:
       case hexasm::Token::LDBI_FB:
       case hexasm::Token::STAI_FB: {
         auto oldInstr = dynamic_cast<InstrStackOffset*>(instr.get());
-        int newOffset = oldInstr->getFrame()->getSize() - oldInstr->getOffset();
+        int newOffset = oldInstr->getFrame()->getSize() + oldInstr->getOffset();
         switch (token) {
         case hexasm::Token::LDAI_FB: cb.genLDAI(newOffset); break;
         case hexasm::Token::LDBI_FB: cb.genLDBI(newOffset); break;

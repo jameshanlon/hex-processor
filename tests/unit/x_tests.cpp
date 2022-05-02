@@ -17,7 +17,7 @@ proc main () is skip
   runXProgram(program);
 }
 
-BOOST_AUTO_TEST_CASE(hello_run) {
+BOOST_AUTO_TEST_CASE(hello_world_1) {
   auto program = R"(
 val put = 1;
 proc main () is {
@@ -33,6 +33,30 @@ proc main () is {
   put('l', 0);
   put('d', 0);
   put('\n', 0)
+}
+)";
+  runXProgram(program);
+  BOOST_TEST(simOutBuffer.str() == "hello world\n");
+}
+
+BOOST_AUTO_TEST_CASE(hello_world_2) {
+  auto program = R"(
+val put = 1;
+proc putval(val c) is put(c, 0)
+proc newline() is putval('\n')
+proc main() is {
+  putval('h');
+  putval('e');
+  putval('l');
+  putval('l');
+  putval('o');
+  putval(' ');
+  putval('w');
+  putval('o');
+  putval('r');
+  putval('l');
+  putval('d');
+  newline()
 }
 )";
   runXProgram(program);

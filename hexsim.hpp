@@ -44,6 +44,7 @@ class Processor {
   int exitCode;
 
   // State for tracing.
+  uint32_t lastPC;
   size_t cycles;
   size_t maxCycles;
   hex::Instr instrEnum;
@@ -52,14 +53,14 @@ class Processor {
 
   /// Lookup a symbol name given the current PC.
   const char *lookupSymbol() {
-    if (pc < debugInfo[0].second) {
+    if (lastPC < debugInfo[0].second) {
       return nullptr;
     }
     for (size_t i=0; i<debugInfo.size(); i++) {
-      if (i == debugInfo.size() - 1 && pc >= debugInfo[i].second) {
+      if (i == debugInfo.size() - 1 && lastPC >= debugInfo[i].second) {
         return debugInfo[i].first.c_str();
       }
-      if (pc >= debugInfo[i].second && pc < debugInfo[i+1].second) {
+      if (lastPC >= debugInfo[i].second && lastPC < debugInfo[i+1].second) {
         return debugInfo[i].first.c_str();
       }
     }
@@ -70,7 +71,8 @@ public:
 
   Processor(std::istream &in, std::ostream &out, size_t maxCycles=0) :
     pc(0), areg(0), breg(0), oreg(0), io(in, out), out(out),
-    running(true), tracing(false), cycles(0), maxCycles(maxCycles) {}
+    running(true), tracing(false), lastPC(0), cycles(0),
+    maxCycles(maxCycles) {}
 
   void setTracing(bool value) { tracing = value; }
 
@@ -158,12 +160,14 @@ public:
       auto symbolName = lookupSymbol();
       std::string symbolInfo;
       if (symbolName) {
-        auto symbolOffset = pc - debugInfoMap[symbolName];
+        auto symbolOffset = lastPC - debugInfoMap[symbolName];
         symbolInfo = (boost::format("%s+%d") % symbolName % symbolOffset).str();
       }
-      out << boost::format("%-6d %-6d %-12s %-4s %-2d ") % cycles % pc % symbolInfo % instrEnumToStr(instrEnum) % (instr & 0xF);
+      out << boost::format("%-6d %-6d %-12s %-4s %-2d ")
+               % cycles % lastPC % symbolInfo % instrEnumToStr(instrEnum) % (instr & 0xF);
     } else {
-      out << boost::format("%-6d %-6d %-4s %-2d ") % cycles % pc % instrEnumToStr(instrEnum) % (instr & 0xF);
+      out << boost::format("%-6d %-6d %-4s %-2d ")
+               % cycles % lastPC % instrEnumToStr(instrEnum) % (instr & 0xF);
     }
     switch (instrEnum) {
       case hex::Instr::LDAM:
@@ -249,6 +253,7 @@ public:
     while (running &&
            (maxCycles > 0 ? cycles <= maxCycles : true)) {
       instr = (memory[pc >> 2] >> ((pc & 0x3) << 3)) & 0xFF;
+      lastPC = pc;
       pc = pc + 1;
       oreg = oreg | (instr & 0xF);
       instrEnum = static_cast<hex::Instr>((instr >> 4) & 0xF);
