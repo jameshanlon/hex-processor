@@ -17,9 +17,10 @@ static void help(const char *argv[]) {
   std::cout << "Positional arguments:\n";
   std::cout << "  file A binary file to simulate\n\n";
   std::cout << "Optional arguments:\n";
-  std::cout << "  -h,--help  Display this message\n";
-  std::cout << "  -d,--dump  Dump the binary file contents\n";
-  std::cout << "  -t,--trace Enable instruction tracing\n";
+  std::cout << "  -h,--help       Display this message\n";
+  std::cout << "  -d,--dump       Dump the binary file contents\n";
+  std::cout << "  -t,--trace      Enable instruction tracing\n";
+  std::cout << "  --max-cycles N  Limit the number of simulation cycles (default: 0)\n";
 }
 
 int main(int argc, const char *argv[]) {
@@ -27,6 +28,7 @@ int main(int argc, const char *argv[]) {
     const char *filename = nullptr;
     bool dumpBinary = false;
     bool trace = false;
+    size_t maxCycles = 0;
     for (unsigned i = 1; i < argc; ++i) {
       if (std::strcmp(argv[i], "-d") == 0 ||
           std::strcmp(argv[i], "--dump") == 0) {
@@ -34,6 +36,8 @@ int main(int argc, const char *argv[]) {
       } else if (std::strcmp(argv[i], "-t") == 0 ||
                  std::strcmp(argv[i], "--trace") == 0) {
         trace = true;
+      } else if (std::strcmp(argv[i], "--max-cycles") == 0) {
+        maxCycles = std::stoull(argv[++i]);
       } else if (std::strcmp(argv[i], "-h") == 0 ||
                  std::strcmp(argv[i], "--help") == 0) {
         help(argv);
@@ -51,7 +55,7 @@ int main(int argc, const char *argv[]) {
       help(argv);
       return 1;
     }
-    hexsim::Processor p(std::cin, std::cout);
+    hexsim::Processor p(std::cin, std::cout, maxCycles);
     p.setTracing(trace);
     p.load(filename, dumpBinary);
     if (dumpBinary) {

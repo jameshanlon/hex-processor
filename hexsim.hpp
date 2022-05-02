@@ -43,7 +43,8 @@ class Processor {
   int exitCode;
 
   // State for tracing.
-  uint64_t cycles;
+  size_t cycles;
+  size_t maxCycles;
   hex::Instr instrEnum;
   std::vector<std::pair<std::string, unsigned>> debugInfo;
 
@@ -65,8 +66,9 @@ class Processor {
 
 public:
 
-  Processor(std::istream &in, std::ostream &out) :
-    pc(0), areg(0), breg(0), oreg(0), io(in, out), out(out), running(true), tracing(false), cycles(0) {}
+  Processor(std::istream &in, std::ostream &out, size_t maxCycles=0) :
+    pc(0), areg(0), breg(0), oreg(0), io(in, out), out(out),
+    running(true), tracing(false), cycles(0), maxCycles(maxCycles) {}
 
   void setTracing(bool value) { tracing = value; }
 
@@ -238,7 +240,8 @@ public:
   }
 
   int run() {
-    while (running) {
+    while (running &&
+           (maxCycles > 0 ? cycles <= maxCycles : true)) {
       instr = (memory[pc >> 2] >> ((pc & 0x3) << 3)) & 0xFF;
       pc = pc + 1;
       oreg = oreg | (instr & 0xF);

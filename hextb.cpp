@@ -100,7 +100,7 @@ int run(const std::unique_ptr<VerilatedContext> &contextp,
   top->i_clk = 0;
 
   while (!contextp->gotFinish() &&
-         (maxCycles > 0 ? cycle_count < maxCycles : true)) {
+         (maxCycles > 0 ? cycle_count <= maxCycles : true)) {
     contextp->timeInc(1);
     // Toggle the clock.
     top->i_clk = !top->i_clk;
