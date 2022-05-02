@@ -2130,8 +2130,13 @@ public:
   /// Reporting -------------------------------------------------------------//
   void emitInstrs(std::ostream &out) {
     for (auto &directive : instrs) {
+      if (directive->getToken() == hexasm::Token::PROC ||
+          directive->getToken() == hexasm::Token::FUNC) {
+        out << "\n";
+      }
       out << boost::format("%-20s\n") % directive->toString();
     }
+    out << "\n";
     for (auto &directive : data) {
       out << boost::format("%-20s\n") % directive->toString();
     }

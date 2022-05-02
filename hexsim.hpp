@@ -100,7 +100,6 @@ public:
 
     // Read debug data (if present).
     if (remainingFileSize > programSize) {
-      //std::cout << "Reading debug data\n";
       // Strings.
       uint32_t numStrings;
       file.read(reinterpret_cast<char*>(&numStrings), sizeof(uint32_t));
@@ -110,7 +109,6 @@ public:
         char c = file.get();
         std::string s;
         while (c != '\0') {
-          //std::cout << c << "\n";
           s += c;
           c = file.get();
         }
@@ -142,7 +140,6 @@ public:
 
   void traceSyscall() {
     unsigned spWordIndex = memory[1];
-    out << "spWordIndex="<<spWordIndex<<"\n";
     switch (static_cast<hex::Syscall>(areg)) {
       case hex::Syscall::EXIT:
         out << boost::format("exit %d\n") % memory[spWordIndex+2];
