@@ -100,6 +100,10 @@ int main(int argc, const char *argv[]) {
 
     xcmp::SymbolTable symbolTable;
 
+    // Populate the symbol table;
+    xcmp::CreateSymbols createSymbols(symbolTable);
+    tree->accept(&createSymbols);
+
     // Constant propagation.
     xcmp::ConstProp constProp(symbolTable);
     tree->accept(&constProp);

@@ -127,6 +127,8 @@ struct TestContext {
     }
     auto tree = parser.parseProgram();
     xcmp::SymbolTable symbolTable;
+    xcmp::CreateSymbols createSymbols(symbolTable);
+    tree->accept(&createSymbols);
     xcmp::ConstProp constProp(symbolTable);
     tree->accept(&constProp);
     xcmp::CodeGen xCodeGen(symbolTable);
@@ -155,6 +157,8 @@ struct TestContext {
     }
     auto tree = parser.parseProgram();
     xcmp::SymbolTable symbolTable;
+    xcmp::CreateSymbols createSymbols(symbolTable);
+    tree->accept(&createSymbols);
     xcmp::ConstProp constProp(symbolTable);
     tree->accept(&constProp);
     xcmp::CodeGen xCodeGen(symbolTable);

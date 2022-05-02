@@ -1643,14 +1643,14 @@ public:
 };
 
 //===---------------------------------------------------------------------===//
-// Symbol table construction adn constant propagation.
+// Symbol table construction.
 //===---------------------------------------------------------------------===//
 
-class ConstProp : public AstVisitor {
+class CreateSymbols : public AstVisitor {
   SymbolTable &symbolTable;
   std::stack<SymbolScope> scope;
 public:
-  ConstProp(SymbolTable &symbolTable) : symbolTable(symbolTable) {}
+  CreateSymbols(SymbolTable &symbolTable) : symbolTable(symbolTable) {}
   virtual void visitPre(Program&) {
     scope.push(SymbolScope::GLOBAL);
   }
@@ -1674,11 +1674,6 @@ public:
   void visitPre(ValDecl &decl) {
     symbolTable.insert(decl.getName(), std::make_unique<Symbol>(SymbolType::VAL, scope.top(), &decl, decl.getName()));
   }
-  void visitPost(ValDecl &decl) {
-    if (decl.getExpr()->isConst()) {
-      decl.setValue(decl.getExpr()->getValue());
-    }
-  }
   void visitPre(ValFormal &formal) {
     symbolTable.insert(formal.getName(), std::make_unique<Symbol>(SymbolType::VAL, scope.top(), &formal, formal.getName()));
   }
@@ -1690,6 +1685,21 @@ public:
   }
   void visitPre(FuncFormal &formal) {
     symbolTable.insert(formal.getName(), std::make_unique<Symbol>(SymbolType::FUNC, scope.top(), &formal, formal.getName()));
+  }
+};
+
+//===---------------------------------------------------------------------===//
+// Constant propagation.
+//===---------------------------------------------------------------------===//
+
+class ConstProp : public AstVisitor {
+  SymbolTable &symbolTable;
+public:
+  ConstProp(SymbolTable &symbolTable) : symbolTable(symbolTable) {}
+  void visitPost(ValDecl &decl) {
+    if (decl.getExpr()->isConst()) {
+      decl.setValue(decl.getExpr()->getValue());
+    }
   }
   void visitPost(BinaryOpExpr &expr) {
     auto LHS = expr.getLHS();
