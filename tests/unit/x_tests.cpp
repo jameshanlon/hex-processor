@@ -187,4 +187,8 @@ BOOST_AUTO_TEST_CASE(parser_token_error_stmt_invalid) {
   BOOST_CHECK_THROW(asmXProgram(program), xcmp::ParserTokenError);
 }
 
+// Semantic errors.
+
+// TODO: NonConstArrayLengthError
+
 BOOST_AUTO_TEST_SUITE_END();
