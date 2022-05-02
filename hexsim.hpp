@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstring>
 #include <exception>
+#include <map>
 #include <fstream>
 #include <iostream>
 #include <boost/format.hpp>
@@ -47,11 +48,12 @@ class Processor {
   size_t maxCycles;
   hex::Instr instrEnum;
   std::vector<std::pair<std::string, unsigned>> debugInfo;
+  std::map<std::string, unsigned> debugInfoMap;
 
   /// Lookup a symbol name given the current PC.
   const char *lookupSymbol() {
     if (pc < debugInfo[0].second) {
-      return "";
+      return nullptr;
     }
     for (size_t i=0; i<debugInfo.size(); i++) {
       if (i == debugInfo.size() - 1 && pc >= debugInfo[i].second) {
@@ -61,7 +63,7 @@ class Processor {
         return debugInfo[i].first.c_str();
       }
     }
-    return "";
+    return nullptr;
   }
 
 public:
@@ -125,6 +127,7 @@ public:
         file.read(reinterpret_cast<char*>(&byteOffset), sizeof(uint32_t));
         //std::cout << "symbol " << strings[strIndex] << " " << std::to_string(byteOffset) << "\n";
         debugInfo.push_back(std::make_pair(strings[strIndex], byteOffset));
+        debugInfoMap[strings[strIndex]] = byteOffset;
       }
     }
 
@@ -155,9 +158,15 @@ public:
 
   void trace(uint32_t instr, hex::Instr instrEnum) {
     if (debugInfo.size()) {
-      out << boost::format("%-6d %-16s %-6s %-4d") % pc % lookupSymbol() % instrEnumToStr(instrEnum) % (instr & 0xF);
+      auto symbolName = lookupSymbol();
+      std::string symbolInfo;
+      if (symbolName) {
+        auto symbolOffset = pc - debugInfoMap[symbolName];
+        symbolInfo = (boost::format("%s+%d") % symbolName % symbolOffset).str();
+      }
+      out << boost::format("%-6d %-6d %-12s %-4s %-2d ") % cycles % pc % symbolInfo % instrEnumToStr(instrEnum) % (instr & 0xF);
     } else {
-      out << boost::format("%-6d %-6s %-4d") % pc % instrEnumToStr(instrEnum) % (instr & 0xF);
+      out << boost::format("%-6d %-6d %-4s %-2d ") % cycles % pc % instrEnumToStr(instrEnum) % (instr & 0xF);
     }
     switch (instrEnum) {
       case hex::Instr::LDAM:
