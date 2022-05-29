@@ -11,13 +11,15 @@
 BOOST_FIXTURE_TEST_SUITE(x_tests, TestContext);
 
 BOOST_AUTO_TEST_CASE(empty_run) {
+  // The simplest program.
   auto program = R"(
 proc main () is skip
 )";
   runXProgram(program);
 }
 
-BOOST_AUTO_TEST_CASE(hello_world_1) {
+BOOST_AUTO_TEST_CASE(hello_world_simple) {
+  // The most basic hello world example.
   auto program = R"(
 val put = 1;
 proc main () is {
@@ -39,7 +41,8 @@ proc main () is {
   BOOST_TEST(simOutBuffer.str() == "hello world\n");
 }
 
-BOOST_AUTO_TEST_CASE(hello_world_2) {
+BOOST_AUTO_TEST_CASE(hello_world_putval) {
+  // Demonstrate a syscall from within a process call.
   auto program = R"(
 val put = 1;
 proc putval(val c) is put(c, 0)
@@ -63,7 +66,44 @@ proc main() is {
   BOOST_TEST(simOutBuffer.str() == "hello world\n");
 }
 
+BOOST_AUTO_TEST_CASE(putval_indirect) {
+  // Demonstrate indirection of the character values through a function.
+  // Requires the process call to have correctly generated call actuals.
+  auto program = R"(
+val put = 1;
+func foo(val c) is return c
+proc putval(val c) is put(c, 0)
+proc newline() is putval('\n')
+proc main() is {
+  putval('x');
+  putval(foo('y'));
+  newline()
+}
+)";
+  runXProgram(program);
+  BOOST_TEST(simOutBuffer.str() == "xy\n");
+}
+
+BOOST_AUTO_TEST_CASE(putval_multiple_indirect) {
+  // Demonstrate multiple indirection of the character values through a function.
+  auto program = R"(
+val put = 1;
+func foo(val c) is return c
+proc putval(val c) is put(c, 0)
+proc newline() is putval('\n')
+proc main() is {
+  putval(foo('x'));
+  putval(foo(foo('y')));
+  putval(foo(foo(foo('z'))));
+  newline()
+}
+)";
+  runXProgram(program);
+  BOOST_TEST(simOutBuffer.str() == "xyz\n");
+}
+
 BOOST_AUTO_TEST_CASE(xhexb_run) {
+  // Demonstrate the xhexb.x can be parsed into an AST.
   treeXProgram(getXTestPath("xhexb.x"), true);
 }
 
@@ -189,6 +229,10 @@ BOOST_AUTO_TEST_CASE(parser_token_error_stmt_invalid) {
 
 // Semantic errors.
 
-// TODO: NonConstArrayLengthError
+// Enable when (global) arrays are handled.
+//BOOST_AUTO_TEST_CASE(semantics_non_const_array_length_error) {
+//  auto program = "var x; array foo[x]; proc main () is skip";
+//  BOOST_CHECK_THROW(asmXProgram(program), xcmp::NonConstArrayLengthError);
+//}
 
 BOOST_AUTO_TEST_SUITE_END();

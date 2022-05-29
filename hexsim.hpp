@@ -215,13 +215,13 @@ public:
       case hex::Instr::OPR:
         switch (static_cast<hex::OprInstr>(oreg)) {
           case hex::OprInstr::BRB:
-            out << boost::format("pc = breg (%#08x)\n") % breg;
+            out << boost::format("BRB pc = breg (%#08x)\n") % breg;
             break;
           case hex::OprInstr::ADD:
-           out << boost::format("areg = areg (%d) + breg (%d) (%d)\n") % areg % breg % (areg + breg);
+           out << boost::format("ADD areg = areg (%d) + breg (%d) (%d)\n") % areg % breg % (areg + breg);
             break;
           case hex::OprInstr::SUB:
-           out << boost::format("areg = areg (%d) - breg (%d) (%d)\n") % areg % breg % (areg - breg);
+           out << boost::format("SUB areg = areg (%d) - breg (%d) (%d)\n") % areg % breg % (areg - breg);
             break;
           case hex::OprInstr::SVC:
             traceSyscall();

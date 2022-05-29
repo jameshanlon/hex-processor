@@ -515,7 +515,12 @@ class CallStatement;
 class AssStatement;
 
 /// A visitor base class for the AST.
-struct AstVisitor {
+class AstVisitor {
+  bool recurseCalls;
+
+public:
+  AstVisitor(bool recurseCalls=true) : recurseCalls(recurseCalls) {}
+  bool shouldRecurseCalls() const { return recurseCalls; }
   virtual void visitPre(Program&) {}
   virtual void visitPost(Program&) {}
   virtual void visitPre(Proc&) {}
@@ -631,8 +636,10 @@ public:
       Expr(location), sysCallId(-1), name(name), args(std::move(args)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    for (auto &arg : args) {
-      arg->accept(visitor);
+    if (visitor->shouldRecurseCalls()) {
+      for (auto &arg : args) {
+        arg->accept(visitor);
+      }
     }
     visitor->visitPost(*this);
   }
@@ -846,7 +853,9 @@ public:
     expr->accept(visitor);
     visitor->visitPost(*this);
   }
+  Expr *getExpr() { return expr.get(); }
 };
+
 
 class IfStatement : public Statement {
   std::unique_ptr<Expr> condition;
@@ -1587,15 +1596,18 @@ enum class SymbolScope {
 };
 
 class Frame {
-  size_t size;   // The size of the frame.
-  size_t offset; // The current stack pointer offset value.
+  size_t size;           // The size of the frame.
+  size_t offset;         // The current stack pointer offset value.
+  std::string exitLabel; // Procedure exit.
+
 public:
-  Frame() : size(0) {}
+  Frame(std::string exitLabel) : size(0), offset(0), exitLabel(exitLabel) {}
   void setSize(int newSize) { size = newSize > size ? newSize : size; }
   int getSize() { return size; }
   void incOffset(int amount) { offset += amount; }
   void setOffset(int value) { offset = value; }
   size_t getOffset() { return offset; }
+  const std::string &getExitLabel() const { return exitLabel; }
 };
 
 /// A class to represent a symbol in the program, recording type, scope, AST
@@ -1891,7 +1903,7 @@ public:
     SymbolTable &st;
     CodeBuffer &cb;
   public:
-    ExprCodeGen(SymbolTable &st, CodeBuffer &cb) : st(st), cb(cb) {}
+    ExprCodeGen(SymbolTable &st, CodeBuffer &cb) : AstVisitor(false), st(st), cb(cb) {}
     void visitPost(BinaryOpExpr &expr) {
       if (expr.isConst()) {
         cb.genConst(Reg::A, expr.getValue());
@@ -1925,6 +1937,7 @@ public:
       } else {
         cb.genProcCall(expr.getName(), expr.getArgs());
       }
+      // The recursion must halt here.
     }
     void visitPost(ArraySubscriptExpr &expr) {
       // generate array subscript
@@ -2050,7 +2063,7 @@ public:
         // been resolved.
         genExpr(arg.get());
         genLDBM(SP_OFFSET);
-        genSTAI_FB(currentFrame, currentFrame->getOffset());
+        genSTAI_FB(currentFrame, currentFrame->getOffset() - 1);
         currentFrame->incOffset(1);
       }
     }
@@ -2060,14 +2073,13 @@ public:
   void loadActuals(const std::vector<std::unique_ptr<Expr>> &args, size_t parameterOffset) {
     size_t stackOffset = currentFrame->getOffset();
     size_t parameterIndex = parameterOffset;
-    currentFrame->setOffset(0); // Parameters follow return value.
     for (auto &arg : args) {
       if (containsCall(arg.get())) {
         // For each actual expression containing one or more calls, load the
         // expression value saved to a temporary stack location and store it
         // to the actual parameter location.
         genLDAM(SP_OFFSET);
-        genLDAI_FB(currentFrame, currentFrame->getOffset());
+        genLDAI_FB(currentFrame, currentFrame->getOffset() - 1);
         genLDBM(SP_OFFSET);
         genSTAI(parameterIndex);
         currentFrame->incOffset(1);
@@ -2092,7 +2104,7 @@ public:
     // Perform syscall.
     genLDAC(syscallId);
     genOPR(hexasm::Token::SVC);
-    // Load any return value.
+    // Load any return value into areg.
     genLDAM(SP_OFFSET);
     genLDAI(SP_RETURN_VALUE_OFFSET);
     currentFrame->setOffset(stackOffset);
@@ -2133,7 +2145,8 @@ public:
   void emitInstrs(std::ostream &out) {
     for (auto &directive : instrs) {
       if (directive->getToken() == hexasm::Token::PROC ||
-          directive->getToken() == hexasm::Token::FUNC) {
+          directive->getToken() == hexasm::Token::FUNC ||
+          directive->getToken() == hexasm::Token::PROLOGUE) {
         out << "\n";
       }
       out << boost::format("%-20s\n") % directive->toString();
@@ -2149,23 +2162,25 @@ public:
   std::vector<std::unique_ptr<hexasm::Directive>> &getData() { return data; }
   void setCurrentFrame(Frame *frame) { currentFrame = frame; }
   void setCurrentFrameSize(size_t size) { currentFrame->setSize(size); }
+  Frame *getCurrentFrame() { return currentFrame; }
 };
 
 /// Assign stack locations to function/process formal parameters, represented
 /// by frame-base offsets into the previous (caller) frame. Offset by 1 for
-/// procs for the saved PC slot, and 2 for funcs for the return value slot.
+/// processes to account for the link address slot, and 2 for functions for
+/// the link and return value slots.
 class FormalLocations : public AstVisitor {
   SymbolTable &st;
   std::shared_ptr<Frame> &frame;
-  size_t count;
+  size_t frameBaseOffset;
   void assignLocation(Formal &formal) {
     auto symbol = st.lookup(formal.getName(), formal.getLocation());
-    symbol->setStackOffset(count++);
+    symbol->setStackOffset(frameBaseOffset++);
     symbol->setFrame(frame);
   }
 public:
   FormalLocations(SymbolTable &st, std::shared_ptr<Frame> &frame, bool isFunction) :
-    st(st), frame(frame), count(isFunction ? 2 : 1) {}
+    st(st), frame(frame), frameBaseOffset(isFunction ? FB_PARAM_OFFSET_FUNC : FB_PARAM_OFFSET_PROC) {}
   void visitPost(ValFormal &formal) { assignLocation(formal); }
   void visitPost(ArrayFormal &formal) { assignLocation(formal); }
   void visitPost(ProcFormal &formal) { assignLocation(formal); }
@@ -2217,10 +2232,11 @@ public:
 
   void visitPost(Program &tree) {}
 
+  /// Procedure call setup.
   void visitPre(Proc &proc) {
     // Setup a frame object for the proc/func.
     auto symbol = symbolTable.lookup(proc.getName(), proc.getLocation());
-    auto frame = std::make_shared<Frame>();
+    auto frame = std::make_shared<Frame>(cb.getLabel());
     symbol->setFrame(frame);
     cb.setCurrentFrame(symbol->getFrame());
     // Allocate storage locations to formals.
@@ -2233,24 +2249,34 @@ public:
     cb.genPrologue(symbol);
   }
 
+  /// Proceudre call completion.
   void visitPost(Proc &proc) {
     auto symbol = symbolTable.lookup(proc.getName(), proc.getLocation());
     cb.genEpilogue(symbol);
   }
 
-  void visitPre(SkipStatement&) {}
-  void visitPost(SkipStatement&) {}
-  void visitPre(StopStatement&) {}
-  void visitPost(StopStatement&) {}
-  void visitPre(ReturnStatement&) {}
-  void visitPost(ReturnStatement&) {}
+  void visitPost(SkipStatement&) {
+    // Do nothing.
+  }
+
+  void visitPost(StopStatement&) {
+    // SVC exit <value>
+  }
+
+  void visitPost(ReturnStatement &stmt) {
+    // Check: A process cannot contain a return.
+    // Check: A function must end with a return.
+    cb.genExpr(stmt.getExpr());
+    cb.genBR(cb.getCurrentFrame()->getExitLabel());
+  }
+
   void visitPre(IfStatement&) {}
   void visitPost(IfStatement&) {}
   void visitPre(WhileStatement&) {}
   void visitPost(WhileStatement&) {}
   void visitPre(SeqStatement&) {}
   void visitPost(SeqStatement&) {}
-  void visitPre(CallStatement&) {}
+
   void visitPost(CallStatement &stmt) {
     if (stmt.getCall()->isSysCall()) {
       cb.genSysCall(stmt.getCall()->getSysCallId(), stmt.getCall()->getArgs());
@@ -2258,6 +2284,7 @@ public:
       cb.genProcCall(stmt.getCall()->getName(), stmt.getCall()->getArgs());
     }
   }
+
   void visitPre(AssStatement&) {}
   void visitPost(AssStatement&) {}
 
@@ -2293,25 +2320,31 @@ public:
         // Save current stack pointer.
         cb.genLDBM(SP_OFFSET);
         cb.genSTAI(0);
-        // Extend the stack pointer by the frame size.
-        cb.genLDAC(-prologue->getFrame()->getSize());
-        cb.genOPR(hexasm::Token::ADD);
-        cb.genSTAM(SP_OFFSET);
+        if (prologue->getFrame()->getSize() > 0) {
+          // Extend the stack pointer by the frame size.
+          cb.genLDAC(-prologue->getFrame()->getSize());
+          cb.genOPR(hexasm::Token::ADD);
+          cb.genSTAM(SP_OFFSET);
+        }
         break;
       }
       case hexasm::Token::EPILOGUE: {
         auto epilogue = dynamic_cast<Epilogue*>(instr.get());
         auto frameSize = epilogue->getFrame()->getSize();
+        cb.genLabel(epilogue->getFrame()->getExitLabel());
         // Function
         if (epilogue->getSymbol()->getType() == SymbolType::FUNC) {
           // Store return value in areg.
           cb.genLDBM(SP_OFFSET);
           cb.genSTAI(frameSize + 1);
-          // Contract the stack poiner.
-          cb.genLDAC(frameSize);
-          cb.genOPR(hexasm::Token::ADD);
-          cb.genSTAM(SP_OFFSET);
+          if (epilogue->getFrame()->getSize() > 0) {
+            // Contract the stack poiner.
+            cb.genLDAC(frameSize);
+            cb.genOPR(hexasm::Token::ADD);
+            cb.genSTAM(SP_OFFSET);
+          }
           // Branch back to the caller.
+          // breg holds unadjusted SP.
           cb.genLDBI(frameSize);
           cb.genOPR(hexasm::Token::BRB);
           break;
@@ -2324,6 +2357,7 @@ public:
           cb.genOPR(hexasm::Token::ADD);
           cb.genSTAM(SP_OFFSET);
           // Branch back to the caller.
+          // breg holds unadjusted SP.
           cb.genLDBI(frameSize);
           cb.genOPR(hexasm::Token::BRB);
           break;
