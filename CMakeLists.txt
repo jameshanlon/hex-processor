@@ -12,8 +12,12 @@ find_package(Boost 1.68.0 REQUIRED COMPONENTS
 find_package(Python3 REQUIRED COMPONENTS
              Interpreter)
 
+# Use local find scripts
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
+
 option(USE_VERILATOR "Use Verilator for simulation" ON)
 option(USE_YOSYS     "Use Yosys for synthesis" ON)
+option(BUILD_DOCS    "Create and install HTML documentation" OFF)
 
 # Verilator
 if (USE_VERILATOR)
@@ -74,3 +78,7 @@ endif()
 enable_testing()
 add_subdirectory(synth)
 add_subdirectory(tests)
+
+if (BUILD_DOCS)
+  add_subdirectory(docs)
+endif()
