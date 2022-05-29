@@ -25,6 +25,8 @@ jobs:
       run:  |
         cd / # Workaround for pip installing binaries into '/home/runner/.local/bin'
         sudo python3 -m pip install --upgrade pip
+        sudo python3 -m pip install -r ${{github.workspace}}/docs/requirements.txt
+
     - name: Create build environment
       run: cmake -E make_directory ${{github.workspace}}/build
 
