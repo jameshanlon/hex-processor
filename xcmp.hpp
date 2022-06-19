@@ -1937,7 +1937,8 @@ public:
       } else {
         cb.genProcCall(expr.getName(), expr.getArgs());
       }
-      // The recursion must halt here.
+      // The recursion must halt here, which is controlled by
+      // AstVisitor::shouldRecurseCalls()
     }
     void visitPost(ArraySubscriptExpr &expr) {
       // generate array subscript
@@ -2260,6 +2261,7 @@ public:
   }
 
   void visitPost(StopStatement&) {
+    // TODO
     // SVC exit <value>
   }
 
@@ -2270,12 +2272,17 @@ public:
     cb.genBR(cb.getCurrentFrame()->getExitLabel());
   }
 
-  void visitPre(IfStatement&) {}
-  void visitPost(IfStatement&) {}
-  void visitPre(WhileStatement&) {}
-  void visitPost(WhileStatement&) {}
-  void visitPre(SeqStatement&) {}
-  void visitPost(SeqStatement&) {}
+  void visitPost(IfStatement&) {
+    // TODO
+  }
+
+  void visitPost(WhileStatement&) {
+    // TODO
+  }
+
+  void visitPost(SeqStatement&) {
+    // TODO
+  }
 
   void visitPost(CallStatement &stmt) {
     if (stmt.getCall()->isSysCall()) {
@@ -2285,8 +2292,9 @@ public:
     }
   }
 
-  void visitPre(AssStatement&) {}
-  void visitPost(AssStatement&) {}
+  void visitPost(AssStatement&) {
+    // TODO
+  }
 
   /// Member access --------------------------------------------------------//
   CodeBuffer &getCodeBuffer() { return cb; }
