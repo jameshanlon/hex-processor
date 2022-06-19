@@ -25,6 +25,12 @@ $ source env/bin/activate
 $ pip install -r docs/requirements.txt
 ```
 
+Ubuntu requirements:
+
+```bash
+apt update && apt install build-essential cmake libboost-all-dev
+```
+
 Then, configure and run a build with CMake:
 
 ```bash
