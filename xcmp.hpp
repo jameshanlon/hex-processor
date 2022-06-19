@@ -123,7 +123,7 @@ static const char *tokenEnumStr(Token token) {
   default:
     throw std::runtime_error(std::string("unexpected token: ")+std::to_string(static_cast<int>(token)));
   }
-};
+}
 
 static bool isBinaryOp(Token token) {
   switch (token) {
@@ -1602,7 +1602,7 @@ class Frame {
 
 public:
   Frame(std::string exitLabel) : size(0), offset(0), exitLabel(exitLabel) {}
-  void setSize(int newSize) { size = newSize > size ? newSize : size; }
+  void setSize(size_t newSize) { size = newSize > size ? newSize : size; }
   int getSize() { return size; }
   void incOffset(int amount) { offset += amount; }
   void setOffset(int value) { offset = value; }

@@ -8,7 +8,7 @@
 // Unit tests for assembly programs.
 //===---------------------------------------------------------------------===//
 
-BOOST_FIXTURE_TEST_SUITE(asm_tests, TestContext);
+BOOST_FIXTURE_TEST_SUITE(asm_tests, TestContext)
 
 BOOST_AUTO_TEST_CASE(exit_tokens) {
   auto output = tokHexProgram(getAsmTestPath("exit0.S"), true).str();
@@ -105,4 +105,4 @@ BOOST_AUTO_TEST_CASE(error_unknown_label) {
   BOOST_CHECK_THROW(asmHexProgram(program), hexasm::UnknownLabelError);
 }
 
-BOOST_AUTO_TEST_SUITE_END();
+BOOST_AUTO_TEST_SUITE_END()

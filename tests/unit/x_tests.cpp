@@ -8,7 +8,7 @@
 // Unit tests for X programs.
 //===---------------------------------------------------------------------===//
 
-BOOST_FIXTURE_TEST_SUITE(x_tests, TestContext);
+BOOST_FIXTURE_TEST_SUITE(x_tests, TestContext)
 
 BOOST_AUTO_TEST_CASE(empty_run) {
   // The simplest program.
@@ -235,4 +235,4 @@ BOOST_AUTO_TEST_CASE(parser_token_error_stmt_invalid) {
 //  BOOST_CHECK_THROW(asmXProgram(program), xcmp::NonConstArrayLengthError);
 //}
 
-BOOST_AUTO_TEST_SUITE_END();
+BOOST_AUTO_TEST_SUITE_END()

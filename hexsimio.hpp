@@ -57,6 +57,6 @@ public:
 
 };
 
-}; // End namespace hex.
+} // End namespace hex.
 
 #endif // HEX_SIM_IO_HPP

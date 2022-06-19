@@ -29,7 +29,7 @@ int main(int argc, const char *argv[]) {
     bool dumpBinary = false;
     bool trace = false;
     size_t maxCycles = 0;
-    for (unsigned i = 1; i < argc; ++i) {
+    for (int i = 1; i < argc; ++i) {
       if (std::strcmp(argv[i], "-d") == 0 ||
           std::strcmp(argv[i], "--dump") == 0) {
         dumpBinary = true;

@@ -157,7 +157,7 @@ int main(int argc, const char** argv) {
     const char *filename = nullptr;
     bool trace = false;
     size_t maxCycles = 0;
-    for (unsigned i = 1; i < argc; ++i) {
+    for (int i = 1; i < argc; ++i) {
       if (std::strcmp(argv[i], "-h") == 0 ||
           std::strcmp(argv[i], "--help") == 0) {
         help(argv);

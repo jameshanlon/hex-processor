@@ -42,6 +42,6 @@ const char *instrEnumToStr(Instr instr);
 const char *oprInstrEnumToStr(OprInstr oprInstr);
 const char *syscallEnumToStr(Syscall syscall);
 
-}; // End namespace hex.
+} // End namespace hex.
 
 #endif // HEX_HPP

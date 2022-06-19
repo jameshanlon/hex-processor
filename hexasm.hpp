@@ -128,7 +128,7 @@ static const char *tokenEnumStr(Token token) {
   default:
     throw std::runtime_error(std::string("unexpected token: ")+std::to_string(static_cast<int>(token)));
   }
-};
+}
 
 static hex::Instr tokenToInstr(Token token) {
   switch (token) {
@@ -204,7 +204,7 @@ struct UnknownLabelError : public Error {
 //===---------------------------------------------------------------------===//
 
 /// Return the number of 4-bit immediates required to represent the value.
-static size_t numNibbles(int value) {
+static int numNibbles(int value) {
   if (value == 0) {
     return 1;
   }
@@ -215,7 +215,7 @@ static size_t numNibbles(int value) {
   if (value < 0) {
     value = std::abs(value);
   }
-  size_t n = 1;
+  int n = 1;
   while (value >= 16) {
     value >>= 4;
     n++;
@@ -239,7 +239,7 @@ static int instrLen(int labelOffset, int byteOffset) {
 // Directive data types.
 //===---------------------------------------------------------------------===//
 
-size_t numNibbles(int value);
+int numNibbles(int value);
 
 // Base class for all directives.
 class Directive {

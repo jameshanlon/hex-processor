@@ -49,7 +49,7 @@ int main(int argc, const char *argv[]) {
     bool asmOnly = false;
     const char *filename = nullptr;
     const char *outputFilename = "a.out";
-    for (unsigned i = 1; i < argc; ++i) {
+    for (int i = 1; i < argc; ++i) {
       if (std::strcmp(argv[i], "-h") == 0 ||
           std::strcmp(argv[i], "--help") == 0) {
         help(argv);
