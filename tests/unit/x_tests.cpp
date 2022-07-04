@@ -102,6 +102,20 @@ proc main() is {
   BOOST_TEST(simOutBuffer.str() == "xyz\n");
 }
 
+BOOST_AUTO_TEST_CASE(binop_const_breg) {
+  // Materialise constant RHS value into breg.
+  auto program = R"(
+val put = 1;
+func foo(val c) is return c + 1
+proc main() is {
+  put(foo('a'), 0);
+  put('\n', 0)
+}
+)";
+  runXProgram(program);
+  BOOST_TEST(simOutBuffer.str() == "b\n");
+}
+
 BOOST_AUTO_TEST_CASE(xhexb_run) {
   // Demonstrate the xhexb.x can be parsed into an AST.
   treeXProgram(getXTestPath("xhexb.x"), true);

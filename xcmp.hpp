@@ -516,10 +516,13 @@ class AssStatement;
 
 /// A visitor base class for the AST.
 class AstVisitor {
+  bool recurseBinop;
   bool recurseCalls;
 
 public:
-  AstVisitor(bool recurseCalls=true) : recurseCalls(recurseCalls) {}
+  AstVisitor(bool recurseBinop=true, bool recurseCalls=true) :
+    recurseBinop(recurseBinop), recurseCalls(recurseCalls) {}
+  bool shouldRecurseBinop() const { return recurseBinop; }
   bool shouldRecurseCalls() const { return recurseCalls; }
   virtual void visitPre(Program&) {}
   virtual void visitPost(Program&) {}
@@ -711,7 +714,7 @@ public:
       Expr(location), op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    if (!isConst()) {
+    if (!isConst() && visitor->shouldRecurseBinop()) {
       LHS->accept(visitor);
       RHS->accept(visitor);
     }
@@ -1902,31 +1905,74 @@ public:
   class ExprCodeGen : public AstVisitor {
     SymbolTable &st;
     CodeBuffer &cb;
+    Reg reg;
   public:
-    ExprCodeGen(SymbolTable &st, CodeBuffer &cb) : AstVisitor(false), st(st), cb(cb) {}
+    ExprCodeGen(SymbolTable &st, CodeBuffer &cb, Reg reg) :
+      AstVisitor(false, false), st(st), cb(cb), reg(reg) {}
+    /// Return true if the expr needs to be materialised in an A register.
+    bool needsAReg(Expr *expr) {
+      return !(expr->isConst() || dynamic_cast<StringExpr*>(expr) || dynamic_cast<VarRefExpr*>(expr));
+    }
+    void visitPre(BinaryOpExpr &expr) {
+      // LHS materialise in areg.
+      // RHS materialise in breg.
+      if (needsAReg(expr.getRHS())) {
+        auto currentFrame = cb.getCurrentFrame();
+        size_t stackOffset = cb.getCurrentFrame()->getOffset();
+        // Gen RHS and save to stack.
+        cb.genExpr(expr.getRHS());
+        currentFrame->incOffset(1);
+        currentFrame->setSize(currentFrame->getSize() + 1);
+        cb.genLDBM(SP_OFFSET);
+        cb.genSTAI_FB(currentFrame, currentFrame->getOffset() - 1);
+        // Gen LHS.
+        cb.genExpr(expr.getLHS());
+        // Restore RHS from stack into breg.
+        cb.genLDBM(SP_OFFSET);
+        cb.genLDBI_FB(currentFrame, currentFrame->getOffset() - 1);
+        currentFrame->setOffset(stackOffset);
+      } else {
+        cb.genExpr(expr.getLHS());
+        cb.genExpr(expr.getRHS(), Reg::B);
+      }
+    }
     void visitPost(BinaryOpExpr &expr) {
       if (expr.isConst()) {
         cb.genConst(Reg::A, expr.getValue());
       } else {
         // generate binary op
-        // generate bool for not, and, or, eq, ls
+        // TODO
+        switch (expr.getOp()) {
+          case Token::PLUS:  cb.genADD(); break;
+          case Token::MINUS: cb.genSUB(); break;
+          case Token::OR:    break;
+          case Token::AND:   break;
+          case Token::EQ:    break;
+          case Token::NE:    break;
+          case Token::LS:    break;
+          case Token::LE:    break;
+          case Token::GR:    break;
+          case Token::GE:    break;
+          default: break;
+        }
       }
     }
     void visitPost(UnaryOpExpr &expr) {
       if (expr.isConst()) {
-        cb.genConst(Reg::A, expr.getValue());
+        cb.genConst(reg, expr.getValue());
       } else {
         // generate unary op
+        // TODO
       }
     }
     void visitPost(StringExpr &expr) {
-      cb.genString(Reg::A, expr.getValue());
+      cb.genString(reg, expr.getValue());
     }
     void visitPost(BooleanExpr &expr) {
-      cb.genConst(Reg::A, expr.getValue());
+      cb.genConst(reg, expr.getValue());
     }
     void visitPost(NumberExpr &expr) {
-      cb.genConst(Reg::A, expr.getValue());
+      cb.genConst(reg, expr.getValue());
     }
     void visitPost(CallExpr &expr) {
       auto symbol = st.lookup(expr.getName(), expr.getLocation());
@@ -1938,23 +1984,24 @@ public:
         cb.genProcCall(expr.getName(), expr.getArgs());
       }
       // The recursion must halt here, which is controlled by
-      // AstVisitor::shouldRecurseCalls()
+      // AstVisitor::shouldRecurseCalls().
     }
     void visitPost(ArraySubscriptExpr &expr) {
       // generate array subscript
+      // TODO
     }
     void visitPost(VarRefExpr &expr) {
       if (expr.isConst()) {
-        cb.genConst(Reg::A, expr.getValue());
+        cb.genConst(reg, expr.getValue());
       } else {
-        cb.genVar(Reg::A, st.lookup(expr.getName(), expr.getLocation()));
+        cb.genVar(reg, st.lookup(expr.getName(), expr.getLocation()));
       }
     }
   };
 
   /// Generate code for an expression using the Expr visitor.
-  void genExpr(Expr *expr) {
-    ExprCodeGen visitor(symbolTable, *this);
+  void genExpr(Expr *expr, Reg reg=Reg::A) {
+    ExprCodeGen visitor(symbolTable, *this, reg);
     expr->accept(&visitor);
   }
 
@@ -2227,7 +2274,7 @@ public:
     cb.genLabel("_exit");
     cb.genLDBM(SP_OFFSET); // breg = sp
     cb.genLDAC(0); // areg = 0
-    cb.genSTAI(2); // sp[2] = areg (actual param 0)
+    cb.genSTAI(FB_PARAM_OFFSET_FUNC); // sp[2] = areg (actual param 0)
     cb.genSVC();
   }
 
@@ -2262,7 +2309,11 @@ public:
 
   void visitPost(StopStatement&) {
     // TODO
-    // SVC exit <value>
+    // SVC exit 0
+    cb.genLDBM(SP_OFFSET); // breg = sp
+    cb.genLDAC(0); // areg = 0
+    cb.genSTAI(FB_PARAM_OFFSET_FUNC); // sp[2] = areg (actual param 0)
+    cb.genSVC();
   }
 
   void visitPost(ReturnStatement &stmt) {
