@@ -1917,6 +1917,7 @@ public:
       // LHS materialise in areg.
       // RHS materialise in breg.
       if (needsAReg(expr.getRHS())) {
+        // Switch RHS areg into breg after generating LHS.
         auto currentFrame = cb.getCurrentFrame();
         size_t stackOffset = cb.getCurrentFrame()->getOffset();
         // Gen RHS and save to stack.
@@ -1924,12 +1925,12 @@ public:
         currentFrame->incOffset(1);
         currentFrame->setSize(currentFrame->getSize() + 1);
         cb.genLDBM(SP_OFFSET);
-        cb.genSTAI_FB(currentFrame, currentFrame->getOffset() - 1);
+        cb.genSTAI_FB(currentFrame, currentFrame->getOffset());
         // Gen LHS.
         cb.genExpr(expr.getLHS());
         // Restore RHS from stack into breg.
         cb.genLDBM(SP_OFFSET);
-        cb.genLDBI_FB(currentFrame, currentFrame->getOffset() - 1);
+        cb.genLDBI_FB(currentFrame, currentFrame->getOffset());
         currentFrame->setOffset(stackOffset);
       } else {
         cb.genExpr(expr.getLHS());

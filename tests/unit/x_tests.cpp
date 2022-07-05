@@ -4,11 +4,22 @@
 #include <boost/test/unit_test.hpp>
 #include "TestContext.hpp"
 
-//===---------------------------------------------------------------------===//
 // Unit tests for X programs.
-//===---------------------------------------------------------------------===//
 
 BOOST_FIXTURE_TEST_SUITE(x_tests, TestContext)
+
+//===---------------------------------------------------------------------===//
+// Parse xhexb and return the tree.
+//===---------------------------------------------------------------------===//
+
+BOOST_AUTO_TEST_CASE(xhexb_run) {
+  // Demonstrate the xhexb.x can be parsed into an AST.
+  treeXProgram(getXTestPath("xhexb.x"), true);
+}
+
+//===---------------------------------------------------------------------===//
+// Hello world
+//===---------------------------------------------------------------------===//
 
 BOOST_AUTO_TEST_CASE(empty_run) {
   // The simplest program.
@@ -35,8 +46,7 @@ proc main () is {
   put('l', 0);
   put('d', 0);
   put('\n', 0)
-}
-)";
+})";
   runXProgram(program);
   BOOST_TEST(simOutBuffer.str() == "hello world\n");
 }
@@ -60,11 +70,14 @@ proc main() is {
   putval('l');
   putval('d');
   newline()
-}
-)";
+})";
   runXProgram(program);
   BOOST_TEST(simOutBuffer.str() == "hello world\n");
 }
+
+//===---------------------------------------------------------------------===//
+// Procedure calling
+//===---------------------------------------------------------------------===//
 
 BOOST_AUTO_TEST_CASE(putval_indirect) {
   // Demonstrate indirection of the character values through a function.
@@ -78,8 +91,7 @@ proc main() is {
   putval('x');
   putval(foo('y'));
   newline()
-}
-)";
+})";
   runXProgram(program);
   BOOST_TEST(simOutBuffer.str() == "xy\n");
 }
@@ -96,29 +108,74 @@ proc main() is {
   putval(foo(foo('y')));
   putval(foo(foo(foo('z'))));
   newline()
-}
-)";
+})";
   runXProgram(program);
   BOOST_TEST(simOutBuffer.str() == "xyz\n");
 }
 
-BOOST_AUTO_TEST_CASE(binop_const_breg) {
-  // Materialise constant RHS value into breg.
+BOOST_AUTO_TEST_CASE(binop_either_breg) {
+  // Materialise RHS value into breg.
+  // Only possible when it's a const, string or name.
   auto program = R"(
 val put = 1;
 func foo(val c) is return c + 1
+func bar(val c) is return 1 + c
 proc main() is {
   put(foo('a'), 0);
+  put(bar('x'), 0);
   put('\n', 0)
-}
-)";
+})";
   runXProgram(program);
-  BOOST_TEST(simOutBuffer.str() == "b\n");
+  BOOST_TEST(simOutBuffer.str() == "by\n");
 }
 
-BOOST_AUTO_TEST_CASE(xhexb_run) {
-  // Demonstrate the xhexb.x can be parsed into an AST.
-  treeXProgram(getXTestPath("xhexb.x"), true);
+BOOST_AUTO_TEST_CASE(binop_func_plus_const) {
+  // Binop addition with a function call on LHS and RHS.
+  // The '1 + foo()' causes the RHS function call result to be written to the stack.
+  auto program = R"(
+val put = 1;
+func foo(val x) is return x
+proc main() is {
+  put(foo('a') + 1, 0);
+  put(2 + foo('a'), 0);
+  put('\n', 0)
+})";
+  runXProgram(program);
+  BOOST_TEST(simOutBuffer.str() == "bc\n");
+}
+
+BOOST_AUTO_TEST_CASE(binop_func_args) {
+  // Nested binop additions with function calls to supply values, requiring
+  // results to be written to the stack.
+  auto program = R"(
+val put = 1;
+func foo(val x) is return x
+proc main() is {
+  put(foo('a') + foo(1), 0);
+  put(foo('a') + foo(1) + foo(1), 0);
+  put(foo('a') + foo(1) + foo(1) + foo(1), 0);
+  put(foo('a') + foo(1) + foo(1) + foo(1) + foo(1), 0);
+  put(foo('a') + foo(1) + foo(1) + foo(1) + foo(1) + foo(1), 0);
+  put('\n', 0)
+})";
+  runXProgram(program);
+  BOOST_TEST(simOutBuffer.str() == "bcdef\n");
+}
+
+BOOST_AUTO_TEST_CASE(binop_nested_func_args) {
+  // Function call bar that must evaluate a binop with a function call.
+  auto program = R"(
+val put = 1;
+func foo(val x) is return x
+func bar(val x) is return foo(x) + 1
+func baz(val x) is return 1 + foo(x)
+proc main() is {
+  put(bar('a') + 1, 0);
+  put(1 + baz('x'), 0);
+  put('\n', 0)
+})";
+  runXProgram(program);
+  BOOST_TEST(simOutBuffer.str() == "cz\n");
 }
 
 //===---------------------------------------------------------------------===//
