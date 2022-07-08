@@ -9,6 +9,7 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <ostream>
 #include <string>
 #include <stack>
 #include <vector>
@@ -57,7 +58,6 @@ enum class Token {
   IS,
   STOP,
   NOT,
-  NEG,
   VAL,
   STRING,
   TRUE,
@@ -103,7 +103,6 @@ static const char *tokenEnumStr(Token token) {
   case Token::IS:          return "is";
   case Token::STOP:        return "stop";
   case Token::NOT:         return "not";
-  case Token::NEG:         return "-";
   case Token::VAL:         return "val";
   case Token::STRING:      return "string";
   case Token::TRUE:        return "true";
@@ -1746,8 +1745,8 @@ public:
       // Evaluate unary expression.
       int result;
       switch (expr.getOp()) {
-        case Token::MINUS: result = -element->getValue();
-        case Token::NOT:   result = ~element->getValue();
+        case Token::MINUS: result = -element->getValue(); break;
+        case Token::NOT:   result = ~element->getValue(); break;
         default:
           throw SemanticTokenError(expr.getLocation(), "unexpected unary op", expr.getOp());
       }
@@ -2455,6 +2454,126 @@ public:
   std::vector<std::unique_ptr<hexasm::Directive>> &getInstrs() {
     return cb.getInstrs();
   }
+};
+
+//===---------------------------------------------------------------------===//
+// Driver.
+//===---------------------------------------------------------------------===//
+
+enum class DriverAction {
+  EMIT_TOKENS,
+  EMIT_TREE,
+  EMIT_INTERMEDIATE_INSTS,
+  EMIT_LOWERED_INSTS,
+  EMIT_ASM,
+  EMIT_BINARY
+};
+
+class Driver {
+  Lexer lexer;
+  Parser parser;
+  std::ostream &outStream;
+
+public:
+  Driver(std::ostream &outStream) :
+    parser(lexer), outStream(outStream) {}
+
+  int run(DriverAction action,
+          const std::string &input,
+          bool inputIsFilename,
+          const std::string outputBinaryFilename="a.out") {
+
+    // Open the file.
+    if (inputIsFilename) {
+      lexer.openFile(input);
+    } else {
+      lexer.loadBuffer(input);
+    }
+
+    // Tokenise only.
+    if (action == DriverAction::EMIT_TOKENS && action != DriverAction::EMIT_TREE) {
+      lexer.emitTokens(outStream);
+      return 0;
+    }
+
+    // Parse the program.
+    auto tree = parser.parseProgram();
+
+    SymbolTable symbolTable;
+
+    // Populate the symbol table;
+    CreateSymbols createSymbols(symbolTable);
+    tree->accept(&createSymbols);
+
+    // Constant propagation.
+    ConstProp constProp(symbolTable);
+    tree->accept(&constProp);
+
+    // Parse and print program only.
+    if (action == DriverAction::EMIT_TREE) {
+      xcmp::AstPrinter printer(outStream);
+      tree->accept(&printer);
+      return 0;
+    }
+
+    // Perform code generation.
+    CodeGen codeGen(symbolTable);
+    tree->accept(&codeGen);
+
+    // Emit the generated intermediate instructions only.
+    if (action == DriverAction::EMIT_INTERMEDIATE_INSTS) {
+      codeGen.emitInstrs(outStream);
+      return 0;
+    }
+
+    // Lower the generated (intermediate code) to assembly directives.
+    xcmp::LowerDirectives lowerDirectives(symbolTable, codeGen);
+
+    // Emit the lowered instructions only.
+    if (action == DriverAction::EMIT_LOWERED_INSTS) {
+      lowerDirectives.emitInstrs(outStream);
+      return 0;
+    }
+
+    // Assemble the instructions.
+    hexasm::CodeGen asmCodeGen(lowerDirectives.getInstrs());
+
+    // Print the assembly instructions only.
+    if (action == DriverAction::EMIT_ASM) {
+      asmCodeGen.emitProgramText(outStream);
+      return 0;
+    }
+
+    if (action == DriverAction::EMIT_BINARY) {
+      asmCodeGen.emitBin(outputBinaryFilename);
+      return 0;
+    }
+
+    // No action.
+    return 1;
+  }
+
+  int runCatchExceptions(DriverAction action,
+                         const std::string &input,
+                         bool inputIsFilename,
+                         const std::string outputBinaryFilename="a.out") {
+    try {
+      return run(action, input, inputIsFilename, outputBinaryFilename);
+    } catch (const hexutil::Error &e) {
+      if (e.hasLocation()) {
+        std::cerr << boost::format("Error %s: %s\n") % e.getLocation().str() % e.what();
+      } else {
+        std::cerr << boost::format("Error: %s\n") % e.what();
+      }
+      if (lexer.hasLine()) {
+        std::cerr << "  " << lexer.getLine() << "\n";
+      }
+      return 1;
+    }
+  }
+
+  Lexer &getLexer() { return lexer; }
+  Parser &getParser() { return parser; }
 };
 
 } // End namespace xcmp.

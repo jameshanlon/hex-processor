@@ -57,7 +57,11 @@ target_link_libraries(hexasm ${Boost_LIBRARIES})
 add_executable(xcmp hex.cpp xcmp.cpp)
 target_link_libraries(xcmp ${Boost_LIBRARIES})
 
-install(TARGETS hexasm xcmp hexsim
+# Compile and run
+add_executable(xrun hex.cpp xrun.cpp)
+target_link_libraries(xrun ${Boost_LIBRARIES})
+
+install(TARGETS hexasm xcmp xrun hexsim
         DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # Verilator

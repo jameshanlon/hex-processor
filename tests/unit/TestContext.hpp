@@ -86,31 +86,18 @@ struct TestContext {
   /// Convert an X program into tokens.
   std::ostringstream tokeniseXProgram(const std::string &program,
                                       bool isFilename=false) {
-    xcmp::Lexer lexer;
     std::ostringstream outBuffer;
-    if (isFilename) {
-      lexer.openFile(program);
-    } else {
-      lexer.loadBuffer(program);
-    }
-    lexer.emitTokens(outBuffer);
+    xcmp::Driver driver(outBuffer);
+    driver.run(xcmp::DriverAction::EMIT_TOKENS, program, isFilename);
     return outBuffer;
   }
 
   /// Parse and emit the AST of an X program into an output buffer.
   std::ostringstream treeXProgram(const std::string &program,
                                   bool isFilename=false) {
-    xcmp::Lexer lexer;
-    xcmp::Parser parser(lexer);
     std::ostringstream outBuffer;
-    xcmp::AstPrinter printer(outBuffer);
-    if (isFilename) {
-      lexer.openFile(program);
-    } else {
-      lexer.loadBuffer(program);
-    }
-    auto tree = parser.parseProgram();
-    tree->accept(&printer);
+    xcmp::Driver driver(outBuffer);
+    driver.run(xcmp::DriverAction::EMIT_TREE, program, isFilename);
     return outBuffer;
   }
 
@@ -118,28 +105,12 @@ struct TestContext {
   std::ostringstream asmXProgram(const std::string &program,
                                  bool isFilename=false,
                                  bool text=false) {
-    xcmp::Lexer lexer;
-    xcmp::Parser parser(lexer);
-    if (isFilename) {
-      lexer.openFile(program);
-    } else {
-      lexer.loadBuffer(program);
-    }
-    auto tree = parser.parseProgram();
-    xcmp::SymbolTable symbolTable;
-    xcmp::CreateSymbols createSymbols(symbolTable);
-    tree->accept(&createSymbols);
-    xcmp::ConstProp constProp(symbolTable);
-    tree->accept(&constProp);
-    xcmp::CodeGen xCodeGen(symbolTable);
-    tree->accept(&xCodeGen);
-    xcmp::LowerDirectives lowerDirectives(symbolTable, xCodeGen);
-    hexasm::CodeGen hexCodeGen(lowerDirectives.getInstrs());
     std::ostringstream outBuffer;
+    xcmp::Driver driver(outBuffer);
     if (text) {
-      hexCodeGen.emitProgramText(outBuffer);
+      driver.run(xcmp::DriverAction::EMIT_ASM, program, isFilename);
     } else {
-      hexCodeGen.emitProgramBin(outBuffer);
+      driver.run(xcmp::DriverAction::EMIT_BINARY, program, isFilename);
     }
     return outBuffer;
   }
@@ -148,31 +119,13 @@ struct TestContext {
   int runXProgram(const std::string &program,
                   bool isFilename=false) {
     // Compile and assemble the program.
-    xcmp::Lexer lexer;
-    xcmp::Parser parser(lexer);
-    if (isFilename) {
-      lexer.openFile(program);
-    } else {
-      lexer.loadBuffer(program);
-    }
-    auto tree = parser.parseProgram();
-    xcmp::SymbolTable symbolTable;
-    xcmp::CreateSymbols createSymbols(symbolTable);
-    tree->accept(&createSymbols);
-    xcmp::ConstProp constProp(symbolTable);
-    tree->accept(&constProp);
-    xcmp::CodeGen xCodeGen(symbolTable);
-    tree->accept(&xCodeGen);
-    xcmp::LowerDirectives lowerDirectives(symbolTable, xCodeGen);
-    // Assemble.
-    hexasm::CodeGen hexCodeGen(lowerDirectives.getInstrs());
-    hexCodeGen.emitBin("a.bin");
+    xcmp::Driver driver(std::cout);
+    driver.run(xcmp::DriverAction::EMIT_BINARY, program, isFilename, "a.bin");
     // Run the program.
-    hexsim::Processor p(simInBuffer, simOutBuffer);
-    p.load("a.bin");
-    return p.run();
+    hexsim::Processor processor(simInBuffer, simOutBuffer);
+    processor.load("a.bin");
+    return processor.run();
   }
-
 };
 
 #endif // TEST_CONTEXT_HPP
