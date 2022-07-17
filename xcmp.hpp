@@ -102,7 +102,7 @@ static const char *tokenEnumStr(Token token) {
   case Token::FUNC:        return "func";
   case Token::IS:          return "is";
   case Token::STOP:        return "stop";
-  case Token::NOT:         return "not";
+  case Token::NOT:         return "~";
   case Token::VAL:         return "val";
   case Token::STRING:      return "string";
   case Token::TRUE:        return "true";
@@ -489,6 +489,7 @@ public:
 // Concrete AstNode forward references.
 class Proc;
 class Program;
+class Expr;
 class ArrayDecl;
 class ValDecl;
 class VarDecl;
@@ -517,12 +518,18 @@ class AssStatement;
 class AstVisitor {
   bool recurseBinop;
   bool recurseCalls;
+  // Useful reference "Visitor Pattern, replacing objects" on this strategy.
+  // https://softwareengineering.stackexchange.com/questions/313783/visitor-pattern-replacing-objects
+  std::unique_ptr<Expr> exprReplacement;
 
 public:
   AstVisitor(bool recurseBinop=true, bool recurseCalls=true) :
-    recurseBinop(recurseBinop), recurseCalls(recurseCalls) {}
+    recurseBinop(recurseBinop), recurseCalls(recurseCalls), exprReplacement(nullptr) {}
   bool shouldRecurseBinop() const { return recurseBinop; }
   bool shouldRecurseCalls() const { return recurseCalls; }
+  bool hasExprReplacement() const { return exprReplacement != nullptr; }
+  void setExprReplacement(std::unique_ptr<Expr> expr) { exprReplacement = std::move(expr); }
+  std::unique_ptr<Expr> &getExprReplacement() { return exprReplacement; }
   virtual void visitPre(Program&) {}
   virtual void visitPost(Program&) {}
   virtual void visitPre(Proc&) {}
@@ -579,11 +586,18 @@ public:
 class AstNode {
   Location location;
 public:
-  AstNode() : location(Location(0,0)) {}
+  AstNode() : location(Location(0, 0)) {}
   AstNode(Location location) : location(location) {}
   virtual ~AstNode() = default;
   virtual void accept(AstVisitor* visitor) = 0;
   const Location &getLocation() const { return location; }
+  void replaceExpr(std::unique_ptr<Expr> &expr, AstVisitor *visitor) {
+    // If the visitor wishes to replcae the expression, it will have created a
+    // replacement, which can be moved in place of the original.
+    if (visitor->hasExprReplacement()) {
+      expr = std::move(visitor->getExprReplacement());
+    }
+  }
 };
 
 // Expressions ============================================================= //
@@ -604,6 +618,8 @@ public:
   VarRefExpr(Location location, std::string name) : Expr(location), name(name) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
+    //expr->accept(visitor);
+    //replaceExpr(expr, visitor);
     visitor->visitPost(*this);
   }
   const std::string &getName() const { return name; }
@@ -618,6 +634,7 @@ public:
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     expr->accept(visitor);
+    replaceExpr(expr, visitor);
     visitor->visitPost(*this);
   }
   const std::string &getName() const { return name; }
@@ -641,6 +658,7 @@ public:
     if (visitor->shouldRecurseCalls()) {
       for (auto &arg : args) {
         arg->accept(visitor);
+        replaceExpr(arg, visitor);
       }
     }
     visitor->visitPost(*this);
@@ -698,11 +716,12 @@ public:
     visitor->visitPre(*this);
     if (!isConst()) {
       element->accept(visitor);
+      replaceExpr(element, visitor);
     }
     visitor->visitPost(*this);
   }
   Token getOp() const { return op; }
-  Expr *getElement() const { return element.get(); }
+  std::unique_ptr<Expr> &getElement() { return element; }
 };
 
 class BinaryOpExpr : public Expr {
@@ -715,7 +734,9 @@ public:
     visitor->visitPre(*this);
     if (!isConst() && visitor->shouldRecurseBinop()) {
       LHS->accept(visitor);
+      replaceExpr(LHS, visitor);
       RHS->accept(visitor);
+      replaceExpr(RHS, visitor);
     }
     visitor->visitPost(*this);
   }
@@ -742,6 +763,7 @@ public:
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     expr->accept(visitor);
+    replaceExpr(expr, visitor);
     visitor->visitPost(*this);
   }
   Expr *getExpr() const { return expr.get(); }
@@ -766,6 +788,7 @@ public:
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     expr->accept(visitor);
+    replaceExpr(expr, visitor);
     visitor->visitPost(*this);
   }
   int getSize() {
@@ -853,6 +876,7 @@ public:
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     expr->accept(visitor);
+    replaceExpr(expr, visitor);
     visitor->visitPost(*this);
   }
   Expr *getExpr() { return expr.get(); }
@@ -875,6 +899,7 @@ public:
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     condition->accept(visitor);
+    replaceExpr(condition, visitor);
     thenStmt->accept(visitor);
     elseStmt->accept(visitor);
     visitor->visitPost(*this);
@@ -894,6 +919,9 @@ public:
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     condition->accept(visitor);
+    if (visitor->hasExprReplacement()) {
+      condition = std::move(visitor->getExprReplacement());
+    }
     stmt->accept(visitor);
     visitor->visitPost(*this);
   }
@@ -920,6 +948,7 @@ public:
       Statement(location), call(std::move(call)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
+    // Note that this does not allow replacement of the expr.
     call->accept(visitor);
     visitor->visitPost(*this);
   }
@@ -936,7 +965,9 @@ public:
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     LHS->accept(visitor);
+    replaceExpr(LHS, visitor);
     RHS->accept(visitor);
+    replaceExpr(RHS, visitor);
     visitor->visitPost(*this);
   }
 };
@@ -1740,7 +1771,7 @@ public:
     }
   }
   void visitPost(UnaryOpExpr &expr) {
-    auto element = expr.getElement();
+    auto &element = expr.getElement();
     if (element->isConst()) {
       // Evaluate unary expression.
       int result;
@@ -1773,6 +1804,24 @@ public:
     auto symbol = symbolTable.lookup(expr.getName(), expr.getLocation());
     if (auto symbolExpr = dynamic_cast<const ValDecl*>(symbol->getNode())) {
       expr.setValue(symbolExpr->getValue());
+    }
+  }
+};
+
+//===---------------------------------------------------------------------===//
+// Optimise expressions.
+//===---------------------------------------------------------------------===//
+
+class OptimiseExpr : public AstVisitor {
+public:
+  OptimiseExpr() {}
+  void visitPost(UnaryOpExpr &expr) {
+    if (expr.getOp() == Token::MINUS) {
+      // Transform -x to 0 - x
+      auto zero = std::make_unique<NumberExpr>(expr.getLocation(), 0);
+      auto replace = std::make_unique<BinaryOpExpr>(expr.getLocation(), expr.getOp(),
+                                                    std::move(zero), std::move(expr.getElement()));
+      setExprReplacement(std::move(replace));
     }
   }
 };
@@ -1957,12 +2006,19 @@ public:
         }
       }
     }
+    void visitPre(UnaryOpExpr &expr) {
+    }
     void visitPost(UnaryOpExpr &expr) {
       if (expr.isConst()) {
         cb.genConst(reg, expr.getValue());
       } else {
         // generate unary op
         // TODO
+        switch (expr.getOp()) {
+          case Token::MINUS: cb.genSUB(); break;
+          case Token::NOT: break;
+          default: break;
+        }
       }
     }
     void visitPost(StringExpr &expr) {
@@ -2317,8 +2373,8 @@ public:
   }
 
   void visitPost(ReturnStatement &stmt) {
-    // Check: A process cannot contain a return.
-    // Check: A function must end with a return.
+    // TODO: Check a process cannot contain a return.
+    // TODO: Check a function must end with a return.
     cb.genExpr(stmt.getExpr());
     cb.genBR(cb.getCurrentFrame()->getExitLabel());
   }
@@ -2508,6 +2564,10 @@ public:
     // Constant propagation.
     ConstProp constProp(symbolTable);
     tree->accept(&constProp);
+
+    // Optimise expressions.
+    OptimiseExpr optimiseExpr;
+    tree->accept(&optimiseExpr);
 
     // Parse and print program only.
     if (action == DriverAction::EMIT_TREE) {
