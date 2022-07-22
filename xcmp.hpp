@@ -607,6 +607,7 @@ class Expr : public AstNode {
 public:
   Expr(Location location) : AstNode(location), constValue(std::nullopt) {}
   bool isConst() const { return constValue.has_value(); }
+  bool isConstZero() const { return isConst() && constValue.value() == 0; }
   int getValue() const { return constValue.value(); }
   void setValue(int newConstValue) { constValue.emplace(newConstValue); }
 };
@@ -667,7 +668,7 @@ public:
   int getSysCallId() const { return sysCallId; }
   void setSysCallId(int value) { sysCallId = value; }
   const std::string &getName() const { return name; }
-  const std::vector<std::unique_ptr<Expr>> &getArgs() const { return args; }
+  const std::vector<std::unique_ptr<Expr>> &getArgs() { return args; }
 };
 
 class NumberExpr : public Expr {
@@ -741,8 +742,8 @@ public:
     visitor->visitPost(*this);
   }
   Token getOp() const { return op; }
-  Expr *getLHS() const { return LHS.get(); }
-  Expr *getRHS() const { return RHS.get(); }
+  std::unique_ptr<Expr> &getLHS() { return LHS; }
+  std::unique_ptr<Expr> &getRHS() { return RHS; }
 };
 
 // Declarations ============================================================ //
@@ -1747,10 +1748,9 @@ public:
     }
   }
   void visitPost(BinaryOpExpr &expr) {
-    auto LHS = expr.getLHS();
-    auto RHS = expr.getRHS();
-    if (LHS->isConst() &&
-        RHS->isConst()) {
+    auto &LHS = expr.getLHS();
+    auto &RHS = expr.getRHS();
+    if (LHS->isConst() && RHS->isConst()) {
       // Evaluate binary expression.
       int result;
       switch (expr.getOp()) {
@@ -1815,6 +1815,51 @@ public:
 class OptimiseExpr : public AstVisitor {
 public:
   OptimiseExpr() {}
+  void visitPost(BinaryOpExpr &expr) {
+    // Translate relational operators ~=, >=, >, <= to expressions only using
+    // <, =, ~.
+    switch (expr.getOp()) {
+      case Token::NE: {
+        // LHS ~= RHS -> not(LHS = RHS)
+        auto eq = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::EQ,
+                                                 std::move(expr.getLHS()),
+                                                 std::move(expr.getRHS()));
+        auto replace = std::make_unique<UnaryOpExpr>(expr.getLocation(),
+                                                     Token::NOT, std::move(eq));
+        setExprReplacement(std::move(replace));
+        break;
+      }
+      case Token::GE: {
+        // LHS >= RHS -> not(LHS < RHS)
+        auto eq = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::LS,
+                                                 std::move(expr.getLHS()),
+                                                 std::move(expr.getRHS()));
+        auto replace = std::make_unique<UnaryOpExpr>(expr.getLocation(),
+                                                     Token::NOT, std::move(eq));
+        setExprReplacement(std::move(replace));
+        break;
+      }
+      case Token::GR: {
+        // LHS > RHS -> RHS < LHS
+        auto replace = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::LS,
+                                                      std::move(expr.getRHS()),
+                                                      std::move(expr.getLHS()));
+        setExprReplacement(std::move(replace));
+        break;
+      }
+      case Token::LE: {
+        // LHS <= RHS -> not(RHS < LHS)
+        auto ls = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::LS,
+                                                 std::move(expr.getRHS()),
+                                                 std::move(expr.getLHS()));
+        auto replace = std::make_unique<UnaryOpExpr>(expr.getLocation(),
+                                                     Token::NOT, std::move(ls));
+        setExprReplacement(std::move(replace));
+        break;
+      }
+      default: break;
+    }
+  }
   void visitPost(UnaryOpExpr &expr) {
     if (expr.getOp() == Token::MINUS) {
       // Transform -x to 0 - x
@@ -1892,7 +1937,8 @@ class CodeBuffer {
   Frame *currentFrame;
 
 public:
-  CodeBuffer(SymbolTable &symbolTable) : symbolTable(symbolTable), constCount(0), stringCount(0) {}
+  CodeBuffer(SymbolTable &symbolTable) :
+    symbolTable(symbolTable), constCount(0), stringCount(0), labelCount(0) {}
 
   const std::string getLabel() { return std::string("lab") + std::to_string(labelCount++); }
   void insertInstr(std::unique_ptr<hexasm::Directive> instr) { instrs.push_back(std::move(instr)); }
@@ -1958,12 +2004,13 @@ public:
     ExprCodeGen(SymbolTable &st, CodeBuffer &cb, Reg reg) :
       AstVisitor(false, false), st(st), cb(cb), reg(reg) {}
     /// Return true if the expr needs to be materialised in an A register.
-    bool needsAReg(Expr *expr) {
-      return !(expr->isConst() || dynamic_cast<StringExpr*>(expr) || dynamic_cast<VarRefExpr*>(expr));
+    bool needsAReg(std::unique_ptr<Expr> &expr) {
+      return !(expr->isConst() || dynamic_cast<StringExpr*>(expr.get()) || dynamic_cast<VarRefExpr*>(expr.get()));
     }
-    void visitPre(BinaryOpExpr &expr) {
-      // LHS materialise in areg.
-      // RHS materialise in breg.
+    void genBinopOperands(BinaryOpExpr &expr) {
+      // For ADD and SUB binary operations:
+      //  - LHS materialise in areg.
+      //  - RHS materialise in breg.
       if (needsAReg(expr.getRHS())) {
         // Switch RHS areg into breg after generating LHS.
         auto currentFrame = cb.getCurrentFrame();
@@ -1989,36 +2036,109 @@ public:
       if (expr.isConst()) {
         cb.genConst(Reg::A, expr.getValue());
       } else {
-        // generate binary op
-        // TODO
+        // Generate a binary op.
         switch (expr.getOp()) {
-          case Token::PLUS:  cb.genADD(); break;
-          case Token::MINUS: cb.genSUB(); break;
-          case Token::OR:    break;
-          case Token::AND:   break;
-          case Token::EQ:    break;
-          case Token::NE:    break;
-          case Token::LS:    break;
-          case Token::LE:    break;
-          case Token::GR:    break;
-          case Token::GE:    break;
-          default: break;
+          case Token::PLUS:
+            genBinopOperands(expr);
+            cb.genADD();
+            break;
+          case Token::MINUS:
+            genBinopOperands(expr);
+            cb.genSUB();
+            break;
+          case Token::AND: {
+            // Logical AND of operands. If first operand is false, result is
+            // false, otherwise the result is the value of the second operand.
+            auto endLabel = cb.getLabel();
+            cb.genExpr(expr.getLHS());
+            cb.genBRZ(endLabel);
+            cb.genExpr(expr.getRHS());
+            cb.genLabel(endLabel);
+            break;
+          }
+          case Token::OR: {
+            // Logical OR of operands. If the value of the first operand is
+            // true, the result is true, otherwise the result is the value of
+            // the second operand.
+            auto falseLabel = cb.getLabel();
+            auto endLabel = cb.getLabel();
+            cb.genExpr(expr.getLHS());
+            cb.genBRZ(falseLabel);
+            cb.genBR(endLabel);
+            cb.genLabel(falseLabel);
+            cb.genExpr(expr.getRHS());
+            cb.genLabel(endLabel);
+            break;
+          }
+          case Token::EQ: {
+            if (expr.getLHS()->isConstZero()) {
+              cb.genExpr(expr.getRHS());
+            }else if (expr.getRHS()->isConstZero()) {
+              cb.genExpr(expr.getLHS());
+            } else {
+              // Create a new AST node on the fly to generate the expression
+              // 'LHS - RHS'. Note that this modifies the program's AST,
+              // precluding this code from running again.
+              auto subtract = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::MINUS,
+                                                             std::move(expr.getLHS()),
+                                                             std::move(expr.getRHS()));
+              cb.genExpr(subtract.get());
+            }
+            auto trueLabel = cb.getLabel();
+            auto endLabel = cb.getLabel();
+            cb.genBRZ(trueLabel); // Equal if result is zero.
+            cb.genLDAC(0);
+            cb.genBR(endLabel);
+            cb.genLabel(trueLabel);
+            cb.genLDAC(1);
+            cb.genLabel(endLabel);
+            break;
+          }
+          case Token::LS: {
+            // LHS < RHS -> LHS - RHS < 0
+            if (expr.getRHS()->isConstZero()) {
+              // If RHS is zero, then only consider is LHS is negative.
+              cb.genExpr(expr.getLHS());
+            } else {
+              // Compute LHS - RHS.
+              auto subtract = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::MINUS,
+                                                             std::move(expr.getLHS()),
+                                                             std::move(expr.getRHS()));
+              cb.genExpr(subtract.get());
+            }
+            auto trueLabel = cb.getLabel();
+            auto endLabel = cb.getLabel();
+            cb.genBRN(trueLabel);
+            cb.genLDAC(0);
+            cb.genBR(endLabel);
+            cb.genLabel(trueLabel);
+            cb.genLDAC(1);
+            cb.genLabel(endLabel);
+            break;
+          }
+          default:
+            // TODO: no other ops expected.
+            break;
         }
       }
-    }
-    void visitPre(UnaryOpExpr &expr) {
     }
     void visitPost(UnaryOpExpr &expr) {
       if (expr.isConst()) {
         cb.genConst(reg, expr.getValue());
       } else {
-        // generate unary op
-        // TODO
-        switch (expr.getOp()) {
-          case Token::MINUS: cb.genSUB(); break;
-          case Token::NOT: break;
-          default: break;
+        // Generate unary logical ~ op.
+        if (expr.getOp() == Token::NOT) {
+          auto trueLabel = cb.getLabel();
+          auto endLabel = cb.getLabel();
+          cb.genExpr(expr.getElement());
+          cb.genBRZ(trueLabel); // False -> True
+          cb.genLDAC(0);
+          cb.genBR(endLabel);
+          cb.genLabel(trueLabel);
+          cb.genLDAC(1);
+          cb.genLabel(endLabel);
         }
+        // TODO: else no other ops expected.
       }
     }
     void visitPost(StringExpr &expr) {
@@ -2056,13 +2176,18 @@ public:
   };
 
   /// Generate code for an expression using the Expr visitor.
+  void genExpr(const std::unique_ptr<Expr> &expr, Reg reg=Reg::A) {
+    ExprCodeGen visitor(symbolTable, *this, reg);
+    expr->accept(&visitor);
+  }
+
   void genExpr(Expr *expr, Reg reg=Reg::A) {
     ExprCodeGen visitor(symbolTable, *this, reg);
     expr->accept(&visitor);
   }
 
   /// Return true if the expression contains a call.
-  bool containsCall(Expr *expr) {
+  bool containsCall(const std::unique_ptr<Expr> &expr) {
     ContainsCall visitor;
     expr->accept(&visitor);
     return visitor.getFlag();
@@ -2160,7 +2285,7 @@ public:
   void genCallActuals(const std::vector<std::unique_ptr<Expr>> &args) {
     size_t stackOffset = currentFrame->getOffset();
     for (auto &arg : args) {
-      if (containsCall(arg.get())) {
+      if (containsCall(arg)) {
         // For each actual expression containing one or more calls, allocate a
         // stack word (FB relative) for the result of that call since it cannot
         // be written directly into the parameter slots until all calls have
@@ -2178,7 +2303,7 @@ public:
     size_t stackOffset = currentFrame->getOffset();
     size_t parameterIndex = parameterOffset;
     for (auto &arg : args) {
-      if (containsCall(arg.get())) {
+      if (containsCall(arg)) {
         // For each actual expression containing one or more calls, load the
         // expression value saved to a temporary stack location and store it
         // to the actual parameter location.
