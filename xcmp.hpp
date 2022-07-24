@@ -516,17 +516,20 @@ class AssStatement;
 
 /// A visitor base class for the AST.
 class AstVisitor {
-  bool recurseBinop;
-  bool recurseCalls;
+  bool recurseBinop; // Expr
+  bool recurseCalls; // Expr
+  bool recurseStmts; // Stmts
   // Useful reference "Visitor Pattern, replacing objects" on this strategy.
   // https://softwareengineering.stackexchange.com/questions/313783/visitor-pattern-replacing-objects
   std::unique_ptr<Expr> exprReplacement;
 
 public:
-  AstVisitor(bool recurseBinop=true, bool recurseCalls=true) :
-    recurseBinop(recurseBinop), recurseCalls(recurseCalls), exprReplacement(nullptr) {}
+  AstVisitor(bool recurseBinop=true, bool recurseCalls=true, bool recurseStmts=true) :
+    recurseBinop(recurseBinop), recurseCalls(recurseCalls), recurseStmts(recurseStmts),
+    exprReplacement(nullptr) {}
   bool shouldRecurseBinop() const { return recurseBinop; }
   bool shouldRecurseCalls() const { return recurseCalls; }
+  bool shouldRecurseStmts() const { return recurseStmts; }
   bool hasExprReplacement() const { return exprReplacement != nullptr; }
   void setExprReplacement(std::unique_ptr<Expr> expr) { exprReplacement = std::move(expr); }
   std::unique_ptr<Expr> &getExprReplacement() { return exprReplacement; }
@@ -876,8 +879,10 @@ public:
       Statement(location), expr(std::move(expr)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    expr->accept(visitor);
-    replaceExpr(expr, visitor);
+    if (visitor->shouldRecurseStmts()) {
+      expr->accept(visitor);
+      replaceExpr(expr, visitor);
+    }
     visitor->visitPost(*this);
   }
   Expr *getExpr() { return expr.get(); }
@@ -899,12 +904,17 @@ public:
       elseStmt(std::move(elseStmt)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    condition->accept(visitor);
-    replaceExpr(condition, visitor);
-    thenStmt->accept(visitor);
-    elseStmt->accept(visitor);
+    if (visitor->shouldRecurseStmts()) {
+      condition->accept(visitor);
+      replaceExpr(condition, visitor);
+      thenStmt->accept(visitor);
+      elseStmt->accept(visitor);
+    }
     visitor->visitPost(*this);
   }
+  const std::unique_ptr<Expr> &getCondition() { return condition; }
+  const std::unique_ptr<Statement> &getThenStmt() { return thenStmt; }
+  const std::unique_ptr<Statement> &getElseStmt() { return elseStmt; }
 };
 
 class WhileStatement : public Statement {
@@ -919,11 +929,13 @@ public:
       stmt(std::move(stmt)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    condition->accept(visitor);
-    if (visitor->hasExprReplacement()) {
-      condition = std::move(visitor->getExprReplacement());
+    if (visitor->shouldRecurseStmts()) {
+      condition->accept(visitor);
+      if (visitor->hasExprReplacement()) {
+        condition = std::move(visitor->getExprReplacement());
+      }
+      stmt->accept(visitor);
     }
-    stmt->accept(visitor);
     visitor->visitPost(*this);
   }
 };
@@ -935,8 +947,10 @@ public:
       Statement(location), stmts(std::move(stmts)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    for (auto &stmt : stmts) {
-      stmt->accept(visitor);
+    if (visitor->shouldRecurseStmts()) {
+      for (auto &stmt : stmts) {
+        stmt->accept(visitor);
+      }
     }
     visitor->visitPost(*this);
   }
@@ -949,8 +963,10 @@ public:
       Statement(location), call(std::move(call)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    // Note that this does not allow replacement of the expr.
-    call->accept(visitor);
+    if (visitor->shouldRecurseStmts()) {
+      // Note that this does not allow replacement of the expr.
+      call->accept(visitor);
+    }
     visitor->visitPost(*this);
   }
   CallExpr *getCall() { return call.get(); }
@@ -965,10 +981,12 @@ public:
       Statement(location), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    LHS->accept(visitor);
-    replaceExpr(LHS, visitor);
-    RHS->accept(visitor);
-    replaceExpr(RHS, visitor);
+    if (visitor->shouldRecurseStmts()) {
+      LHS->accept(visitor);
+      replaceExpr(LHS, visitor);
+      RHS->accept(visitor);
+      replaceExpr(RHS, visitor);
+    }
     visitor->visitPost(*this);
   }
 };
@@ -1006,7 +1024,7 @@ public:
   const std::string &getName() const { return name; }
   std::vector<std::unique_ptr<Formal>> &getFormals() { return formals; }
   std::vector<std::unique_ptr<Decl>> &getDecls() { return decls; }
-  Statement *getStatement() { return statement.get(); }
+  const std::unique_ptr<Statement> &getStatement() { return statement; }
 };
 
 class Program : public AstNode {
@@ -2002,7 +2020,7 @@ public:
     Reg reg;
   public:
     ExprCodeGen(SymbolTable &st, CodeBuffer &cb, Reg reg) :
-      AstVisitor(false, false), st(st), cb(cb), reg(reg) {}
+      AstVisitor(false, false, false), st(st), cb(cb), reg(reg) {}
     /// Return true if the expr needs to be materialised in an A register.
     bool needsAReg(std::unique_ptr<Expr> &expr) {
       return !(expr->isConst() || dynamic_cast<StringExpr*>(expr.get()) || dynamic_cast<VarRefExpr*>(expr.get()));
@@ -2175,7 +2193,91 @@ public:
     }
   };
 
-  /// Generate code for an expression using the Expr visitor.
+  class StmtCodeGen : public AstVisitor {
+    SymbolTable &st;
+    CodeBuffer &cb;
+    Reg reg;
+  public:
+    StmtCodeGen(SymbolTable &st, CodeBuffer &cb) :
+      AstVisitor(false, false, false), st(st), cb(cb) {}
+
+    void visitPost(SkipStatement&) {
+      // Do nothing.
+    }
+
+    void visitPost(StopStatement&) {
+      // SVC exit 0
+      cb.genLDBM(SP_OFFSET); // breg = sp
+      cb.genLDAC(0); // areg = 0
+      cb.genSTAI(FB_PARAM_OFFSET_FUNC); // sp[2] = areg (actual param 0)
+      cb.genSVC();
+    }
+
+    void visitPost(ReturnStatement &stmt) {
+      // TODO: Check a process cannot contain a return.
+      // TODO: Check a function must end with a return.
+      // TODO: handle tail function calls
+      cb.genExpr(stmt.getExpr());
+      cb.genBR(cb.getCurrentFrame()->getExitLabel());
+    }
+
+    void visitPost(IfStatement &stmt) {
+      bool skipThen = dynamic_cast<SkipStatement*>(stmt.getThenStmt().get());
+      bool skipElse = dynamic_cast<SkipStatement*>(stmt.getElseStmt().get());
+      if (skipThen && skipElse) {
+        // Do nothing.
+      } else if (skipElse) {
+        // No else branch.
+        auto endLabel = cb.getLabel();
+        cb.genExpr(stmt.getCondition());
+        cb.genBRZ(endLabel);
+        cb.genStmt(stmt.getThenStmt());
+        cb.genLabel(endLabel);
+      } else if (skipThen) {
+        // No then branch.
+        auto elseLabel = cb.getLabel();
+        auto endLabel = cb.getLabel();
+        cb.genExpr(stmt.getCondition());
+        cb.genBRZ(elseLabel);
+        cb.genBR(endLabel);
+        cb.genLabel(elseLabel);
+        cb.genStmt(stmt.getElseStmt());
+        cb.genLabel(endLabel);
+      } else {
+        auto elseLabel = cb.getLabel();
+        auto endLabel = cb.getLabel();
+        cb.genExpr(stmt.getCondition());
+        cb.genBRZ(elseLabel);
+        cb.genStmt(stmt.getThenStmt());
+        cb.genBR(endLabel);
+        cb.genLabel(elseLabel);
+        cb.genStmt(stmt.getElseStmt());
+        cb.genLabel(endLabel);
+      }
+    }
+
+    void visitPost(WhileStatement&) {
+      // TODO
+    }
+
+    void visitPost(SeqStatement&) {
+      // TODO
+    }
+
+    void visitPost(CallStatement &stmt) {
+      if (stmt.getCall()->isSysCall()) {
+        cb.genSysCall(stmt.getCall()->getSysCallId(), stmt.getCall()->getArgs());
+      } else {
+        cb.genProcCall(stmt.getCall()->getName(), stmt.getCall()->getArgs());
+      }
+    }
+
+    void visitPost(AssStatement&) {
+      // TODO
+    }
+  };
+
+  /// Generate code for an expression using the ExprCodeGen visitor.
   void genExpr(const std::unique_ptr<Expr> &expr, Reg reg=Reg::A) {
     ExprCodeGen visitor(symbolTable, *this, reg);
     expr->accept(&visitor);
@@ -2184,6 +2286,12 @@ public:
   void genExpr(Expr *expr, Reg reg=Reg::A) {
     ExprCodeGen visitor(symbolTable, *this, reg);
     expr->accept(&visitor);
+  }
+
+  /// Generate code for a statement using the StmtCodeGen visitor.
+  void genStmt(const std::unique_ptr<Statement> &stmt) {
+    StmtCodeGen visitor(symbolTable, *this);
+    stmt->accept(&visitor);
   }
 
   /// Return true if the expression contains a call.
@@ -2441,7 +2549,8 @@ class CodeGen : public AstVisitor {
   CodeBuffer cb;
 
 public:
-  CodeGen(SymbolTable &symbolTable) : symbolTable(symbolTable), cb(symbolTable) {}
+  CodeGen(SymbolTable &symbolTable) :
+    AstVisitor(false, false, false), symbolTable(symbolTable), cb(symbolTable) {}
 
   void visitPre(Program &tree) {
     // Setup.
@@ -2476,56 +2585,14 @@ public:
     proc.accept(&localDeclLocations);
     // Generate the prologue.
     cb.genPrologue(symbol);
+    // Generate the body.
+    cb.genStmt(proc.getStatement());
   }
 
   /// Proceudre call completion.
   void visitPost(Proc &proc) {
     auto symbol = symbolTable.lookup(proc.getName(), proc.getLocation());
     cb.genEpilogue(symbol);
-  }
-
-  void visitPost(SkipStatement&) {
-    // Do nothing.
-  }
-
-  void visitPost(StopStatement&) {
-    // SVC exit 0
-    cb.genLDBM(SP_OFFSET); // breg = sp
-    cb.genLDAC(0); // areg = 0
-    cb.genSTAI(FB_PARAM_OFFSET_FUNC); // sp[2] = areg (actual param 0)
-    cb.genSVC();
-  }
-
-  void visitPost(ReturnStatement &stmt) {
-    // TODO: Check a process cannot contain a return.
-    // TODO: Check a function must end with a return.
-    // TODO: handle tail function calls
-    cb.genExpr(stmt.getExpr());
-    cb.genBR(cb.getCurrentFrame()->getExitLabel());
-  }
-
-  void visitPost(IfStatement&) {
-    // TODO
-  }
-
-  void visitPost(WhileStatement&) {
-    // TODO
-  }
-
-  void visitPost(SeqStatement&) {
-    // TODO
-  }
-
-  void visitPost(CallStatement &stmt) {
-    if (stmt.getCall()->isSysCall()) {
-      cb.genSysCall(stmt.getCall()->getSysCallId(), stmt.getCall()->getArgs());
-    } else {
-      cb.genProcCall(stmt.getCall()->getName(), stmt.getCall()->getArgs());
-    }
-  }
-
-  void visitPost(AssStatement&) {
-    // TODO
   }
 
   /// Member access --------------------------------------------------------//
