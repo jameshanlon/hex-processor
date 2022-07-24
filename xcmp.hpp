@@ -2489,7 +2489,6 @@ public:
   }
 
   void visitPost(StopStatement&) {
-    // TODO
     // SVC exit 0
     cb.genLDBM(SP_OFFSET); // breg = sp
     cb.genLDAC(0); // areg = 0
@@ -2500,6 +2499,7 @@ public:
   void visitPost(ReturnStatement &stmt) {
     // TODO: Check a process cannot contain a return.
     // TODO: Check a function must end with a return.
+    // TODO: handle tail function calls
     cb.genExpr(stmt.getExpr());
     cb.genBR(cb.getCurrentFrame()->getExitLabel());
   }
