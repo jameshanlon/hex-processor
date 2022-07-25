@@ -947,10 +947,8 @@ public:
       Statement(location), stmts(std::move(stmts)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    if (visitor->shouldRecurseStmts()) {
-      for (auto &stmt : stmts) {
-        stmt->accept(visitor);
-      }
+    for (auto &stmt : stmts) {
+      stmt->accept(visitor);
     }
     visitor->visitPost(*this);
   }
