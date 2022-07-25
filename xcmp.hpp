@@ -938,6 +938,8 @@ public:
     }
     visitor->visitPost(*this);
   }
+  const std::unique_ptr<Expr> &getCondition() { return condition; }
+  const std::unique_ptr<Statement> &getStmt() { return stmt; }
 };
 
 class SeqStatement : public Statement {
@@ -987,6 +989,8 @@ public:
     }
     visitor->visitPost(*this);
   }
+  const std::unique_ptr<Expr> &getLHS() { return LHS; }
+  const std::unique_ptr<Expr> &getRHS() { return RHS; }
 };
 
 // Procedures and functions ================================================= //
@@ -2194,7 +2198,6 @@ public:
   class StmtCodeGen : public AstVisitor {
     SymbolTable &st;
     CodeBuffer &cb;
-    Reg reg;
   public:
     StmtCodeGen(SymbolTable &st, CodeBuffer &cb) :
       AstVisitor(false, false, false), st(st), cb(cb) {}
@@ -2254,12 +2257,19 @@ public:
       }
     }
 
-    void visitPost(WhileStatement&) {
-      // TODO
+    void visitPost(WhileStatement &expr) {
+      auto beginLabel = cb.getLabel();
+      auto endLabel = cb.getLabel();
+      cb.genLabel(beginLabel);
+      cb.genExpr(expr.getCondition());
+      cb.genBRZ(endLabel);
+      cb.genStmt(expr.getStmt());
+      cb.genBR(beginLabel);
+      cb.genLabel(endLabel);
     }
 
     void visitPost(SeqStatement&) {
-      // TODO
+      // Handled by the visitor.
     }
 
     void visitPost(CallStatement &stmt) {
@@ -2270,8 +2280,17 @@ public:
       }
     }
 
-    void visitPost(AssStatement&) {
-      // TODO
+    void visitPost(AssStatement &expr) {
+      cb.genExpr(expr.getRHS());
+      auto *varRefRHS = dynamic_cast<VarRefExpr*>(expr.getLHS().get());
+      if (varRefRHS) {
+        auto var = st.lookup(varRefRHS->getName(), expr.getLocation());
+        auto frameIndex = var->getFrame()->getOffset();
+        cb.genLDBM(SP_OFFSET);
+        cb.genSTAI(frameIndex);
+      } else {
+        // TODO: handle RHS subscript.
+      }
     }
   };
 
