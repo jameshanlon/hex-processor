@@ -40,7 +40,7 @@ int main(int argc, const char *argv[]) {
   try {
 
     // Handle arguments.
-    xcmp::DriverAction driverAction;
+    auto driverAction = xcmp::DriverAction::EMIT_BINARY;
     const char *inputFilename = nullptr;
     const char *outputFilename = "a.out";
     for (int i = 1; i < argc; ++i) {
