@@ -5,11 +5,11 @@ Features:
 - Arithmetic binary and unary operations [DONE, need tests]
 - Boolean binary and unary operations [DONE, need tests]
 - Stop statement [DONE, need tests]
-- If statement
-- Sequence statement
+- If statement [DONE, needs tests]
+- Sequence statement [DONE]
 - Assign statement
 - Global variables
-- Array variables and subscript elements
+- Array variables and subscript elements (LHS and RHS)
 - String constants
 
 Optimisations:
