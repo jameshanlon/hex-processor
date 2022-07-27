@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
         }
       }
     }
-    driver.runCatchExceptions(xcmp::DriverAction::EMIT_BINARY, inputFilename, true, "a.bin");
+    driver.runCatchExceptions(xcmp::DriverAction::EMIT_BINARY, inputFilename, true, "a.bin", false);
     hexsim::Processor processor(std::cin, std::cout, maxCycles);
     processor.setTracing(trace);
     processor.load("a.bin");
