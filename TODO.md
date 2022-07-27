@@ -7,7 +7,7 @@ Features:
 - Stop statement [DONE, need tests]
 - If statement [DONE, needs tests]
 - Sequence statement [DONE]
-- Assign statement
+- Assign statement [DONE, needs tests]
 - Global variables
 - Array variables and subscript elements (LHS and RHS)
 - String constants

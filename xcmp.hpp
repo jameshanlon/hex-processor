@@ -1649,6 +1649,8 @@ enum class SymbolScope {
   LOCAL
 };
 
+class Symbol;
+
 class Frame {
   size_t size;           // The size of the frame.
   size_t offset;         // The current stack pointer offset value.
@@ -2282,12 +2284,12 @@ public:
 
     void visitPost(AssStatement &expr) {
       cb.genExpr(expr.getRHS());
-      auto *varRefRHS = dynamic_cast<VarRefExpr*>(expr.getLHS().get());
-      if (varRefRHS) {
-        auto var = st.lookup(varRefRHS->getName(), expr.getLocation());
-        auto frameIndex = var->getFrame()->getOffset();
+      auto *varRefLHS = dynamic_cast<VarRefExpr*>(expr.getLHS().get());
+      if (varRefLHS) {
+        auto symbol = st.lookup(varRefLHS->getName(), expr.getLocation());
+        auto frameIndex = symbol->getStackOffset();
         cb.genLDBM(SP_OFFSET);
-        cb.genSTAI(frameIndex);
+        cb.genSTAI_FB(symbol->getFrame(), frameIndex);
       } else {
         // TODO: handle RHS subscript.
       }
@@ -2541,11 +2543,11 @@ public:
   void visitPost(FuncFormal &formal) { assignLocation(formal); }
 };
 
-/// Assign stack locations to local variables.
+/// Assign stack locations to local variables, starting from the base of the frame.
 class LocalDeclLocations : public AstVisitor {
   SymbolTable &st;
   std::shared_ptr<Frame> &frame;
-  size_t count;
+  size_t count; // Starts at 1 for the stack offset to account for 0-indexed offsets.
   void assignLocation(Decl &decl, size_t size) {
     auto symbol = st.lookup(decl.getName(), decl.getLocation());
     symbol->setStackOffset(count);
@@ -2554,7 +2556,7 @@ class LocalDeclLocations : public AstVisitor {
   }
 public:
   LocalDeclLocations(SymbolTable &st, std::shared_ptr<Frame> &frame) :
-    st(st), frame(frame), count(0) {}
+    st(st), frame(frame), count(1) {}
   void visitPost(ArrayDecl &decl) { assignLocation(decl, decl.getSize()); }
   void visitPost(VarDecl &decl) { assignLocation(decl, 1); }
   void visitPost(ValDecl &decl) { assignLocation(decl, 1); }
@@ -2722,6 +2724,35 @@ public:
 };
 
 //===---------------------------------------------------------------------===//
+// Report frame contents.
+//===---------------------------------------------------------------------===//
+
+class ReportFrameInfo : public AstVisitor {
+  SymbolTable &symbolTable;
+  std::ostream &outs;
+  void reportFrame(Frame *frame,
+                   Proc &proc,
+                   std::ostream& outs = std::cout) {
+    outs << boost::format("Frame for %s\n") % proc.getName();
+    outs << "  Size: " << frame->getSize() << "\n";
+    outs << "  Symbols:\n";
+    for (auto &decl : proc.getDecls()) {
+      auto symbol = symbolTable.lookup(decl->getName(), decl->getLocation());
+      outs << boost::format("    %s, FB index %d \n")
+                % symbol->getName() % symbol->getStackOffset();
+    }
+    outs << "\n";
+  }
+public:
+  ReportFrameInfo(SymbolTable &symbolTable, std::ostream &outs) :
+    AstVisitor(false, false, false), symbolTable(symbolTable), outs(outs) {}
+  void visitPost(Proc &proc) {
+    auto procSymbol = symbolTable.lookup(proc.getName(), proc.getLocation());
+    reportFrame(procSymbol->getFrame(), proc);
+  }
+};
+
+//===---------------------------------------------------------------------===//
 // Driver.
 //===---------------------------------------------------------------------===//
 
@@ -2746,7 +2777,8 @@ public:
   int run(DriverAction action,
           const std::string &input,
           bool inputIsFilename,
-          const std::string outputBinaryFilename="a.out") {
+          const std::string outputBinaryFilename="a.out",
+          bool reportFrameInfo=false) {
 
     // Open the file.
     if (inputIsFilename) {
@@ -2798,6 +2830,12 @@ public:
     // Lower the generated (intermediate code) to assembly directives.
     xcmp::LowerDirectives lowerDirectives(symbolTable, codeGen);
 
+    // Report frame information.
+    if (reportFrameInfo) {
+      xcmp::ReportFrameInfo reportFrameInfo(symbolTable, std::cout);
+      tree->accept(&reportFrameInfo);
+    }
+
     // Emit the lowered instructions only.
     if (action == DriverAction::EMIT_LOWERED_INSTS) {
       lowerDirectives.emitInstrs(outStream);
@@ -2825,9 +2863,10 @@ public:
   int runCatchExceptions(DriverAction action,
                          const std::string &input,
                          bool inputIsFilename,
-                         const std::string outputBinaryFilename="a.out") {
+                         const std::string outputBinaryFilename="a.out",
+                         bool reportFrameInfo=false) {
     try {
-      return run(action, input, inputIsFilename, outputBinaryFilename);
+      return run(action, input, inputIsFilename, outputBinaryFilename, reportFrameInfo);
     } catch (const hexutil::Error &e) {
       if (e.hasLocation()) {
         std::cerr << boost::format("Error %s: %s\n") % e.getLocation().str() % e.what();
