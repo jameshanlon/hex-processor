@@ -1898,7 +1898,7 @@ public:
 //===---------------------------------------------------------------------===//
 
 const int SP_OFFSET = 1;
-const int SP_INIT_VALUE = 1 << 16;
+const int MAX_ADDRESS = 1 << 16;
 const int SP_LINK_VALUE_OFFSET = 0;
 const int SP_RETURN_VALUE_OFFSET = 1;
 const int FB_PARAM_OFFSET_FUNC = 2;
@@ -1912,6 +1912,12 @@ public:
   bool operandIsLabel() const { return false; }
   size_t getSize() const { return 0; }
   int getValue() const { return 0; }
+};
+
+class SPValue : public IntermediateDirective {
+public:
+  SPValue() : IntermediateDirective(hexasm::Token::SP_VALUE) {}
+  std::string toString() const { return "SP_VALUE"; }
 };
 
 /// Procedure/function prologue.
@@ -1995,9 +2001,14 @@ public:
   void genBRN(std::string label)  { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::BRN, label, true)); }
   void genOPR(hexasm::Token op)   { instrs.push_back(std::make_unique<hexasm::InstrOp>(hexasm::Token::OPR, op)); }
 
-  /// Procedure calling and frame-base relative accesses -------------------///
+  /// Intermediate instruction for placeholder SP value --------------------///
+  void genSPValue() { instrs.push_back(std::make_unique<SPValue>()); }
+
+  /// Intermediate instructions for procedure calling ----------------------///
   void genPrologue(Symbol *symbol) { instrs.push_back(std::make_unique<Prologue>(symbol)); }
   void genEpilogue(Symbol *symbol) { instrs.push_back(std::make_unique<Epilogue>(symbol)); }
+
+  /// Intermediate instructions for frame-base relative accesses -----------///
   void genLDAI_FB(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::LDAI_FB, frame, offset)); }
   void genLDBI_FB(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::LDBI_FB, frame, offset)); }
   void genSTAI_FB(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::STAI_FB, frame, offset)); }
@@ -2564,17 +2575,22 @@ public:
 
 /// Walk the AST and generate intermediate code.
 class CodeGen : public AstVisitor {
-  SymbolTable &symbolTable;
+  SymbolTable &st;
   CodeBuffer cb;
+  size_t globalsOffset;
+
+  void assignGlobalLocation(Decl &decl, size_t size) {
+  }
 
 public:
   CodeGen(SymbolTable &symbolTable) :
-    AstVisitor(false, false, false), symbolTable(symbolTable), cb(symbolTable) {}
+    AstVisitor(false, false, false), st(symbolTable), cb(symbolTable),
+    globalsOffset(0) {}
 
   void visitPre(Program &tree) {
     // Setup.
     cb.genBR("start"); // Branch to the start.
-    cb.genInstrData(SP_INIT_VALUE); // Initialise the stack pointer
+    cb.genSPValue(); // Placeholder for the stack pointer value.
     cb.genLabel("start");
     // Branch and link to main().
     cb.genLDAP("_exit");
@@ -2592,15 +2608,15 @@ public:
   /// Procedure call setup.
   void visitPre(Proc &proc) {
     // Setup a frame object for the proc/func.
-    auto symbol = symbolTable.lookup(proc.getName(), proc.getLocation());
+    auto symbol = st.lookup(proc.getName(), proc.getLocation());
     auto frame = std::make_shared<Frame>(cb.getLabel());
     symbol->setFrame(frame);
     cb.setCurrentFrame(symbol->getFrame());
     // Allocate storage locations to formals.
-    FormalLocations formalLocations(symbolTable, frame, proc.isFunction());
+    FormalLocations formalLocations(st, frame, proc.isFunction());
     proc.accept(&formalLocations);
     // Allocate storage locations to local declarations.
-    LocalDeclLocations localDeclLocations(symbolTable, frame);
+    LocalDeclLocations localDeclLocations(st, frame);
     proc.accept(&localDeclLocations);
     // Generate the prologue.
     cb.genPrologue(symbol);
@@ -2610,12 +2626,35 @@ public:
 
   /// Proceudre call completion.
   void visitPost(Proc &proc) {
-    auto symbol = symbolTable.lookup(proc.getName(), proc.getLocation());
+    auto symbol = st.lookup(proc.getName(), proc.getLocation());
     cb.genEpilogue(symbol);
+  }
+
+  /// Global variables. Allocate a word with a DATA directive and assign them
+  /// a label.
+  void visitPost(VarDecl &decl) {
+    auto symbol = st.lookup(decl.getName(), decl.getLocation());
+    auto label = cb.getLabel();
+    symbol->setGlobalLabel(label);
+    cb.genLabel(label);
+    cb.genData(0);
+  }
+
+  /// Global arrays. Allocate space at the end of memory, generate a DATA
+  /// directive with the address and assign it a label.
+  void visitPost(ArrayDecl &decl) {
+    auto symbol = st.lookup(decl.getName(), decl.getLocation());
+    size_t address = MAX_ADDRESS - globalsOffset;
+    globalsOffset += decl.getSize();
+    auto label = cb.getLabel();
+    symbol->setGlobalLabel(label);
+    cb.genLabel(label);
+    cb.genData(address);
   }
 
   /// Member access --------------------------------------------------------//
   CodeBuffer &getCodeBuffer() { return cb; }
+  size_t getGlobalsOffset() const { return globalsOffset; }
   void emitInstrs(std::ostream &out) { cb.emitInstrs(out); }
 };
 
@@ -2634,6 +2673,10 @@ public:
     for (auto &instr : cg.getCodeBuffer().getInstrs()) {
       auto token = instr->getToken();
       switch (token) {
+      case hexasm::Token::SP_VALUE: {
+        cb.genData(MAX_ADDRESS - cg.getGlobalsOffset());
+        break;
+      }
       case hexasm::Token::PROLOGUE: {
         auto prologue = dynamic_cast<Prologue*>(instr.get());
         auto name = prologue->getSymbol()->getName();
@@ -2730,16 +2773,18 @@ public:
 class ReportFrameInfo : public AstVisitor {
   SymbolTable &symbolTable;
   std::ostream &outs;
-  void reportFrame(Frame *frame,
-                   Proc &proc,
-                   std::ostream& outs = std::cout) {
+  void reportFrame(Frame *frame, Proc &proc, std::ostream& outs = std::cout) {
     outs << boost::format("Frame for %s\n") % proc.getName();
     outs << "  Size: " << frame->getSize() << "\n";
-    outs << "  Symbols:\n";
-    for (auto &decl : proc.getDecls()) {
-      auto symbol = symbolTable.lookup(decl->getName(), decl->getLocation());
-      outs << boost::format("    %s, FB index %d \n")
-                % symbol->getName() % symbol->getStackOffset();
+    if (proc.getDecls().empty()) {
+      outs << "  No local variables\n";
+    } else {
+      outs << "  Local variables:\n";
+      for (auto &decl : proc.getDecls()) {
+        auto symbol = symbolTable.lookup(decl->getName(), decl->getLocation());
+        auto index = symbol->getFrame()->getSize() - symbol->getStackOffset();
+        outs << boost::format("    %s at index %d\n") % symbol->getName() % index;
+      }
     }
     outs << "\n";
   }
@@ -2821,6 +2866,12 @@ public:
     CodeGen codeGen(symbolTable);
     tree->accept(&codeGen);
 
+    // Report frame information.
+    if (reportFrameInfo) {
+      xcmp::ReportFrameInfo reportFrameInfo(symbolTable, std::cout);
+      tree->accept(&reportFrameInfo);
+    }
+
     // Emit the generated intermediate instructions only.
     if (action == DriverAction::EMIT_INTERMEDIATE_INSTS) {
       codeGen.emitInstrs(outStream);
@@ -2829,12 +2880,6 @@ public:
 
     // Lower the generated (intermediate code) to assembly directives.
     xcmp::LowerDirectives lowerDirectives(symbolTable, codeGen);
-
-    // Report frame information.
-    if (reportFrameInfo) {
-      xcmp::ReportFrameInfo reportFrameInfo(symbolTable, std::cout);
-      tree->accept(&reportFrameInfo);
-    }
 
     // Emit the lowered instructions only.
     if (action == DriverAction::EMIT_LOWERED_INSTS) {
