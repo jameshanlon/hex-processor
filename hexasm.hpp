@@ -83,6 +83,7 @@ enum class Token {
   END_OF_FILE,
   // Lowering.
   PADDING,
+  SP_VALUE,
   PROLOGUE,
   EPILOGUE,
   LDAI_FB,
