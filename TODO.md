@@ -8,8 +8,8 @@ Features:
 - If statement [DONE, needs tests]
 - Sequence statement [DONE]
 - Assign statement [DONE, needs tests]
-- Global variables
-- Array variables and subscript elements (LHS and RHS)
+- Global variables [DONE, needs tests]
+- Array variables and subscript elements (LHS and RHS) [DONE, needs tests]
 - String constants
 
 Optimisations:

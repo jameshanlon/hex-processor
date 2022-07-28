@@ -179,6 +179,27 @@ proc main() is {
 }
 
 //===---------------------------------------------------------------------===//
+// Arrays
+//===---------------------------------------------------------------------===//
+
+BOOST_AUTO_TEST_CASE(array_while_printvals) {
+  // Write the contents of an array then print it out.
+  // Testing array subscript assignment and access.
+  auto program = R"(
+array foo[10];
+val put = 1;
+proc main() is
+  var i;
+{ i := 0;
+  while i < 9 do { foo[i] := i; i:=i+1 };
+  i := 0;
+  while i < 9 do { put('0'+foo[i], 0); i:=i+1 }
+})";
+  runXProgram(program);
+  BOOST_TEST(simOutBuffer.str() == "012345678");
+}
+
+//===---------------------------------------------------------------------===//
 // Error handling.
 //===---------------------------------------------------------------------===//
 
