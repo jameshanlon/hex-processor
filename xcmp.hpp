@@ -642,6 +642,7 @@ public:
     visitor->visitPost(*this);
   }
   const std::string &getName() const { return name; }
+  const std::unique_ptr<Expr> &getExpr() { return expr; }
 };
 
 class CallExpr : public Expr {
@@ -1652,15 +1653,18 @@ enum class SymbolScope {
 class Symbol;
 
 class Frame {
-  size_t size;           // The size of the frame.
-  size_t offset;         // The current stack pointer offset value.
+  size_t size;           // The running maximum size of the frame.
+  size_t offset;         // The current stack pointer offset from the frame base.
+                         // Negative offsets index temporaries in the current frame.
+                         // Positive offsets index arguments from the previous frame.
   std::string exitLabel; // Procedure exit.
 
 public:
-  Frame(std::string exitLabel) : size(0), offset(0), exitLabel(exitLabel) {}
+  Frame(std::string exitLabel) : size(0), offset(-1), exitLabel(exitLabel) {}
   void setSize(size_t newSize) { size = newSize > size ? newSize : size; }
   int getSize() { return size; }
   void incOffset(int amount) { offset += amount; }
+  void decOffset(int amount) { offset -= amount; }
   void setOffset(int value) { offset = value; }
   size_t getOffset() { return offset; }
   const std::string &getExitLabel() const { return exitLabel; }
@@ -2050,7 +2054,7 @@ public:
         size_t stackOffset = cb.getCurrentFrame()->getOffset();
         // Gen RHS and save to stack.
         cb.genExpr(expr.getRHS());
-        currentFrame->incOffset(1);
+        currentFrame->decOffset(1);
         currentFrame->setSize(currentFrame->getSize() + 1);
         cb.genLDBM(SP_OFFSET);
         cb.genSTAI_FB(currentFrame, currentFrame->getOffset());
@@ -2150,7 +2154,7 @@ public:
             break;
           }
           default:
-            // TODO: no other ops expected.
+            assert(0 && "unexpected token in binop codegen");
             break;
         }
       }
@@ -2170,8 +2174,9 @@ public:
           cb.genLabel(trueLabel);
           cb.genLDAC(1);
           cb.genLabel(endLabel);
+        } else {
+          assert(0 && "unexpected token in unary op codegen");
         }
-        // TODO: else no other ops expected.
       }
     }
     void visitPost(StringExpr &expr) {
@@ -2196,8 +2201,15 @@ public:
       // AstVisitor::shouldRecurseCalls().
     }
     void visitPost(ArraySubscriptExpr &expr) {
-      // generate array subscript
-      // TODO
+      // Generate array subscript.
+      cb.genVar(Reg::B, st.lookup(expr.getName(), expr.getLocation()));
+      cb.genExpr(expr.getExpr());
+      if (expr.getExpr()->isConst()) {
+        cb.genLDAI(expr.getExpr()->getValue());
+      } else {
+        cb.genADD();
+        cb.genLDAI(0);
+      }
     }
     void visitPost(VarRefExpr &expr) {
       if (expr.isConst()) {
@@ -2295,14 +2307,28 @@ public:
 
     void visitPost(AssStatement &expr) {
       cb.genExpr(expr.getRHS());
-      auto *varRefLHS = dynamic_cast<VarRefExpr*>(expr.getLHS().get());
-      if (varRefLHS) {
+      if (auto *varRefLHS = dynamic_cast<VarRefExpr*>(expr.getLHS().get())) {
+        // RHS variable reference.
         auto symbol = st.lookup(varRefLHS->getName(), expr.getLocation());
         auto frameIndex = symbol->getStackOffset();
         cb.genLDBM(SP_OFFSET);
         cb.genSTAI_FB(symbol->getFrame(), frameIndex);
+      } else if (auto *arraySubLHS = dynamic_cast<ArraySubscriptExpr*>(expr.getLHS().get())) {
+        // Handle RHS subscript.
+        cb.genVar(Reg::B, st.lookup(arraySubLHS->getName(), arraySubLHS->getLocation()));
+        cb.genExpr(arraySubLHS->getExpr());
+        cb.genADD();
+        auto stackOffset = cb.getCurrentFrame()->getOffset();
+        cb.getCurrentFrame()->setSize(cb.getCurrentFrame()->getSize() + 1);
+        cb.genLDBM(SP_OFFSET);
+        cb.genSTAI_FB(cb.getCurrentFrame(), stackOffset);
+        cb.genExpr(expr.getRHS());
+        cb.genLDBM(SP_OFFSET);
+        cb.genLDBI_FB(cb.getCurrentFrame(), stackOffset);
+        cb.genSTAI(0);
+        cb.getCurrentFrame()->setOffset(stackOffset);
       } else {
-        // TODO: handle RHS subscript.
+        assert(0 && "unexpected target of assignment statement");
       }
     }
   };
@@ -2430,8 +2456,8 @@ public:
         // been resolved.
         genExpr(arg.get());
         genLDBM(SP_OFFSET);
-        genSTAI_FB(currentFrame, currentFrame->getOffset() - 1);
-        currentFrame->incOffset(1);
+        genSTAI_FB(currentFrame, currentFrame->getOffset());
+        currentFrame->decOffset(1);
       }
     }
     currentFrame->setOffset(stackOffset);
@@ -2446,10 +2472,10 @@ public:
         // expression value saved to a temporary stack location and store it
         // to the actual parameter location.
         genLDAM(SP_OFFSET);
-        genLDAI_FB(currentFrame, currentFrame->getOffset() - 1);
+        genLDAI_FB(currentFrame, currentFrame->getOffset());
         genLDBM(SP_OFFSET);
         genSTAI(parameterIndex);
-        currentFrame->incOffset(1);
+        currentFrame->decOffset(1);
       } else {
         // For all other actual expressions, generate the value and store it to
         // the actual parameter location.
@@ -2744,12 +2770,17 @@ public:
       case hexasm::Token::LDBI_FB:
       case hexasm::Token::STAI_FB: {
         auto oldInstr = dynamic_cast<InstrStackOffset*>(instr.get());
+        // Calculate the new offset from the SP: frame size plus frame-base
+        // offset (negative to access current frame, positive to access
+        // previous frame).
         int newOffset = oldInstr->getFrame()->getSize() + oldInstr->getOffset();
         switch (token) {
         case hexasm::Token::LDAI_FB: cb.genLDAI(newOffset); break;
         case hexasm::Token::LDBI_FB: cb.genLDBI(newOffset); break;
         case hexasm::Token::STAI_FB: cb.genSTAI(newOffset); break;
-        default: break;
+        default:
+          assert(0 && "unexpected token in lowering of FB-relative memory accesses");
+          break;
         }
         break;
       }
@@ -2889,16 +2920,16 @@ public:
     // Lower the generated (intermediate code) to assembly directives.
     xcmp::LowerDirectives lowerDirectives(symbolTable, codeGen);
 
-    // Emit the lowered instructions only.
-    if (action == DriverAction::EMIT_LOWERED_INSTS) {
-      lowerDirectives.emitInstrs(outStream);
-      return 0;
-    }
-
     // Report frame information.
     if (reportMemoryInfo) {
       xcmp::ReportMemoryInfo reportMemoryInfo(symbolTable, lowerDirectives.getInstrs(), std::cout);
       tree->accept(&reportMemoryInfo);
+    }
+
+    // Emit the lowered instructions only.
+    if (action == DriverAction::EMIT_LOWERED_INSTS) {
+      lowerDirectives.emitInstrs(outStream);
+      return 0;
     }
 
     // Assemble the instructions.
