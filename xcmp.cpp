@@ -29,7 +29,7 @@ static void help(const char *argv[]) {
   std::cout << "  --tree            Display the syntax tree only\n";
   std::cout << "  --insts           Display the intermediate instructions only\n";
   std::cout << "  --insts-lowered   Display the lowered instructions only\n";
-  std::cout << "  --frame-info      Report procedure frame information\n";
+  std::cout << "  --memory-info     Report memory information\n";
   std::cout << "  -S                Emit the assembly program\n";
   std::cout << "  --insts-asm       Display the assembled instructions only\n";
   std::cout << "  -o,--output file  Specify a file for output (default a.out)\n";
@@ -43,7 +43,7 @@ int main(int argc, const char *argv[]) {
     auto driverAction = xcmp::DriverAction::EMIT_BINARY;
     const char *inputFilename = nullptr;
     const char *outputFilename = "a.out";
-    bool reportFrameInfo = false;
+    bool reportMemoryInfo = false;
     for (int i = 1; i < argc; ++i) {
       if (std::strcmp(argv[i], "-h") == 0 ||
           std::strcmp(argv[i], "--help") == 0) {
@@ -61,8 +61,8 @@ int main(int argc, const char *argv[]) {
         driverAction = xcmp::DriverAction::EMIT_ASM;
       } else if (std::strcmp(argv[i], "--insts-asm") == 0) {
         driverAction = xcmp::DriverAction::EMIT_TREE;
-      } else if (std::strcmp(argv[i], "--frame-info") == 0) {
-        reportFrameInfo = true;
+      } else if (std::strcmp(argv[i], "--memory-info") == 0) {
+        reportMemoryInfo = true;
       } else if (std::strcmp(argv[i], "--output") == 0 ||
                  std::strcmp(argv[i], "-o") == 0) {
         outputFilename = argv[++i];
@@ -82,7 +82,7 @@ int main(int argc, const char *argv[]) {
       std::exit(1);
     }
     // Run.
-    driver.runCatchExceptions(driverAction, inputFilename, outputFilename, "a.out", reportFrameInfo);
+    driver.runCatchExceptions(driverAction, inputFilename, outputFilename, "a.out", reportMemoryInfo);
   } catch (const std::exception &e) {
     std::cerr << boost::format("Error: %s\n") % e.what();
     return 1;
