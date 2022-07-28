@@ -2514,14 +2514,20 @@ public:
       if (directive->getToken() == hexasm::Token::PROC ||
           directive->getToken() == hexasm::Token::FUNC ||
           directive->getToken() == hexasm::Token::PROLOGUE) {
-        out << "\n";
+        // Add some new lines for these section markers.
+        out << boost::format("\n%-20s\n") % directive->toString();
+      } else if (directive->getToken() == hexasm::Token::SP_VALUE) {
+        // SP value and data section are emitted together.
+        out << boost::format("%-20s\n") % directive->toString();
+        for (auto &directive : data) {
+          out << boost::format("%-20s\n") % directive->toString();
+        }
+      } else {
+        // All other directives.
+        out << boost::format("%-20s\n") % directive->toString();
       }
-      out << boost::format("%-20s\n") % directive->toString();
     }
     out << "\n";
-    for (auto &directive : data) {
-      out << boost::format("%-20s\n") % directive->toString();
-    }
   }
 
   /// Member access --------------------------------------------------------//
@@ -2579,9 +2585,6 @@ class CodeGen : public AstVisitor {
   CodeBuffer cb;
   size_t globalsOffset;
 
-  void assignGlobalLocation(Decl &decl, size_t size) {
-  }
-
 public:
   CodeGen(SymbolTable &symbolTable) :
     AstVisitor(false, false, false), st(symbolTable), cb(symbolTable),
@@ -2636,7 +2639,7 @@ public:
     auto symbol = st.lookup(decl.getName(), decl.getLocation());
     auto label = cb.getLabel();
     symbol->setGlobalLabel(label);
-    cb.genLabel(label);
+    cb.genDataLabel(label);
     cb.genData(0);
   }
 
@@ -2644,11 +2647,11 @@ public:
   /// directive with the address and assign it a label.
   void visitPost(ArrayDecl &decl) {
     auto symbol = st.lookup(decl.getName(), decl.getLocation());
-    size_t address = MAX_ADDRESS - globalsOffset;
     globalsOffset += decl.getSize();
+    size_t address = MAX_ADDRESS - globalsOffset;
     auto label = cb.getLabel();
     symbol->setGlobalLabel(label);
-    cb.genLabel(label);
+    cb.genDataLabel(label);
     cb.genData(address);
   }
 
@@ -2674,7 +2677,12 @@ public:
       auto token = instr->getToken();
       switch (token) {
       case hexasm::Token::SP_VALUE: {
-        cb.genData(MAX_ADDRESS - cg.getGlobalsOffset());
+        // SP value.
+        cb.genInstrData(MAX_ADDRESS - cg.getGlobalsOffset() - 1);
+        // Emit data directives for globals, constants and strings.
+        for (auto &data : cg.getCodeBuffer().getData()) {
+          cb.insertInstr(std::move(data));
+        }
         break;
       }
       case hexasm::Token::PROLOGUE: {
@@ -2751,10 +2759,6 @@ public:
         break;
       }
     }
-    // Copy data directives.
-    for (auto &data : cg.getCodeBuffer().getData()) {
-      cb.insertInstr(std::move(data));
-    }
   }
 
   /// Reporting -------------------------------------------------------------//
@@ -2770,10 +2774,11 @@ public:
 // Report frame contents.
 //===---------------------------------------------------------------------===//
 
-class ReportFrameInfo : public AstVisitor {
-  SymbolTable &symbolTable;
+class ReportMemoryInfo : public AstVisitor {
+  SymbolTable &st;
+  const std::vector<std::unique_ptr<hexasm::Directive>> &directives;
   std::ostream &outs;
-  void reportFrame(Frame *frame, Proc &proc, std::ostream& outs = std::cout) {
+  void reportFrame(Frame *frame, Proc &proc) {
     outs << boost::format("Frame for %s\n") % proc.getName();
     outs << "  Size: " << frame->getSize() << "\n";
     if (proc.getDecls().empty()) {
@@ -2781,7 +2786,7 @@ class ReportFrameInfo : public AstVisitor {
     } else {
       outs << "  Local variables:\n";
       for (auto &decl : proc.getDecls()) {
-        auto symbol = symbolTable.lookup(decl->getName(), decl->getLocation());
+        auto symbol = st.lookup(decl->getName(), decl->getLocation());
         auto index = symbol->getFrame()->getSize() - symbol->getStackOffset();
         outs << boost::format("    %s at index %d\n") % symbol->getName() % index;
       }
@@ -2789,10 +2794,19 @@ class ReportFrameInfo : public AstVisitor {
     outs << "\n";
   }
 public:
-  ReportFrameInfo(SymbolTable &symbolTable, std::ostream &outs) :
-    AstVisitor(false, false, false), symbolTable(symbolTable), outs(outs) {}
-  void visitPost(Proc &proc) {
-    auto procSymbol = symbolTable.lookup(proc.getName(), proc.getLocation());
+  ReportMemoryInfo(SymbolTable &symbolTable,
+                   const std::vector<std::unique_ptr<hexasm::Directive>> &directives,
+                   std::ostream &outs) :
+    AstVisitor(false, false, false), st(symbolTable), directives(directives), outs(outs) {}
+  void visitPre(Program &program) {
+    auto stackPointer = dynamic_cast<hexasm::Data*>(directives[1].get())->getValue();
+    outs << boost::format("Memory range 0x%x - 0x%x\n") % 0 % MAX_ADDRESS;
+    outs << boost::format("Stack pointer initialised to 0x%x\n") % stackPointer;
+    outs << boost::format("Arrays allocated 0x%x - 0x%x\n") % (stackPointer+1) % MAX_ADDRESS;
+    outs << "\n";
+  }
+  void visitPre(Proc &proc) {
+    auto procSymbol = st.lookup(proc.getName(), proc.getLocation());
     reportFrame(procSymbol->getFrame(), proc);
   }
 };
@@ -2823,7 +2837,7 @@ public:
           const std::string &input,
           bool inputIsFilename,
           const std::string outputBinaryFilename="a.out",
-          bool reportFrameInfo=false) {
+          bool reportMemoryInfo=false) {
 
     // Open the file.
     if (inputIsFilename) {
@@ -2866,12 +2880,6 @@ public:
     CodeGen codeGen(symbolTable);
     tree->accept(&codeGen);
 
-    // Report frame information.
-    if (reportFrameInfo) {
-      xcmp::ReportFrameInfo reportFrameInfo(symbolTable, std::cout);
-      tree->accept(&reportFrameInfo);
-    }
-
     // Emit the generated intermediate instructions only.
     if (action == DriverAction::EMIT_INTERMEDIATE_INSTS) {
       codeGen.emitInstrs(outStream);
@@ -2885,6 +2893,12 @@ public:
     if (action == DriverAction::EMIT_LOWERED_INSTS) {
       lowerDirectives.emitInstrs(outStream);
       return 0;
+    }
+
+    // Report frame information.
+    if (reportMemoryInfo) {
+      xcmp::ReportMemoryInfo reportMemoryInfo(symbolTable, lowerDirectives.getInstrs(), std::cout);
+      tree->accept(&reportMemoryInfo);
     }
 
     // Assemble the instructions.
@@ -2909,9 +2923,9 @@ public:
                          const std::string &input,
                          bool inputIsFilename,
                          const std::string outputBinaryFilename="a.out",
-                         bool reportFrameInfo=false) {
+                         bool reportMemoryInfo=false) {
     try {
-      return run(action, input, inputIsFilename, outputBinaryFilename, reportFrameInfo);
+      return run(action, input, inputIsFilename, outputBinaryFilename, reportMemoryInfo);
     } catch (const hexutil::Error &e) {
       if (e.hasLocation()) {
         std::cerr << boost::format("Error %s: %s\n") % e.getLocation().str() % e.what();
