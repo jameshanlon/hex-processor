@@ -2,15 +2,33 @@
 
 Features:
 
-- Arithmetic binary and unary operations [DONE, need tests]
-- Boolean binary and unary operations [DONE, need tests]
-- Stop statement [DONE, need tests]
-- If statement [DONE, needs tests]
+- Arithmetic binary and unary operations [DONE]
+- Boolean binary and unary operations [DONE]
+- Stop statement [DONE]
+- If statement [DONE]
 - Sequence statement [DONE]
-- Assign statement [DONE, needs tests]
-- Global variables [DONE, needs tests]
-- Array variables and subscript elements (LHS and RHS) [DONE, needs tests]
+- Assign statement [DONE]
+- Global variables [DONE]
+- Array variables and subscript elements (LHS and RHS) [DONE]
+- String constants [DONE]
+
+Tests:
+
+- Unary operators
+- Add, sub operators
+- Boolean operators ls, gt, le, ge, not, eq
+- Stop statment [DONE]
+- If statement
+- While statement
+- Sequence statement
+- Assign statement
+- Global variable allocation
+- Global array allocation
+- Array subscripts (assign and access)
+- Array arguments
+- Constant pool
 - String constants
+- Syscalls (exit, read, write) [DONE]
 
 Optimisations:
 
