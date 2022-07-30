@@ -1819,9 +1819,11 @@ public:
   }
   void visitPost(CallExpr &expr) {
     // Propagate constant values for syscalls.
-    auto symbol = symbolTable.lookup(expr.getName(), expr.getLocation());
-    if (auto symbolExpr = dynamic_cast<const ValDecl*>(symbol->getNode())) {
-      expr.setSysCallId(symbolExpr->getValue());
+    if (!expr.isSysCall()) {
+      auto symbol = symbolTable.lookup(expr.getName(), expr.getLocation());
+      if (auto symbolExpr = dynamic_cast<const ValDecl*>(symbol->getNode())) {
+        expr.setSysCallId(symbolExpr->getValue());
+      }
     }
   }
   void visitPost(ArraySubscriptExpr &expr) {}

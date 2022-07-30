@@ -37,6 +37,13 @@ BOOST_AUTO_TEST_CASE(main_stop) {
 // Syscalls
 //===---------------------------------------------------------------------===//
 
+BOOST_AUTO_TEST_CASE(syscall_exit_0_no_val) {
+  auto program = R"(
+proc main () is 0(0)
+)";
+  BOOST_TEST(runXProgram(program) == 0);
+}
+
 BOOST_AUTO_TEST_CASE(syscall_exit_0) {
   auto program = R"(
 val exit = 0;
@@ -260,6 +267,29 @@ proc main() is {
   BOOST_TEST(simOutBuffer.str() == "cz\n");
 }
 
+BOOST_AUTO_TEST_CASE(three_func_args) {
+  // Nested binop additions with function calls to supply values, requiring
+  // results to be written to the stack.
+  auto program = R"(
+val exit = 0;
+func foo(val a0, val a1, val a2) is
+  return a0 + a1 + a2
+proc main() is exit(foo(0, 1, 2)))";
+  BOOST_TEST(runXProgram(program) == 3);
+}
+
+BOOST_AUTO_TEST_CASE(ten_func_args) {
+  // Nested binop additions with function calls to supply values, requiring
+  // results to be written to the stack.
+  auto program = R"(
+val exit = 0;
+func foo(val a0, val a1, val a2, val a3, val a4,
+         val a5, val a6, val a7, val a8, val a9) is
+  return a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9
+proc main() is exit(foo(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)))";
+  BOOST_TEST(runXProgram(program) == 45);
+}
+
 //===---------------------------------------------------------------------===//
 // Arrays
 //===---------------------------------------------------------------------===//
@@ -268,17 +298,17 @@ BOOST_AUTO_TEST_CASE(array_while_printvals) {
   // Write the contents of an array then print it out.
   // Testing array subscript assignment and access.
   auto program = R"(
-array foo[10];
+array foo[9];
 val put = 1;
 proc main() is
   var i;
 { i := 0;
-  while i < 9 do { foo[i] := i; i:=i+1 };
+  while i < 10 do { foo[i] := i; i:=i+1 };
   i := 0;
-  while i < 9 do { put('0'+foo[i], 0); i:=i+1 }
+  while i < 10 do { put('0'+foo[i], 0); i:=i+1 }
 })";
   runXProgram(program);
-  BOOST_TEST(simOutBuffer.str() == "012345678");
+  BOOST_TEST(simOutBuffer.str() == "0123456789");
 }
 
 //===---------------------------------------------------------------------===//
