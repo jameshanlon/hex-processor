@@ -18,16 +18,98 @@ BOOST_AUTO_TEST_CASE(xhexb_run) {
 }
 
 //===---------------------------------------------------------------------===//
-// Hello world
+// Null programs
 //===---------------------------------------------------------------------===//
 
-BOOST_AUTO_TEST_CASE(empty_run) {
+BOOST_AUTO_TEST_CASE(main_skip) {
   // The simplest program.
+  auto program = "proc main () is skip";
+  BOOST_TEST(runXProgram(program) == 0);
+}
+
+BOOST_AUTO_TEST_CASE(main_stop) {
+  // The simplest program.
+  auto program = "proc main () is stop";
+  BOOST_TEST(runXProgram(program) == 0);
+}
+
+//===---------------------------------------------------------------------===//
+// Syscalls
+//===---------------------------------------------------------------------===//
+
+BOOST_AUTO_TEST_CASE(syscall_exit_0) {
   auto program = R"(
-proc main () is skip
+val exit = 0;
+proc main () is exit(0)
+)";
+  BOOST_TEST(runXProgram(program) == 0);
+}
+
+BOOST_AUTO_TEST_CASE(syscall_exit_1) {
+  auto program = R"(
+val exit = 0;
+proc main () is exit(1)
+)";
+  BOOST_TEST(runXProgram(program) == 1);
+}
+
+BOOST_AUTO_TEST_CASE(syscall_exit_255) {
+  auto program = R"(
+val exit = 0;
+proc main () is exit(255)
+)";
+  BOOST_TEST(runXProgram(program) == 255);
+}
+
+BOOST_AUTO_TEST_CASE(syscall_exit_neg_255) {
+  auto program = R"(
+val exit = 0;
+proc main () is exit(-255)
+)";
+  BOOST_TEST(runXProgram(program) == -255);
+}
+
+BOOST_AUTO_TEST_CASE(syscall_put_stream_0) {
+  auto program = R"(
+val put = 1;
+proc main () is put('x', 0)
 )";
   runXProgram(program);
+  BOOST_TEST(simOutBuffer.str() == "x");
 }
+
+BOOST_AUTO_TEST_CASE(syscall_put_stream_255) {
+  auto program = R"(
+val put = 1;
+proc main () is put('x', 255)
+)";
+  runXProgram(program);
+  BOOST_TEST(simOutBuffer.str() == "x");
+}
+
+BOOST_AUTO_TEST_CASE(syscall_get_stream_0) {
+  auto program = R"(
+val exit = 0;
+val get = 2;
+proc main () is exit(get(0))
+)";
+  simInBuffer.str("a");
+  BOOST_TEST(runXProgram(program) == 'a');
+}
+
+BOOST_AUTO_TEST_CASE(syscall_get_stream_255) {
+  auto program = R"(
+val exit = 0;
+val get = 2;
+proc main () is exit(get(255))
+)";
+  simInBuffer.str("a");
+  BOOST_TEST(runXProgram(program) == 'a');
+}
+
+//===---------------------------------------------------------------------===//
+// Hello world
+//===---------------------------------------------------------------------===//
 
 BOOST_AUTO_TEST_CASE(hello_world_simple) {
   // The most basic hello world example.

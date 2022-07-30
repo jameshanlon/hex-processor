@@ -11,7 +11,7 @@ namespace hex {
 
 class HexSimIO {
 
-  //std::istream &in;
+  std::istream &in;
   std::ostream &out;
   std::array<std::fstream, 8> fileIO;
   std::array<bool, 8> connected;
@@ -19,7 +19,7 @@ class HexSimIO {
 public:
 
   HexSimIO(std::istream &in, std::ostream &out) :
-      /*in(in),*/ out(out), connected({false, false, false, false, false, false, false, false}) {}
+      in(in), out(out), connected({false, false, false, false, false, false, false, false}) {}
 
   /// Output a character to ostream or a file.
   void output(char value, int stream) {
@@ -40,10 +40,10 @@ public:
   char input(int stream) {
     if (stream < 256) {
       // FIXME
-      //char c;
-      //in.get(c);
-      //return c;
-      return std::getchar();
+      char c;
+      in.get(c);
+      return c;
+      //return std::getchar();
     } else {
       size_t index = (stream >> 8) & 7;
       if (!connected[index]) {
