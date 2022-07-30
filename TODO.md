@@ -11,6 +11,7 @@ Features:
 - Global variables [DONE]
 - Array variables and subscript elements (LHS and RHS) [DONE]
 - String constants [DONE]
+- Procedure call as <expr>(...)
 
 Tests:
 
