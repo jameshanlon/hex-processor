@@ -39,9 +39,7 @@ public:
   /// Input a character from stdin or a file.
   char input(int stream) {
     if (stream < 256) {
-      char c;
-      in.get(c);
-      return c;
+      return in.get();
     } else {
       size_t index = (stream >> 8) & 7;
       if (!connected[index]) {
