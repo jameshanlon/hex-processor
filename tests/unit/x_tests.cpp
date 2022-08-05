@@ -460,9 +460,9 @@ BOOST_AUTO_TEST_CASE(parser_token_error_stmt_invalid) {
 // Semantic errors.
 
 // Enable when (global) arrays are handled.
-//BOOST_AUTO_TEST_CASE(semantics_non_const_array_length_error) {
-//  auto program = "var x; array foo[x]; proc main () is skip";
-//  BOOST_CHECK_THROW(asmXProgram(program), xcmp::NonConstArrayLengthError);
-//}
+BOOST_AUTO_TEST_CASE(semantics_non_const_array_length_error) {
+  auto program = "var x; array foo[x]; proc main () is skip";
+  BOOST_CHECK_THROW(asmXProgram(program), xcmp::NonConstArrayLengthError);
+}
 
 BOOST_AUTO_TEST_SUITE_END()
