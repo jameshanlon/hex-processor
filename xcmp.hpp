@@ -2191,13 +2191,15 @@ public:
       cb.genConst(reg, expr.getValue());
     }
     void visitPost(CallExpr &expr) {
-      auto symbol = st.lookup(expr.getName(), expr.getLocation());
       if (expr.isSysCall()) {
         cb.genSysCall(expr.getSysCallId(), expr.getArgs());
-      } else if (symbol->getType() == SymbolType::FUNC) {
-        cb.genFuncCall(expr.getName(), expr.getArgs());
       } else {
-        cb.genProcCall(expr.getName(), expr.getArgs());
+        auto symbol = st.lookup(expr.getName(), expr.getLocation());
+        if (symbol->getType() == SymbolType::FUNC) {
+          cb.genFuncCall(expr.getName(), expr.getArgs());
+        } else {
+          cb.genProcCall(expr.getName(), expr.getArgs());
+        }
       }
       // The recursion must halt here, which is controlled by
       // AstVisitor::shouldRecurseCalls().

@@ -22,13 +22,11 @@ BOOST_AUTO_TEST_CASE(xhexb_run) {
 //===---------------------------------------------------------------------===//
 
 BOOST_AUTO_TEST_CASE(main_skip) {
-  // The simplest program.
   auto program = "proc main () is skip";
   BOOST_TEST(runXProgram(program) == 0);
 }
 
 BOOST_AUTO_TEST_CASE(main_stop) {
-  // The simplest program.
   auto program = "proc main () is stop";
   BOOST_TEST(runXProgram(program) == 0);
 }
@@ -76,6 +74,12 @@ proc main () is exit(-255)
   BOOST_TEST(runXProgram(program) == -255);
 }
 
+BOOST_AUTO_TEST_CASE(syscall_put_stream_0_no_val) {
+  auto program = "proc main () is 1('x', 0)";
+  runXProgram(program);
+  BOOST_TEST(simOutBuffer.str() == "x");
+}
+
 BOOST_AUTO_TEST_CASE(syscall_put_stream_0) {
   auto program = R"(
 val put = 1;
@@ -92,6 +96,12 @@ proc main () is put('x', 255)
 )";
   runXProgram(program);
   BOOST_TEST(simOutBuffer.str() == "x");
+}
+
+BOOST_AUTO_TEST_CASE(syscall_get_stream_0_no_vals) {
+  auto program = "proc main () is 0(2(0))";
+  simInBuffer.str("a");
+  BOOST_TEST(runXProgram(program) == 'a');
 }
 
 BOOST_AUTO_TEST_CASE(syscall_get_stream_0) {
@@ -112,6 +122,22 @@ proc main () is exit(get(255))
 )";
   simInBuffer.str("a");
   BOOST_TEST(runXProgram(program) == 'a');
+}
+
+BOOST_AUTO_TEST_CASE(syscall_echo_multiple) {
+  auto program = R"(
+val exit = 0;
+val put = 1;
+val get = 2;
+proc main () is {
+  put(get(255));
+  put(get(255));
+  put(get(255));
+  exit(0)
+})";
+  simInBuffer.str("abc");
+  runXProgram(program);
+  BOOST_TEST(simOutBuffer.str() == "abc");
 }
 
 //===---------------------------------------------------------------------===//
