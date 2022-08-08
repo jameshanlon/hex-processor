@@ -2388,8 +2388,8 @@ public:
       // Load larger values from the constant pool, adding them only if they don't exist.
       auto label = genConstPool(value);
       switch (reg) {
-      case Reg::A: genLDAC(label); break;
-      case Reg::B: genLDBC(label); break;
+      case Reg::A: genLDAM(label); break;
+      case Reg::B: genLDBM(label); break;
       }
     }
   }

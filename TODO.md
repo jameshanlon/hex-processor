@@ -27,7 +27,7 @@ Tests:
 - Global array allocation
 - Array subscripts (assign and access)
 - Array arguments
-- Constant pool
+- Constant pool [DONE]
 - String constants
 - Syscalls (exit, read, write) [DONE]
 

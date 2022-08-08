@@ -191,6 +191,34 @@ proc main() is {
 }
 
 //===---------------------------------------------------------------------===//
+// Constants
+//===---------------------------------------------------------------------===//
+
+BOOST_AUTO_TEST_CASE(constants_min_positive_pool) {
+  auto program = "val x = 65536; proc main () is 0(x)";
+  BOOST_TEST(asmXProgram(program, false, true).str().find("_const0") != std::string::npos);
+  BOOST_TEST(runXProgram(program) == 65536);
+}
+
+BOOST_AUTO_TEST_CASE(constants_max_positive_pool) {
+  auto program = "val x = 2147483647; proc main () is 0(x)";
+  BOOST_TEST(asmXProgram(program, false, true).str().find("_const0") != std::string::npos);
+  BOOST_TEST(runXProgram(program) == 2147483647);
+}
+
+BOOST_AUTO_TEST_CASE(constants_min_negative_pool) {
+  auto program = "val x = -65536; proc main () is 0(x)";
+  BOOST_TEST(asmXProgram(program, false, true).str().find("_const0") != std::string::npos);
+  BOOST_TEST(runXProgram(program) == -65536);
+}
+
+BOOST_AUTO_TEST_CASE(constants_max_negative_pool) {
+  auto program = "val x = -2147483648; proc main () is 0(x)";
+  BOOST_TEST(asmXProgram(program, false, true).str().find("_const0") != std::string::npos);
+  BOOST_TEST(runXProgram(program) == -2147483648);
+}
+
+//===---------------------------------------------------------------------===//
 // Procedure calling
 //===---------------------------------------------------------------------===//
 
