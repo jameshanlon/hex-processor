@@ -140,6 +140,16 @@ proc main () is {
   BOOST_TEST(simOutBuffer.str() == "abc");
 }
 
+BOOST_AUTO_TEST_CASE(syscall_invalid_3) {
+  auto program = "proc main () is 3(0)";
+  BOOST_CHECK_THROW(runXProgram(program), xcmp::InvalidSyscallError);
+}
+
+BOOST_AUTO_TEST_CASE(syscall_invalid_val_3) {
+  auto program = "val syscall=3; proc main () is syscall(0)";
+  BOOST_CHECK_THROW(runXProgram(program), xcmp::InvalidSyscallError);
+}
+
 //===---------------------------------------------------------------------===//
 // Hello world
 //===---------------------------------------------------------------------===//
@@ -216,6 +226,20 @@ BOOST_AUTO_TEST_CASE(constants_max_negative_pool) {
   auto program = "val x = -2147483648; proc main () is 0(x)";
   BOOST_TEST(asmXProgram(program, false, true).str().find("_const0") != std::string::npos);
   BOOST_TEST(runXProgram(program) == -2147483648);
+}
+
+//===---------------------------------------------------------------------===//
+// Unary operators
+//===---------------------------------------------------------------------===//
+
+BOOST_AUTO_TEST_CASE(unary_minus) {
+  auto program = "func value() is return 42 proc main () is 0(-value())";
+  BOOST_TEST(runXProgram(program) == -42);
+}
+
+BOOST_AUTO_TEST_CASE(unary_not) {
+  auto program = "func value() is return 42 proc main () is 0(~value())";
+  BOOST_TEST(runXProgram(program) == 0);
 }
 
 //===---------------------------------------------------------------------===//

@@ -15,10 +15,12 @@ Features:
 
 Tests:
 
+- Stop, skip statments [DONE]
+- Syscalls (exit, read, write) [DONE]
+- Constant pool [DONE]
 - Unary operators
 - Add, sub operators
 - Boolean operators ls, gt, le, ge, not, eq
-- Stop statment [DONE]
 - If statement
 - While statement
 - Sequence statement
@@ -27,9 +29,7 @@ Tests:
 - Global array allocation
 - Array subscripts (assign and access)
 - Array arguments
-- Constant pool [DONE]
 - String constants
-- Syscalls (exit, read, write) [DONE]
 
 Optimisations:
 

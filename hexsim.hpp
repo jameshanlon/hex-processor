@@ -152,6 +152,7 @@ public:
       case hex::Syscall::READ:
         out << boost::format("read to mem[%08x]\n") % (spWordIndex+1);
         break;
+      default: break;
     }
   }
 

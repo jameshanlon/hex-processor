@@ -184,6 +184,11 @@ struct NonConstArrayLengthError : public Error {
     Error(location, (boost::format("array %s length is not constant") % name).str()) {}
 };
 
+struct InvalidSyscallError : public Error {
+  InvalidSyscallError(Location location, int sysCallId) :
+    Error(location, (boost::format("invalid syscall: %d") % sysCallId).str()) {}
+};
+
 //===---------------------------------------------------------------------===//
 // Lexer
 //===---------------------------------------------------------------------===//
@@ -1823,7 +1828,13 @@ public:
       auto symbol = symbolTable.lookup(expr.getName(), expr.getLocation());
       if (auto symbolExpr = dynamic_cast<const ValDecl*>(symbol->getNode())) {
         expr.setSysCallId(symbolExpr->getValue());
+      } else {
+        return;
       }
+    }
+    // Check Syscall ID is valid.
+    if (expr.getSysCallId() >= static_cast<int>(hex::Syscall::NUM_VALUES)) {
+      throw InvalidSyscallError(expr.getLocation(), expr.getSysCallId());
     }
   }
   void visitPost(ArraySubscriptExpr &expr) {}

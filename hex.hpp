@@ -35,7 +35,8 @@ enum OprInstr {
 enum class Syscall {
   EXIT  = 0,
   WRITE = 1,
-  READ  = 2
+  READ  = 2,
+  NUM_VALUES
 };
 
 const char *instrEnumToStr(Instr instr);
