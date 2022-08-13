@@ -350,6 +350,43 @@ proc main() is exit(foo(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)))";
   BOOST_TEST(runXProgramSrc(program) == 45);
 }
 
+BOOST_AUTO_TEST_CASE(prepare_call_actuals) {
+  // Check that multiple actuals containing calls are allocted stack space
+  // correctly.
+  auto program = R"(
+func nop(val v) is return v
+func add3(val a0, val a1, val a2) is return a0 + a1 + a2
+proc main() is 0(add3(nop(1), nop(2), nop(3))))";
+  BOOST_TEST(runXProgramSrc(program) == 6);
+}
+
+BOOST_AUTO_TEST_CASE(prepare_call_actuals_nested_1) {
+  // As above, but this time with two levels of nesting.
+  auto program = R"(
+func nop(val v) is return v
+func add3(val a0, val a1, val a2) is return a0 + a1 + a2
+proc main() is 0(add3(add3(nop(1), nop(2), nop(3)), nop(4), nop(5))))";
+  BOOST_TEST(runXProgramSrc(program) == 15);
+}
+
+BOOST_AUTO_TEST_CASE(prepare_call_actuals_nested_2) {
+  // As above, but this time with three levels of nesting.
+  auto program = R"(
+func nop(val v) is return v
+func add3(val a0, val a1, val a2) is return a0 + a1 + a2
+proc main() is 0(add3(add3(add3(nop(1), nop(2), nop(3)), nop(4), nop(5)), nop(6), nop(7))))";
+  BOOST_TEST(runXProgramSrc(program) == 28);
+}
+
+BOOST_AUTO_TEST_CASE(prepare_call_actuals_nested_3) {
+  // As above, but this time with the calls nested in an addition.
+  auto program = R"(
+func nop(val v) is return v
+func add3(val a0, val a1, val a2) is return a0 + a1 + a2
+proc main() is 0(add3(add3(add3(nop(1)+1, nop(2)+1, nop(3)+1), nop(4)+1, nop(5)+1), nop(6)+1, nop(7)+1)))";
+  BOOST_TEST(runXProgramSrc(program) == 35);
+}
+
 //===---------------------------------------------------------------------===//
 // Unary operators
 //===---------------------------------------------------------------------===//

@@ -18,8 +18,8 @@ Tests:
 - Stop, skip statments [DONE]
 - Syscalls (exit, read, write) [DONE]
 - Constant pool [DONE]
-- Unary operators [DONE]
-- Boolean operators +, -, ls, gt, le, ge, not, eq
+- Unary operators -, ~ [DONE]
+- Boolean operators +, -, <, <=, >, >=, =, ~= [DONE]
 - If statement
 - While statement
 - Sequence statement
