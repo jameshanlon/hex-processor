@@ -53,6 +53,8 @@ int main(int argc, const char *argv[]) {
         driverAction = xcmp::DriverAction::EMIT_TOKENS;
       } else if (std::strcmp(argv[i], "--tree") == 0) {
         driverAction = xcmp::DriverAction::EMIT_TREE;
+      } else if (std::strcmp(argv[i], "--tree-opt") == 0) {
+        driverAction = xcmp::DriverAction::EMIT_OPTIMISED_TREE;
       } else if (std::strcmp(argv[i], "--insts") == 0) {
         driverAction = xcmp::DriverAction::EMIT_INTERMEDIATE_INSTS;
       } else if (std::strcmp(argv[i], "--insts-lowered") == 0) {

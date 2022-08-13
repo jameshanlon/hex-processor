@@ -150,7 +150,7 @@ public:
         out << boost::format("write %d to simout(%d)\n") % memory[spWordIndex+2] % memory[spWordIndex+3];
         break;
       case hex::Syscall::READ:
-        out << boost::format("read to mem[%08x]\n") % (spWordIndex+1);
+        out << boost::format("read %d to mem[%08x]\n") % memory[spWordIndex+1] % (spWordIndex+1);
         break;
       default: break;
     }
@@ -225,7 +225,6 @@ public:
            out << boost::format("SUB areg = areg (%d) - breg (%d) (%d)\n") % areg % breg % (areg - breg);
             break;
           case hex::OprInstr::SVC:
-            traceSyscall();
             break;
         };
         break;
@@ -336,6 +335,9 @@ public:
               break;
             case hex::OprInstr::SVC:
               syscall();
+              if (tracing) {
+                traceSyscall();
+              }
               break;
             default:
               throw std::runtime_error("invalid OPR: " + std::to_string(oreg));

@@ -23,12 +23,12 @@ BOOST_AUTO_TEST_CASE(xhexb_run) {
 
 BOOST_AUTO_TEST_CASE(main_skip) {
   auto program = "proc main () is skip";
-  BOOST_TEST(runXProgram(program) == 0);
+  BOOST_TEST(runXProgramSrc(program) == 0);
 }
 
 BOOST_AUTO_TEST_CASE(main_stop) {
   auto program = "proc main () is stop";
-  BOOST_TEST(runXProgram(program) == 0);
+  BOOST_TEST(runXProgramSrc(program) == 0);
 }
 
 //===---------------------------------------------------------------------===//
@@ -39,7 +39,7 @@ BOOST_AUTO_TEST_CASE(syscall_exit_0_no_val) {
   auto program = R"(
 proc main () is 0(0)
 )";
-  BOOST_TEST(runXProgram(program) == 0);
+  BOOST_TEST(runXProgramSrc(program) == 0);
 }
 
 BOOST_AUTO_TEST_CASE(syscall_exit_0) {
@@ -47,7 +47,7 @@ BOOST_AUTO_TEST_CASE(syscall_exit_0) {
 val exit = 0;
 proc main () is exit(0)
 )";
-  BOOST_TEST(runXProgram(program) == 0);
+  BOOST_TEST(runXProgramSrc(program) == 0);
 }
 
 BOOST_AUTO_TEST_CASE(syscall_exit_1) {
@@ -55,7 +55,7 @@ BOOST_AUTO_TEST_CASE(syscall_exit_1) {
 val exit = 0;
 proc main () is exit(1)
 )";
-  BOOST_TEST(runXProgram(program) == 1);
+  BOOST_TEST(runXProgramSrc(program) == 1);
 }
 
 BOOST_AUTO_TEST_CASE(syscall_exit_255) {
@@ -63,7 +63,7 @@ BOOST_AUTO_TEST_CASE(syscall_exit_255) {
 val exit = 0;
 proc main () is exit(255)
 )";
-  BOOST_TEST(runXProgram(program) == 255);
+  BOOST_TEST(runXProgramSrc(program) == 255);
 }
 
 BOOST_AUTO_TEST_CASE(syscall_exit_neg_255) {
@@ -71,12 +71,12 @@ BOOST_AUTO_TEST_CASE(syscall_exit_neg_255) {
 val exit = 0;
 proc main () is exit(-255)
 )";
-  BOOST_TEST(runXProgram(program) == -255);
+  BOOST_TEST(runXProgramSrc(program) == -255);
 }
 
 BOOST_AUTO_TEST_CASE(syscall_put_stream_0_no_val) {
   auto program = "proc main () is 1('x', 0)";
-  runXProgram(program);
+  runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == "x");
 }
 
@@ -85,7 +85,7 @@ BOOST_AUTO_TEST_CASE(syscall_put_stream_0) {
 val put = 1;
 proc main () is put('x', 0)
 )";
-  runXProgram(program);
+  runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == "x");
 }
 
@@ -94,14 +94,13 @@ BOOST_AUTO_TEST_CASE(syscall_put_stream_255) {
 val put = 1;
 proc main () is put('x', 255)
 )";
-  runXProgram(program);
+  runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == "x");
 }
 
 BOOST_AUTO_TEST_CASE(syscall_get_stream_0_no_vals) {
   auto program = "proc main () is 0(2(0))";
-  simInBuffer.str("a");
-  BOOST_TEST(runXProgram(program) == 'a');
+  BOOST_TEST(runXProgramSrc(program, "a") == 'a');
 }
 
 BOOST_AUTO_TEST_CASE(syscall_get_stream_0) {
@@ -110,8 +109,7 @@ val exit = 0;
 val get = 2;
 proc main () is exit(get(0))
 )";
-  simInBuffer.str("a");
-  BOOST_TEST(runXProgram(program) == 'a');
+  BOOST_TEST(runXProgramSrc(program, "a") == 'a');
 }
 
 BOOST_AUTO_TEST_CASE(syscall_get_stream_255) {
@@ -120,8 +118,7 @@ val exit = 0;
 val get = 2;
 proc main () is exit(get(255))
 )";
-  simInBuffer.str("a");
-  BOOST_TEST(runXProgram(program) == 'a');
+  BOOST_TEST(runXProgramSrc(program, "a") == 'a');
 }
 
 BOOST_AUTO_TEST_CASE(syscall_echo_multiple) {
@@ -135,19 +132,18 @@ proc main () is {
   put(get(255));
   exit(0)
 })";
-  simInBuffer.str("abc");
-  runXProgram(program);
+  runXProgramSrc(program, "abc");
   BOOST_TEST(simOutBuffer.str() == "abc");
 }
 
 BOOST_AUTO_TEST_CASE(syscall_invalid_3) {
   auto program = "proc main () is 3(0)";
-  BOOST_CHECK_THROW(runXProgram(program), xcmp::InvalidSyscallError);
+  BOOST_CHECK_THROW(runXProgramSrc(program), xcmp::InvalidSyscallError);
 }
 
 BOOST_AUTO_TEST_CASE(syscall_invalid_val_3) {
   auto program = "val syscall=3; proc main () is syscall(0)";
-  BOOST_CHECK_THROW(runXProgram(program), xcmp::InvalidSyscallError);
+  BOOST_CHECK_THROW(runXProgramSrc(program), xcmp::InvalidSyscallError);
 }
 
 //===---------------------------------------------------------------------===//
@@ -172,7 +168,7 @@ proc main () is {
   put('d', 0);
   put('\n', 0)
 })";
-  runXProgram(program);
+  runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == "hello world\n");
 }
 
@@ -196,7 +192,7 @@ proc main() is {
   putval('d');
   newline()
 })";
-  runXProgram(program);
+  runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == "hello world\n");
 }
 
@@ -207,39 +203,25 @@ proc main() is {
 BOOST_AUTO_TEST_CASE(constants_min_positive_pool) {
   auto program = "val x = 65536; proc main () is 0(x)";
   BOOST_TEST(asmXProgram(program, false, true).str().find("_const0") != std::string::npos);
-  BOOST_TEST(runXProgram(program) == 65536);
+  BOOST_TEST(runXProgramSrc(program) == 65536);
 }
 
 BOOST_AUTO_TEST_CASE(constants_max_positive_pool) {
   auto program = "val x = 2147483647; proc main () is 0(x)";
   BOOST_TEST(asmXProgram(program, false, true).str().find("_const0") != std::string::npos);
-  BOOST_TEST(runXProgram(program) == 2147483647);
+  BOOST_TEST(runXProgramSrc(program) == 2147483647);
 }
 
 BOOST_AUTO_TEST_CASE(constants_min_negative_pool) {
   auto program = "val x = -65536; proc main () is 0(x)";
   BOOST_TEST(asmXProgram(program, false, true).str().find("_const0") != std::string::npos);
-  BOOST_TEST(runXProgram(program) == -65536);
+  BOOST_TEST(runXProgramSrc(program) == -65536);
 }
 
 BOOST_AUTO_TEST_CASE(constants_max_negative_pool) {
   auto program = "val x = -2147483648; proc main () is 0(x)";
   BOOST_TEST(asmXProgram(program, false, true).str().find("_const0") != std::string::npos);
-  BOOST_TEST(runXProgram(program) == -2147483648);
-}
-
-//===---------------------------------------------------------------------===//
-// Unary operators
-//===---------------------------------------------------------------------===//
-
-BOOST_AUTO_TEST_CASE(unary_minus) {
-  auto program = "func value() is return 42 proc main () is 0(-value())";
-  BOOST_TEST(runXProgram(program) == -42);
-}
-
-BOOST_AUTO_TEST_CASE(unary_not) {
-  auto program = "func value() is return 42 proc main () is 0(~value())";
-  BOOST_TEST(runXProgram(program) == 0);
+  BOOST_TEST(runXProgramSrc(program) == -2147483648);
 }
 
 //===---------------------------------------------------------------------===//
@@ -259,7 +241,7 @@ proc main() is {
   putval(foo('y'));
   newline()
 })";
-  runXProgram(program);
+  runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == "xy\n");
 }
 
@@ -276,7 +258,7 @@ proc main() is {
   putval(foo(foo(foo('z'))));
   newline()
 })";
-  runXProgram(program);
+  runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == "xyz\n");
 }
 
@@ -292,7 +274,7 @@ proc main() is {
   put(bar('x'), 0);
   put('\n', 0)
 })";
-  runXProgram(program);
+  runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == "by\n");
 }
 
@@ -307,7 +289,7 @@ proc main() is {
   put(2 + foo('a'), 0);
   put('\n', 0)
 })";
-  runXProgram(program);
+  runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == "bc\n");
 }
 
@@ -325,7 +307,7 @@ proc main() is {
   put(foo('a') + foo(1) + foo(1) + foo(1) + foo(1) + foo(1), 0);
   put('\n', 0)
 })";
-  runXProgram(program);
+  runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == "bcdef\n");
 }
 
@@ -341,7 +323,7 @@ proc main() is {
   put(1 + baz('x'), 0);
   put('\n', 0)
 })";
-  runXProgram(program);
+  runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == "cz\n");
 }
 
@@ -353,7 +335,7 @@ val exit = 0;
 func foo(val a0, val a1, val a2) is
   return a0 + a1 + a2
 proc main() is exit(foo(0, 1, 2)))";
-  BOOST_TEST(runXProgram(program) == 3);
+  BOOST_TEST(runXProgramSrc(program) == 3);
 }
 
 BOOST_AUTO_TEST_CASE(ten_func_args) {
@@ -365,7 +347,148 @@ func foo(val a0, val a1, val a2, val a3, val a4,
          val a5, val a6, val a7, val a8, val a9) is
   return a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9
 proc main() is exit(foo(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)))";
-  BOOST_TEST(runXProgram(program) == 45);
+  BOOST_TEST(runXProgramSrc(program) == 45);
+}
+
+//===---------------------------------------------------------------------===//
+// Unary operators
+//===---------------------------------------------------------------------===//
+
+BOOST_AUTO_TEST_CASE(unary_minus) {
+  auto program = "func value() is return 42 proc main () is 0(-value())";
+  BOOST_TEST(runXProgramSrc(program) == -42);
+}
+
+BOOST_AUTO_TEST_CASE(unary_minus_minus) {
+  auto program = "func value() is return 42 proc main () is 0(-(-value()))";
+  BOOST_TEST(runXProgramSrc(program) == 42);
+}
+
+BOOST_AUTO_TEST_CASE(unary_not) {
+  auto program = "func value() is return 42 proc main () is 0(~value())";
+  BOOST_TEST(runXProgramSrc(program) == 0);
+}
+
+BOOST_AUTO_TEST_CASE(unary_not_not) {
+  auto program = "func value() is return 42 proc main () is 0(~(~value()))";
+  BOOST_TEST(runXProgramSrc(program) == 1);
+}
+
+//===---------------------------------------------------------------------===//
+// Binary operators.
+// Tests using only syscalls and functions.
+//===---------------------------------------------------------------------===//
+
+BOOST_AUTO_TEST_CASE(binary_plus) {
+  auto program = R"(func add(val a, val b) is return a + b
+                    proc main () is 0(add(2(0), 2(0))))";
+  BOOST_TEST(runXProgramSrc(program, "00") == '0' + '0');
+  BOOST_TEST(runXProgramSrc(program, "01") == '0' + '1');
+  BOOST_TEST(runXProgramSrc(program, "02") == '0' + '2');
+  BOOST_TEST(runXProgramSrc(program, "03") == '0' + '3');
+  BOOST_TEST(runXProgramSrc(program, "04") == '0' + '4');
+  BOOST_TEST(runXProgramSrc(program, "05") == '0' + '5');
+}
+
+BOOST_AUTO_TEST_CASE(binary_sub) {
+  auto program = R"(func sub(val a, val b) is return a - b
+                    proc main () is 0(sub(2(0), 2(0))))";
+  BOOST_TEST(runXProgramSrc(program, "00") == '0' - '0');
+  BOOST_TEST(runXProgramSrc(program, "01") == '0' - '1');
+  BOOST_TEST(runXProgramSrc(program, "02") == '0' - '2');
+  BOOST_TEST(runXProgramSrc(program, "03") == '0' - '3');
+  BOOST_TEST(runXProgramSrc(program, "04") == '0' - '4');
+  BOOST_TEST(runXProgramSrc(program, "05") == '0' - '5');
+}
+
+BOOST_AUTO_TEST_CASE(binary_ls) {
+  auto program = R"(func ls(val a, val b) is return a < b
+                    proc main () is 0(ls(2(0), 2(0))))";
+  BOOST_TEST(runXProgramSrc(program, "40") == 0);
+  BOOST_TEST(runXProgramSrc(program, "41") == 0);
+  BOOST_TEST(runXProgramSrc(program, "42") == 0);
+  BOOST_TEST(runXProgramSrc(program, "43") == 0);
+  BOOST_TEST(runXProgramSrc(program, "44") == 0);
+  BOOST_TEST(runXProgramSrc(program, "45") == 1);
+  BOOST_TEST(runXProgramSrc(program, "46") == 1);
+  BOOST_TEST(runXProgramSrc(program, "47") == 1);
+  BOOST_TEST(runXProgramSrc(program, "48") == 1);
+  BOOST_TEST(runXProgramSrc(program, "49") == 1);
+}
+
+BOOST_AUTO_TEST_CASE(binary_le) {
+  auto program = R"(func le(val a, val b) is return a <= b
+                    proc main () is 0(le(2(0), 2(0))))";
+  BOOST_TEST(runXProgramSrc(program, "40") == 0);
+  BOOST_TEST(runXProgramSrc(program, "41") == 0);
+  BOOST_TEST(runXProgramSrc(program, "42") == 0);
+  BOOST_TEST(runXProgramSrc(program, "43") == 0);
+  BOOST_TEST(runXProgramSrc(program, "44") == 1);
+  BOOST_TEST(runXProgramSrc(program, "45") == 1);
+  BOOST_TEST(runXProgramSrc(program, "46") == 1);
+  BOOST_TEST(runXProgramSrc(program, "47") == 1);
+  BOOST_TEST(runXProgramSrc(program, "48") == 1);
+  BOOST_TEST(runXProgramSrc(program, "49") == 1);
+}
+
+BOOST_AUTO_TEST_CASE(binary_gt) {
+  auto program = R"(func gt(val a, val b) is return a > b
+                    proc main () is 0(gt(2(0), 2(0))))";
+  BOOST_TEST(runXProgramSrc(program, "40") == 1);
+  BOOST_TEST(runXProgramSrc(program, "41") == 1);
+  BOOST_TEST(runXProgramSrc(program, "42") == 1);
+  BOOST_TEST(runXProgramSrc(program, "43") == 1);
+  BOOST_TEST(runXProgramSrc(program, "44") == 0);
+  BOOST_TEST(runXProgramSrc(program, "45") == 0);
+  BOOST_TEST(runXProgramSrc(program, "46") == 0);
+  BOOST_TEST(runXProgramSrc(program, "47") == 0);
+  BOOST_TEST(runXProgramSrc(program, "48") == 0);
+  BOOST_TEST(runXProgramSrc(program, "49") == 0);
+}
+
+BOOST_AUTO_TEST_CASE(binary_ge) {
+  auto program = R"(func ge(val a, val b) is return a >= b
+                    proc main () is 0(ge(2(0), 2(0))))";
+  BOOST_TEST(runXProgramSrc(program, "40") == 1);
+  BOOST_TEST(runXProgramSrc(program, "41") == 1);
+  BOOST_TEST(runXProgramSrc(program, "42") == 1);
+  BOOST_TEST(runXProgramSrc(program, "43") == 1);
+  BOOST_TEST(runXProgramSrc(program, "44") == 1);
+  BOOST_TEST(runXProgramSrc(program, "45") == 0);
+  BOOST_TEST(runXProgramSrc(program, "46") == 0);
+  BOOST_TEST(runXProgramSrc(program, "47") == 0);
+  BOOST_TEST(runXProgramSrc(program, "48") == 0);
+  BOOST_TEST(runXProgramSrc(program, "49") == 0);
+}
+
+BOOST_AUTO_TEST_CASE(binary_eq) {
+  auto program = R"(func eq(val a, val b) is return a = b
+                    proc main () is 0(eq(2(0), 2(0))))";
+  BOOST_TEST(runXProgramSrc(program, "40") == 0);
+  BOOST_TEST(runXProgramSrc(program, "41") == 0);
+  BOOST_TEST(runXProgramSrc(program, "42") == 0);
+  BOOST_TEST(runXProgramSrc(program, "43") == 0);
+  BOOST_TEST(runXProgramSrc(program, "44") == 1);
+  BOOST_TEST(runXProgramSrc(program, "45") == 0);
+  BOOST_TEST(runXProgramSrc(program, "46") == 0);
+  BOOST_TEST(runXProgramSrc(program, "47") == 0);
+  BOOST_TEST(runXProgramSrc(program, "48") == 0);
+  BOOST_TEST(runXProgramSrc(program, "49") == 0);
+}
+
+BOOST_AUTO_TEST_CASE(binary_ne) {
+  auto program = R"(func ne(val a, val b) is return a ~= b
+                    proc main () is 0(ne(2(0), 2(0))))";
+  BOOST_TEST(runXProgramSrc(program, "40") == 1);
+  BOOST_TEST(runXProgramSrc(program, "41") == 1);
+  BOOST_TEST(runXProgramSrc(program, "42") == 1);
+  BOOST_TEST(runXProgramSrc(program, "43") == 1);
+  BOOST_TEST(runXProgramSrc(program, "44") == 0);
+  BOOST_TEST(runXProgramSrc(program, "45") == 1);
+  BOOST_TEST(runXProgramSrc(program, "46") == 1);
+  BOOST_TEST(runXProgramSrc(program, "47") == 1);
+  BOOST_TEST(runXProgramSrc(program, "48") == 1);
+  BOOST_TEST(runXProgramSrc(program, "49") == 1);
 }
 
 //===---------------------------------------------------------------------===//
@@ -385,7 +508,7 @@ proc main() is
   i := 0;
   while i < 10 do { put('0'+foo[i], 0); i:=i+1 }
 })";
-  runXProgram(program);
+  runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == "0123456789");
 }
 

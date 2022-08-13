@@ -116,12 +116,27 @@ struct TestContext {
   }
 
   /// Run an X program.
-  int runXProgram(const std::string &program,
-                  bool isFilename=false) {
+  int runXProgramSrc(const std::string &program,
+                     const std::string input="") {
     // Compile and assemble the program.
     xcmp::Driver driver(std::cout);
-    driver.run(xcmp::DriverAction::EMIT_BINARY, program, isFilename, "a.bin");
+    driver.run(xcmp::DriverAction::EMIT_BINARY, program, false, "a.bin");
     // Run the program.
+    simInBuffer.clear();
+    simInBuffer.str(input);
+    hexsim::Processor processor(simInBuffer, simOutBuffer);
+    processor.load("a.bin");
+    return processor.run();
+  }
+
+  int runXProgramFile(const std::string &filename,
+                      const std::string input="") {
+    // Compile and assemble the program.
+    xcmp::Driver driver(std::cout);
+    driver.run(xcmp::DriverAction::EMIT_BINARY, filename, true, "a.bin");
+    // Run the program.
+    simInBuffer.clear();
+    simInBuffer.str(input);
     hexsim::Processor processor(simInBuffer, simOutBuffer);
     processor.load("a.bin");
     return processor.run();

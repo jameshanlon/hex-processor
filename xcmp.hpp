@@ -615,7 +615,7 @@ class Expr : public AstNode {
 public:
   Expr(Location location) : AstNode(location), constValue(std::nullopt) {}
   bool isConst() const { return constValue.has_value(); }
-  bool isConstZero() const { return isConst() && constValue.value() == 0; }
+  bool isConstZero() const { return constValue.has_value() && constValue.value() == 0; }
   int getValue() const { return constValue.value(); }
   void setValue(int newConstValue) { constValue.emplace(newConstValue); }
 };
@@ -937,9 +937,7 @@ public:
     visitor->visitPre(*this);
     if (visitor->shouldRecurseStmts()) {
       condition->accept(visitor);
-      if (visitor->hasExprReplacement()) {
-        condition = std::move(visitor->getExprReplacement());
-      }
+      replaceExpr(condition, visitor);
       stmt->accept(visitor);
     }
     visitor->visitPost(*this);
@@ -2180,7 +2178,7 @@ public:
         if (expr.getOp() == Token::NOT) {
           auto trueLabel = cb.getLabel();
           auto endLabel = cb.getLabel();
-          cb.genExpr(expr.getElement());
+          // Element generated before.
           cb.genBRZ(trueLabel); // False -> True
           cb.genLDAC(0);
           cb.genBR(endLabel);
@@ -2470,6 +2468,7 @@ public:
         // be written directly into the parameter slots until all calls have
         // been resolved.
         genExpr(arg.get());
+        currentFrame->setSize(currentFrame->getSize() + 1);
         genLDBM(SP_OFFSET);
         genSTAI_FB(currentFrame, currentFrame->getOffset());
         currentFrame->decOffset(1);
@@ -2864,6 +2863,7 @@ public:
 enum class DriverAction {
   EMIT_TOKENS,
   EMIT_TREE,
+  EMIT_OPTIMISED_TREE,
   EMIT_INTERMEDIATE_INSTS,
   EMIT_LOWERED_INSTS,
   EMIT_ASM,
@@ -2911,12 +2911,19 @@ public:
     ConstProp constProp(symbolTable);
     tree->accept(&constProp);
 
+    // Parse and print program only.
+    if (action == DriverAction::EMIT_TREE) {
+      xcmp::AstPrinter printer(outStream);
+      tree->accept(&printer);
+      return 0;
+    }
+
     // Optimise expressions.
     OptimiseExpr optimiseExpr;
     tree->accept(&optimiseExpr);
 
     // Parse and print program only.
-    if (action == DriverAction::EMIT_TREE) {
+    if (action == DriverAction::EMIT_OPTIMISED_TREE) {
       xcmp::AstPrinter printer(outStream);
       tree->accept(&printer);
       return 0;
