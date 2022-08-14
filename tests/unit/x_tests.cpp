@@ -529,6 +529,117 @@ BOOST_AUTO_TEST_CASE(binary_ne) {
 }
 
 //===---------------------------------------------------------------------===//
+// Assign statement
+//===---------------------------------------------------------------------===//
+
+BOOST_AUTO_TEST_CASE(assign_statement) {
+  auto program = R"(
+proc main () is var x; {
+  x := 2(0); 0(x)
+})";
+  BOOST_TEST(runXProgramSrc(program, "0") == '0');
+  BOOST_TEST(runXProgramSrc(program, "1") == '1');
+}
+
+BOOST_AUTO_TEST_CASE(assign_statement_chained) {
+  auto program = R"(
+proc main () is
+var x; var y; var z; {
+  x := 2(0); y := x; z := y; 0(z)
+})";
+  BOOST_TEST(runXProgramSrc(program, "0") == '0');
+  BOOST_TEST(runXProgramSrc(program, "1") == '1');
+}
+
+//===---------------------------------------------------------------------===//
+// If statement
+//===---------------------------------------------------------------------===//
+
+BOOST_AUTO_TEST_CASE(if_statement) {
+  auto program = R"(
+proc main () is if 2() = 48 then 0(0) else 0(1))";
+  BOOST_TEST(runXProgramSrc(program, "0") == 0);
+  BOOST_TEST(runXProgramSrc(program, "1") == 1);
+}
+
+BOOST_AUTO_TEST_CASE(if_statement_skip_else) {
+  auto program = R"(
+proc main () is if 2() = 48 then 0(1) else skip)";
+  BOOST_TEST(runXProgramSrc(program, "0") == 1);
+  BOOST_TEST(runXProgramSrc(program, "1") == 0);
+}
+
+BOOST_AUTO_TEST_CASE(if_statement_skip_then) {
+  auto program = R"(
+proc main () is if 2() = 48 then skip else 0(1))";
+  BOOST_TEST(runXProgramSrc(program, "0") == 0);
+  BOOST_TEST(runXProgramSrc(program, "1") == 1);
+}
+
+BOOST_AUTO_TEST_CASE(if_statement_chained) {
+  auto program = R"(
+proc foo(val x) is      if x = 48 then 0(0)
+                   else if x = 49 then 0(1)
+                   else if x = 50 then 0(2)
+                   else 0(3)
+proc main () is foo(2(0)))";
+  BOOST_TEST(runXProgramSrc(program, "0") == 0);
+  BOOST_TEST(runXProgramSrc(program, "1") == 1);
+  BOOST_TEST(runXProgramSrc(program, "2") == 2);
+  BOOST_TEST(runXProgramSrc(program, "3") == 3);
+  BOOST_TEST(runXProgramSrc(program, "4") == 3);
+}
+
+//===---------------------------------------------------------------------===//
+// While statement
+//===---------------------------------------------------------------------===//
+
+BOOST_AUTO_TEST_CASE(while_statement_count) {
+  auto program = R"(
+proc main () is
+  var i;
+{ i := 0;
+  while i < 100 do i := i + 1;
+  0(i)
+})";
+  BOOST_TEST(runXProgramSrc(program) == 100);
+}
+
+BOOST_AUTO_TEST_CASE(while_statement_nested_count) {
+  auto program = R"(
+proc main () is
+  var i;
+  var j;
+  var count;
+{ count := 0;
+  i := 0;
+  while i < 10 do
+  { j := 0;
+    while j < 10 do
+    { count := count + 1;
+      j := j + 1
+    };
+    i := i + 1
+  };
+  0(count)
+})";
+  BOOST_TEST(runXProgramSrc(program) == 100);
+}
+
+BOOST_AUTO_TEST_CASE(while_statement_count_if_exit) {
+  auto program = R"(
+proc main () is
+  var i;
+{ i := 0;
+  while true do
+  { if i >= 100 then 0(i) else skip;
+    i := i + 1
+  }
+})";
+  BOOST_TEST(runXProgramSrc(program) == 100);
+}
+
+//===---------------------------------------------------------------------===//
 // Arrays
 //===---------------------------------------------------------------------===//
 
