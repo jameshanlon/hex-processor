@@ -521,7 +521,7 @@ class AssStatement;
 
 /// A visitor base class for the AST.
 class AstVisitor {
-  bool recurseBinop; // Expr
+  bool recurseOp; // Expr
   bool recurseCalls; // Expr
   bool recurseStmts; // Stmts
   // Useful reference "Visitor Pattern, replacing objects" on this strategy.
@@ -529,10 +529,10 @@ class AstVisitor {
   std::unique_ptr<Expr> exprReplacement;
 
 public:
-  AstVisitor(bool recurseBinop=true, bool recurseCalls=true, bool recurseStmts=true) :
-    recurseBinop(recurseBinop), recurseCalls(recurseCalls), recurseStmts(recurseStmts),
+  AstVisitor(bool recurseOp=true, bool recurseCalls=true, bool recurseStmts=true) :
+    recurseOp(recurseOp), recurseCalls(recurseCalls), recurseStmts(recurseStmts),
     exprReplacement(nullptr) {}
-  bool shouldRecurseBinop() const { return recurseBinop; }
+  bool shouldRecurseOp() const { return recurseOp; }
   bool shouldRecurseCalls() const { return recurseCalls; }
   bool shouldRecurseStmts() const { return recurseStmts; }
   bool hasExprReplacement() const { return exprReplacement != nullptr; }
@@ -724,7 +724,7 @@ public:
       Expr(location), op(op), element(std::move(element)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    if (!isConst() && visitor->shouldRecurseBinop()) {
+    if (!isConst() && visitor->shouldRecurseOp()) {
       element->accept(visitor);
       replaceExpr(element, visitor);
     }
@@ -742,7 +742,7 @@ public:
       Expr(location), op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    if (!isConst() && visitor->shouldRecurseBinop()) {
+    if (!isConst() && visitor->shouldRecurseOp()) {
       LHS->accept(visitor);
       replaceExpr(LHS, visitor);
       RHS->accept(visitor);
