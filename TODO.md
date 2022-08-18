@@ -21,21 +21,23 @@ Tests:
 - Constant pool [DONE]
 - Unary operators -, ~ [DONE]
 - Boolean operators +, -, <, <=, >, >=, =, ~= [DONE]
-- If statement
-- While statement
+- If statement [DONE]
+- While statement [DONE]
 - Sequence statement
-- Assign statement
+- Assign statement [DONE]
 - Global variable allocation
 - Global array allocation
 - Array subscripts (assign and access)
 - Array arguments
 - String constants
+- Constant propagation for expressions
 
 Optimisations:
 
+- Tail recursion (jump to end of EPILOGUE)
+- Eliminate BR lab; lab, for procedure exits
 - x + 0 -> x
 - x | 0 -> x
 - x - 0 -> x
 - ~a | ~b -> ~(a & b)
 - ~a & ~b -> ~(a | b)
-- Tail recursion

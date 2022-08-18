@@ -724,7 +724,7 @@ public:
       Expr(location), op(op), element(std::move(element)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    if (!isConst()) {
+    if (!isConst() && visitor->shouldRecurseBinop()) {
       element->accept(visitor);
       replaceExpr(element, visitor);
     }
@@ -1656,18 +1656,26 @@ enum class SymbolScope {
 class Symbol;
 
 class Frame {
-  size_t size;           // The running maximum size of the frame.
-  size_t offset;         // The current stack pointer offset from the frame base.
-                         // Negative offsets index temporaries in the current frame.
-                         // Positive offsets index arguments from the previous frame.
-  std::string exitLabel; // Procedure exit.
+  // The current stack pointer offset from the frame base.  This is a positive
+  // index addressing high-to-low memory locations.  Frame base is the top-most
+  // memory location of the frame, ie the first location after the caller's
+  // frame.
+  size_t offset;
+  // The running maximum size of the frame.
+  size_t size;
+  // Exit label.
+  std::string exitLabel;
 
 public:
-  Frame(std::string exitLabel) : size(0), offset(-1), exitLabel(exitLabel) {}
-  void setSize(size_t newSize) { size = newSize > size ? newSize : size; }
+  Frame(std::string exitLabel) : offset(0), size(0), exitLabel(exitLabel) {}
   int getSize() { return size; }
-  void incOffset(int amount) { offset += amount; }
-  void decOffset(int amount) { offset -= amount; }
+  void incOffset(int amount) {
+    offset += amount;
+    size = std::max(size, offset); // +1 since it's an offset?
+  }
+  void decOffset(int amount) {
+    offset -= amount;
+  }
   void setOffset(int value) { offset = value; }
   size_t getOffset() { return offset; }
   const std::string &getExitLabel() const { return exitLabel; }
@@ -1785,14 +1793,14 @@ public:
       switch (expr.getOp()) {
         case Token::PLUS:  result = LHS->getValue() +  RHS->getValue(); break;
         case Token::MINUS: result = LHS->getValue() -  RHS->getValue(); break;
-        case Token::OR:    result = LHS->getValue() |  RHS->getValue(); break;
-        case Token::AND:   result = LHS->getValue() &  RHS->getValue(); break;
         case Token::EQ:    result = LHS->getValue() == RHS->getValue(); break;
         case Token::NE:    result = LHS->getValue() != RHS->getValue(); break;
         case Token::LS:    result = LHS->getValue() <  RHS->getValue(); break;
         case Token::LE:    result = LHS->getValue() <= RHS->getValue(); break;
         case Token::GR:    result = LHS->getValue() >  RHS->getValue(); break;
         case Token::GE:    result = LHS->getValue() >= RHS->getValue(); break;
+        case Token::AND:   result = LHS->getValue() == 0 ? 0 : (RHS->getValue() == 0 ? 0 : 1); break;
+        case Token::OR:    result = LHS->getValue() != 0 ? 1 : (RHS->getValue() == 0 ? 0 : 1); break;
         default:
           throw SemanticTokenError(expr.getLocation(), "unexpected binary op", expr.getOp());
       }
@@ -1806,7 +1814,7 @@ public:
       int result;
       switch (expr.getOp()) {
         case Token::MINUS: result = -element->getValue(); break;
-        case Token::NOT:   result = ~element->getValue(); break;
+        case Token::NOT:   result = element->getValue() == 0 ? 1 : 0; break;
         default:
           throw SemanticTokenError(expr.getLocation(), "unexpected unary op", expr.getOp());
       }
@@ -2065,15 +2073,14 @@ public:
         size_t stackOffset = cb.getCurrentFrame()->getOffset();
         // Gen RHS and save to stack.
         cb.genExpr(expr.getRHS());
-        currentFrame->decOffset(1);
-        currentFrame->setSize(currentFrame->getSize() + 1);
+        currentFrame->incOffset(1);
         cb.genLDBM(SP_OFFSET);
-        cb.genSTAI_FB(currentFrame, currentFrame->getOffset());
+        cb.genSTAI_FB(currentFrame, -currentFrame->getOffset());
         // Gen LHS.
         cb.genExpr(expr.getLHS());
         // Restore RHS from stack into breg.
         cb.genLDBM(SP_OFFSET);
-        cb.genLDBI_FB(currentFrame, currentFrame->getOffset());
+        cb.genLDBI_FB(currentFrame, -currentFrame->getOffset());
         currentFrame->setOffset(stackOffset);
       } else {
         cb.genExpr(expr.getLHS());
@@ -2178,7 +2185,7 @@ public:
         if (expr.getOp() == Token::NOT) {
           auto trueLabel = cb.getLabel();
           auto endLabel = cb.getLabel();
-          // Element generated before.
+          cb.genExpr(expr.getElement());
           cb.genBRZ(trueLabel); // False -> True
           cb.genLDAC(0);
           cb.genBR(endLabel);
@@ -2321,25 +2328,25 @@ public:
     void visitPost(AssStatement &expr) {
       cb.genExpr(expr.getRHS());
       if (auto *varRefLHS = dynamic_cast<VarRefExpr*>(expr.getLHS().get())) {
-        // RHS variable reference.
+        // LHS variable reference.
         auto symbol = st.lookup(varRefLHS->getName(), expr.getLocation());
         auto frameIndex = symbol->getStackOffset();
         cb.genLDBM(SP_OFFSET);
         cb.genSTAI_FB(symbol->getFrame(), frameIndex);
       } else if (auto *arraySubLHS = dynamic_cast<ArraySubscriptExpr*>(expr.getLHS().get())) {
-        // Handle RHS subscript.
+        // Handle LHS subscript.
         cb.genVar(Reg::B, st.lookup(arraySubLHS->getName(), arraySubLHS->getLocation()));
         cb.genExpr(arraySubLHS->getExpr());
         cb.genADD();
         auto stackOffset = cb.getCurrentFrame()->getOffset();
-        cb.getCurrentFrame()->setSize(cb.getCurrentFrame()->getSize() + 1);
+        cb.getCurrentFrame()->incOffset(1);
         cb.genLDBM(SP_OFFSET);
-        cb.genSTAI_FB(cb.getCurrentFrame(), stackOffset);
+        cb.genSTAI_FB(cb.getCurrentFrame(), -stackOffset);
         cb.genExpr(expr.getRHS());
         cb.genLDBM(SP_OFFSET);
-        cb.genLDBI_FB(cb.getCurrentFrame(), stackOffset);
+        cb.genLDBI_FB(cb.getCurrentFrame(), -stackOffset);
         cb.genSTAI(0);
-        cb.getCurrentFrame()->setOffset(stackOffset);
+        cb.getCurrentFrame()->decOffset(1);
       } else {
         assert(0 && "unexpected target of assignment statement");
       }
@@ -2468,17 +2475,17 @@ public:
         // be written directly into the parameter slots until all calls have
         // been resolved.
         genExpr(arg.get());
-        currentFrame->setSize(currentFrame->getSize() + 1);
         genLDBM(SP_OFFSET);
-        genSTAI_FB(currentFrame, currentFrame->getOffset());
-        currentFrame->decOffset(1);
+        genSTAI_FB(currentFrame, -currentFrame->getOffset());
+        currentFrame->incOffset(1);
       }
     }
+    // Restore the stack pointer offset so loadActuals can sequence through
+    // the call actual locations again.
     currentFrame->setOffset(stackOffset);
   }
 
   void loadActuals(const std::vector<std::unique_ptr<Expr>> &args, size_t parameterOffset) {
-    size_t stackOffset = currentFrame->getOffset();
     size_t parameterIndex = parameterOffset;
     for (auto &arg : args) {
       if (containsCall(arg)) {
@@ -2486,10 +2493,10 @@ public:
         // expression value saved to a temporary stack location and store it
         // to the actual parameter location.
         genLDAM(SP_OFFSET);
-        genLDAI_FB(currentFrame, currentFrame->getOffset());
+        genLDAI_FB(currentFrame, -currentFrame->getOffset());
+        currentFrame->incOffset(1);
         genLDBM(SP_OFFSET);
         genSTAI(parameterIndex);
-        currentFrame->decOffset(1);
       } else {
         // For all other actual expressions, generate the value and store it to
         // the actual parameter location.
@@ -2499,7 +2506,6 @@ public:
       }
       parameterIndex++;
     }
-    currentFrame->setOffset(stackOffset);
   }
 
   void genSysCall(int syscallId, const std::vector<std::unique_ptr<Expr>> &args) {
@@ -2507,7 +2513,7 @@ public:
     // Actual parameters.
     genCallActuals(args);
     loadActuals(args, FB_PARAM_OFFSET_FUNC);
-    currentFrame->setSize(args.size() + FB_PARAM_OFFSET_FUNC);
+    currentFrame->incOffset(args.size() + FB_PARAM_OFFSET_FUNC);
     // Perform syscall.
     genLDAC(syscallId);
     genOPR(hexasm::Token::SVC);
@@ -2522,7 +2528,7 @@ public:
     // Actual parameters.
     genCallActuals(args);
     loadActuals(args, FB_PARAM_OFFSET_FUNC);
-    currentFrame->setSize(args.size() + FB_PARAM_OFFSET_FUNC);
+    currentFrame->incOffset(args.size() + FB_PARAM_OFFSET_FUNC);
     // Branch and link.
     auto linkLabel = getLabel();
     genLDAP(linkLabel);
@@ -2539,7 +2545,7 @@ public:
     // Actual parameters.
     genCallActuals(args);
     loadActuals(args, FB_PARAM_OFFSET_PROC);
-    currentFrame->setSize(args.size() + FB_PARAM_OFFSET_PROC);
+    currentFrame->incOffset(args.size() + FB_PARAM_OFFSET_PROC);
     // Branch and link.
     auto linkLabel = getLabel();
     genLDAP(linkLabel);
@@ -2574,14 +2580,14 @@ public:
   std::vector<std::unique_ptr<hexasm::Directive>> &getInstrs() { return instrs; }
   std::vector<std::unique_ptr<hexasm::Directive>> &getData() { return data; }
   void setCurrentFrame(Frame *frame) { currentFrame = frame; }
-  void setCurrentFrameSize(size_t size) { currentFrame->setSize(size); }
   Frame *getCurrentFrame() { return currentFrame; }
 };
 
 /// Assign stack locations to function/process formal parameters, represented
 /// by frame-base offsets into the previous (caller) frame. Offset by 1 for
-/// processes to account for the link address slot, and 2 for functions for
-/// the link and return value slots.
+/// processes to account for the link address slot, 2 for functions for
+/// the link and return value slots, and +1 in both cases to account for the
+/// frame-base indexing.
 class FormalLocations : public AstVisitor {
   SymbolTable &st;
   std::shared_ptr<Frame> &frame;
@@ -2593,7 +2599,7 @@ class FormalLocations : public AstVisitor {
   }
 public:
   FormalLocations(SymbolTable &st, std::shared_ptr<Frame> &frame, bool isFunction) :
-    st(st), frame(frame), frameBaseOffset(isFunction ? FB_PARAM_OFFSET_FUNC : FB_PARAM_OFFSET_PROC) {}
+    st(st), frame(frame), frameBaseOffset(1 + (isFunction ? FB_PARAM_OFFSET_FUNC : FB_PARAM_OFFSET_PROC)) {}
   void visitPost(ValFormal &formal) { assignLocation(formal); }
   void visitPost(ArrayFormal &formal) { assignLocation(formal); }
   void visitPost(ProcFormal &formal) { assignLocation(formal); }
@@ -2604,16 +2610,17 @@ public:
 class LocalDeclLocations : public AstVisitor {
   SymbolTable &st;
   std::shared_ptr<Frame> &frame;
-  size_t count; // Starts at 1 for the stack offset to account for 0-indexed offsets.
+  size_t count;
   void assignLocation(Decl &decl, size_t size) {
     auto symbol = st.lookup(decl.getName(), decl.getLocation());
     symbol->setStackOffset(count);
     symbol->setFrame(frame);
+    frame->incOffset(size);
     count += size;
   }
 public:
   LocalDeclLocations(SymbolTable &st, std::shared_ptr<Frame> &frame) :
-    st(st), frame(frame), count(1) {}
+    st(st), frame(frame), count(0) {}
   void visitPost(ArrayDecl &decl) { assignLocation(decl, decl.getSize()); }
   void visitPost(VarDecl &decl) { assignLocation(decl, 1); }
   void visitPost(ValDecl &decl) { assignLocation(decl, 1); }
@@ -2787,7 +2794,7 @@ public:
         // Calculate the new offset from the SP: frame size plus frame-base
         // offset (negative to access current frame, positive to access
         // previous frame).
-        int newOffset = oldInstr->getFrame()->getSize() + oldInstr->getOffset();
+        int newOffset = oldInstr->getFrame()->getSize() - 1 + oldInstr->getOffset();
         switch (token) {
         case hexasm::Token::LDAI_FB: cb.genLDAI(newOffset); break;
         case hexasm::Token::LDBI_FB: cb.genLDBI(newOffset); break;

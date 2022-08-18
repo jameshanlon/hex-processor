@@ -388,27 +388,32 @@ proc main() is 0(add3(add3(add3(nop(1)+1, nop(2)+1, nop(3)+1), nop(4)+1, nop(5)+
 }
 
 //===---------------------------------------------------------------------===//
-// Unary operators
+// Unary operators (using stdin to avoid constant propagation).
 //===---------------------------------------------------------------------===//
 
 BOOST_AUTO_TEST_CASE(unary_minus) {
-  auto program = "func value() is return 42 proc main () is 0(-value())";
-  BOOST_TEST(runXProgramSrc(program) == -42);
-}
-
-BOOST_AUTO_TEST_CASE(unary_minus_minus) {
-  auto program = "func value() is return 42 proc main () is 0(-(-value()))";
-  BOOST_TEST(runXProgramSrc(program) == 42);
+  BOOST_TEST(runXProgramSrc("proc main () is 0(-(2()))", "0") == -'0');
+  BOOST_TEST(runXProgramSrc("proc main () is 0(-(-(2())))", "0") == '0');
+  BOOST_TEST(runXProgramSrc("proc main () is 0(-(-(-(2()))))", "0") == -'0');
+  // Constant popagation.
+  BOOST_TEST(runXProgramSrc("proc main () is 0(-42)") == -42);
+  BOOST_TEST(runXProgramSrc("proc main () is 0(-(-42))") == 42);
+  BOOST_TEST(runXProgramSrc("proc main () is 0(-(-(-42)))") == -42);
 }
 
 BOOST_AUTO_TEST_CASE(unary_not) {
-  auto program = "func value() is return 42 proc main () is 0(~value())";
-  BOOST_TEST(runXProgramSrc(program) == 0);
-}
-
-BOOST_AUTO_TEST_CASE(unary_not_not) {
-  auto program = "func value() is return 42 proc main () is 0(~(~value()))";
-  BOOST_TEST(runXProgramSrc(program) == 1);
+  BOOST_TEST(runXProgramSrc("proc main () is 0(~2())", "0") == 0);
+  BOOST_TEST(runXProgramSrc("proc main () is 0(~(~2()))", "0") == 1);
+  BOOST_TEST(runXProgramSrc("proc main () is 0(~(~(~2())))", "0") == 0);
+  // With boolean literals.
+  BOOST_TEST(runXProgramSrc("proc main () is 0(~(2()))", {1}) == 0);
+  BOOST_TEST(runXProgramSrc("proc main () is 0(~(2()))", {0}) == 1);
+  // Constant popagation.
+  BOOST_TEST(runXProgramSrc("proc main () is 0(~42)") == 0);
+  BOOST_TEST(runXProgramSrc("proc main () is 0(~(~42))") == 1);
+  BOOST_TEST(runXProgramSrc("proc main () is 0(~(~(~42)))") == 0);
+  BOOST_TEST(runXProgramSrc("proc main () is 0(~true)") == 0);
+  BOOST_TEST(runXProgramSrc("proc main () is 0(~false)") != 0);
 }
 
 //===---------------------------------------------------------------------===//
@@ -528,6 +533,38 @@ BOOST_AUTO_TEST_CASE(binary_ne) {
   BOOST_TEST(runXProgramSrc(program, "49") == 1);
 }
 
+// Associative operators.
+
+BOOST_AUTO_TEST_CASE(binary_associative_plus4) {
+  auto program = R"(func add4(val a, val b, val c, val d) is
+                      return a + b + c + d
+                    proc main () is 0(add4(2(0), 2(0), 2(0), 2(0))))";
+  BOOST_TEST(runXProgramSrc(program, "1234") == '1'+'2'+'3'+'4');
+}
+
+BOOST_AUTO_TEST_CASE(binary_associative_and4) {
+  auto program = R"(func and4(val a, val b, val c, val d) is
+                      return a and b and c and d
+                    proc main () is 0(and4(2(0), 2(0), 2(0), 2(0))))";
+  BOOST_TEST(runXProgramSrc(program, {0, 0, 0, 0}) == 0);
+  BOOST_TEST(runXProgramSrc(program, {1, 0, 0, 0}) == 0);
+  BOOST_TEST(runXProgramSrc(program, {1, 1, 0, 0}) == 0);
+  BOOST_TEST(runXProgramSrc(program, {1, 1, 1, 0}) == 0);
+  BOOST_TEST(runXProgramSrc(program, {1, 1, 1, 1}) == 1);
+}
+
+BOOST_AUTO_TEST_CASE(binary_associative_or4) {
+  auto program = R"(func or4(val a, val b, val c, val d) is
+                      return a or b or c or d
+                    proc main () is 0(or4(2(0), 2(0), 2(0), 2(0))))";
+  BOOST_TEST(runXProgramSrc(program, {0, 0, 0, 0}) == 0);
+  BOOST_TEST(runXProgramSrc(program, {1, 0, 0, 0}) == 1);
+  BOOST_TEST(runXProgramSrc(program, {0, 1, 0, 0}) == 1);
+  BOOST_TEST(runXProgramSrc(program, {0, 0, 1, 0}) == 1);
+  BOOST_TEST(runXProgramSrc(program, {0, 0, 0, 1}) == 1);
+  BOOST_TEST(runXProgramSrc(program, {1, 1, 1, 1}) == 1);
+}
+
 //===---------------------------------------------------------------------===//
 // Assign statement
 //===---------------------------------------------------------------------===//
@@ -640,10 +677,16 @@ proc main () is
 }
 
 //===---------------------------------------------------------------------===//
-// Arrays
+// Global variables
 //===---------------------------------------------------------------------===//
 
-BOOST_AUTO_TEST_CASE(array_while_printvals) {
+
+
+//===---------------------------------------------------------------------===//
+// Global arrays
+//===---------------------------------------------------------------------===//
+
+BOOST_AUTO_TEST_CASE(global_array_while_printvals) {
   // Write the contents of an array then print it out.
   // Testing array subscript assignment and access.
   auto program = R"(
@@ -652,9 +695,11 @@ val put = 1;
 proc main() is
   var i;
 { i := 0;
-  while i < 10 do { foo[i] := i; i:=i+1 };
-  i := 0;
-  while i < 10 do { put('0'+foo[i], 0); i:=i+1 }
+  while i < 10 do
+  { foo[i] := i;
+    put('0'+foo[i], 0);
+    i := i + 1
+  }
 })";
   runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == "0123456789");
