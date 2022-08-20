@@ -1133,7 +1133,7 @@ public:
   void visitPost(NumberExpr &expr) override { }
   void visitPre(CallExpr &expr) override {
     if (expr.isSysCall()) {
-      indent(); outs << boost::format("syscallstmt %d%s\n") % expr.getSysCallId() % locString(expr);
+      indent(); outs << boost::format("syscall %d%s\n") % expr.getSysCallId() % locString(expr);
     } else {
       indent(); outs << boost::format("call %s%s\n") % expr.getName() % locString(expr);
     }
@@ -1206,7 +1206,11 @@ public:
     indentCount--;
   };
   void visitPre(CallStatement &stmt) override {
-    indent(); outs << boost::format("callstmt %s\n") % locString(stmt);
+    if (stmt.getCall()->isSysCall()) {
+      indent(); outs << boost::format("syscallstmt %d%s\n") % stmt.getCall()->getSysCallId() % locString(stmt);
+    } else {
+      indent(); outs << boost::format("callstmt %s\n") % locString(stmt);
+    }
     indentCount++;
   };
   void visitPost(CallStatement &stmt) override {
@@ -1906,7 +1910,7 @@ public:
     }
   }
   void visitPost(UnaryOpExpr &expr) {
-    if (expr.getOp() == Token::MINUS) {
+    if (!expr.isConst() && expr.getOp() == Token::MINUS) {
       // Transform -x to 0 - x
       auto zero = std::make_unique<NumberExpr>(expr.getLocation(), 0);
       auto replace = std::make_unique<BinaryOpExpr>(expr.getLocation(), expr.getOp(),
@@ -2067,20 +2071,22 @@ public:
       // For ADD and SUB binary operations:
       //  - LHS materialise in areg.
       //  - RHS materialise in breg.
+      // NOTE: this does not respect left-to-right ordering of operations.
       if (needsAReg(expr.getRHS())) {
         // Switch RHS areg into breg after generating LHS.
         auto currentFrame = cb.getCurrentFrame();
         size_t stackOffset = cb.getCurrentFrame()->getOffset();
         // Gen RHS and save to stack.
         cb.genExpr(expr.getRHS());
+        auto offset = currentFrame->getOffset();
         currentFrame->incOffset(1);
         cb.genLDBM(SP_OFFSET);
-        cb.genSTAI_FB(currentFrame, -currentFrame->getOffset());
+        cb.genSTAI_FB(currentFrame, -stackOffset);
         // Gen LHS.
         cb.genExpr(expr.getLHS());
         // Restore RHS from stack into breg.
         cb.genLDBM(SP_OFFSET);
-        cb.genLDBI_FB(currentFrame, -currentFrame->getOffset());
+        cb.genLDBI_FB(currentFrame, -offset);
         currentFrame->setOffset(stackOffset);
       } else {
         cb.genExpr(expr.getLHS());
@@ -2775,11 +2781,13 @@ public:
         }
         // Process
         if (epilogue->getSymbol()->getType() == SymbolType::PROC) {
-          // Contract the stack poiner.
-          cb.genLDBM(SP_OFFSET);
-          cb.genLDAC(frameSize);
-          cb.genOPR(hexasm::Token::ADD);
-          cb.genSTAM(SP_OFFSET);
+          if (epilogue->getFrame()->getSize() > 0) {
+            // Contract the stack poiner.
+            cb.genLDBM(SP_OFFSET);
+            cb.genLDAC(frameSize);
+            cb.genOPR(hexasm::Token::ADD);
+            cb.genSTAM(SP_OFFSET);
+          }
           // Branch back to the caller.
           // breg holds unadjusted SP.
           cb.genLDBI(frameSize);

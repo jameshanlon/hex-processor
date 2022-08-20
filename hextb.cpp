@@ -80,7 +80,7 @@ void handleSyscall(hex::Syscall syscall,
       if (trace) {
         std::cout << boost::format("input(%d)\n") % stream;
       }
-      top->hex->u_memory->memory_q[spWordIndex+1] = io.input(stream) & 0xFF;
+      top->hex->u_memory->memory_q[spWordIndex+1] = io.input(stream);
       break;
     }
     default:

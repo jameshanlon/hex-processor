@@ -27,6 +27,7 @@ static void help(const char *argv[]) {
   std::cout << "  -h,--help         Display this message\n";
   std::cout << "  --tokens          Tokenise the input only\n";
   std::cout << "  --tree            Display the syntax tree only\n";
+  std::cout << "  --tree-opt        Display the optimised syntax tree only\n";
   std::cout << "  --insts           Display the intermediate instructions only\n";
   std::cout << "  --insts-lowered   Display the lowered instructions only\n";
   std::cout << "  --memory-info     Report memory information\n";

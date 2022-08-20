@@ -242,7 +242,7 @@ public:
         io.output(memory[spWordIndex+2], memory[spWordIndex+3]);
         break;
       case hex::Syscall::READ:
-        memory[spWordIndex+1] = io.input(memory[spWordIndex+2]) & 0xFF;
+        memory[spWordIndex+1] = io.input(memory[spWordIndex+2]);
         break;
       default:
         throw std::runtime_error("invalid syscall: " + std::to_string(areg));

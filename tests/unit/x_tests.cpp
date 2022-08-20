@@ -388,7 +388,7 @@ proc main() is 0(add3(add3(add3(nop(1)+1, nop(2)+1, nop(3)+1), nop(4)+1, nop(5)+
 }
 
 //===---------------------------------------------------------------------===//
-// Unary operators (using stdin to avoid constant propagation).
+// Unary operators.
 //===---------------------------------------------------------------------===//
 
 BOOST_AUTO_TEST_CASE(unary_minus) {
@@ -419,127 +419,221 @@ BOOST_AUTO_TEST_CASE(unary_not) {
 //===---------------------------------------------------------------------===//
 // Binary operators.
 // Tests using only syscalls and functions.
+// Note that the order of evaluation in binary operations is not guaranteed
+// left-to-right, so in the tests below where syscalls are used, ordering is
+// fixed by performing the calls in separate actuals.
 //===---------------------------------------------------------------------===//
 
 BOOST_AUTO_TEST_CASE(binary_plus) {
   auto program = R"(func add(val a, val b) is return a + b
                     proc main () is 0(add(2(0), 2(0))))";
-  BOOST_TEST(runXProgramSrc(program, "00") == '0' + '0');
-  BOOST_TEST(runXProgramSrc(program, "01") == '0' + '1');
-  BOOST_TEST(runXProgramSrc(program, "02") == '0' + '2');
-  BOOST_TEST(runXProgramSrc(program, "03") == '0' + '3');
-  BOOST_TEST(runXProgramSrc(program, "04") == '0' + '4');
-  BOOST_TEST(runXProgramSrc(program, "05") == '0' + '5');
+  for (auto a : getCharValues()) {
+    for (auto b : getCharValues()) {
+      BOOST_TEST(runXProgramSrc(program, {a, b}) == (a + b));
+    }
+  }
 }
 
 BOOST_AUTO_TEST_CASE(binary_sub) {
   auto program = R"(func sub(val a, val b) is return a - b
                     proc main () is 0(sub(2(0), 2(0))))";
-  BOOST_TEST(runXProgramSrc(program, "00") == '0' - '0');
-  BOOST_TEST(runXProgramSrc(program, "01") == '0' - '1');
-  BOOST_TEST(runXProgramSrc(program, "02") == '0' - '2');
-  BOOST_TEST(runXProgramSrc(program, "03") == '0' - '3');
-  BOOST_TEST(runXProgramSrc(program, "04") == '0' - '4');
-  BOOST_TEST(runXProgramSrc(program, "05") == '0' - '5');
+  for (auto a : getCharValues()) {
+    for (auto b : getCharValues()) {
+      BOOST_TEST(runXProgramSrc(program, {a, b}) == (a - b));
+    }
+  }
+}
+
+BOOST_AUTO_TEST_CASE(binary_sub_rhs_then_lhs) {
+  // A test to show that binops with operatings both requiring aregs are
+  // evaluated RHS then LHS (eg b - a in this case).
+  auto program = "proc main () is 0(2(0) - 2(0))";
+  for (auto a : getCharValues()) {
+    for (auto b : getCharValues()) {
+      BOOST_TEST(runXProgramSrc(program, {a, b}) == (b - a));
+    }
+  }
 }
 
 BOOST_AUTO_TEST_CASE(binary_ls) {
   auto program = R"(func ls(val a, val b) is return a < b
                     proc main () is 0(ls(2(0), 2(0))))";
-  BOOST_TEST(runXProgramSrc(program, "40") == 0);
-  BOOST_TEST(runXProgramSrc(program, "41") == 0);
-  BOOST_TEST(runXProgramSrc(program, "42") == 0);
-  BOOST_TEST(runXProgramSrc(program, "43") == 0);
-  BOOST_TEST(runXProgramSrc(program, "44") == 0);
-  BOOST_TEST(runXProgramSrc(program, "45") == 1);
-  BOOST_TEST(runXProgramSrc(program, "46") == 1);
-  BOOST_TEST(runXProgramSrc(program, "47") == 1);
-  BOOST_TEST(runXProgramSrc(program, "48") == 1);
-  BOOST_TEST(runXProgramSrc(program, "49") == 1);
+  for (auto a : getCharValues()) {
+    for (auto b : getCharValues()) {
+      BOOST_TEST((runXProgramSrc(program, {a, b}) != 0) == (a < b));
+    }
+  }
 }
 
 BOOST_AUTO_TEST_CASE(binary_le) {
   auto program = R"(func le(val a, val b) is return a <= b
                     proc main () is 0(le(2(0), 2(0))))";
-  BOOST_TEST(runXProgramSrc(program, "40") == 0);
-  BOOST_TEST(runXProgramSrc(program, "41") == 0);
-  BOOST_TEST(runXProgramSrc(program, "42") == 0);
-  BOOST_TEST(runXProgramSrc(program, "43") == 0);
-  BOOST_TEST(runXProgramSrc(program, "44") == 1);
-  BOOST_TEST(runXProgramSrc(program, "45") == 1);
-  BOOST_TEST(runXProgramSrc(program, "46") == 1);
-  BOOST_TEST(runXProgramSrc(program, "47") == 1);
-  BOOST_TEST(runXProgramSrc(program, "48") == 1);
-  BOOST_TEST(runXProgramSrc(program, "49") == 1);
+  for (auto a : getCharValues()) {
+    for (auto b : getCharValues()) {
+      BOOST_TEST((runXProgramSrc(program, {a, b}) != 0) == (a <= b));
+    }
+  }
 }
 
 BOOST_AUTO_TEST_CASE(binary_gt) {
   auto program = R"(func gt(val a, val b) is return a > b
                     proc main () is 0(gt(2(0), 2(0))))";
-  BOOST_TEST(runXProgramSrc(program, "40") == 1);
-  BOOST_TEST(runXProgramSrc(program, "41") == 1);
-  BOOST_TEST(runXProgramSrc(program, "42") == 1);
-  BOOST_TEST(runXProgramSrc(program, "43") == 1);
-  BOOST_TEST(runXProgramSrc(program, "44") == 0);
-  BOOST_TEST(runXProgramSrc(program, "45") == 0);
-  BOOST_TEST(runXProgramSrc(program, "46") == 0);
-  BOOST_TEST(runXProgramSrc(program, "47") == 0);
-  BOOST_TEST(runXProgramSrc(program, "48") == 0);
-  BOOST_TEST(runXProgramSrc(program, "49") == 0);
+  for (auto a : getCharValues()) {
+    for (auto b : getCharValues()) {
+      BOOST_TEST((runXProgramSrc(program, {a, b}) != 0) == (a > b));
+    }
+  }
 }
 
 BOOST_AUTO_TEST_CASE(binary_ge) {
   auto program = R"(func ge(val a, val b) is return a >= b
                     proc main () is 0(ge(2(0), 2(0))))";
-  BOOST_TEST(runXProgramSrc(program, "40") == 1);
-  BOOST_TEST(runXProgramSrc(program, "41") == 1);
-  BOOST_TEST(runXProgramSrc(program, "42") == 1);
-  BOOST_TEST(runXProgramSrc(program, "43") == 1);
-  BOOST_TEST(runXProgramSrc(program, "44") == 1);
-  BOOST_TEST(runXProgramSrc(program, "45") == 0);
-  BOOST_TEST(runXProgramSrc(program, "46") == 0);
-  BOOST_TEST(runXProgramSrc(program, "47") == 0);
-  BOOST_TEST(runXProgramSrc(program, "48") == 0);
-  BOOST_TEST(runXProgramSrc(program, "49") == 0);
+  for (auto a : getCharValues()) {
+    for (auto b : getCharValues()) {
+      BOOST_TEST((runXProgramSrc(program, {a, b}) != 0) == (a >= b));
+    }
+  }
 }
 
 BOOST_AUTO_TEST_CASE(binary_eq) {
   auto program = R"(func eq(val a, val b) is return a = b
                     proc main () is 0(eq(2(0), 2(0))))";
-  BOOST_TEST(runXProgramSrc(program, "40") == 0);
-  BOOST_TEST(runXProgramSrc(program, "41") == 0);
-  BOOST_TEST(runXProgramSrc(program, "42") == 0);
-  BOOST_TEST(runXProgramSrc(program, "43") == 0);
-  BOOST_TEST(runXProgramSrc(program, "44") == 1);
-  BOOST_TEST(runXProgramSrc(program, "45") == 0);
-  BOOST_TEST(runXProgramSrc(program, "46") == 0);
-  BOOST_TEST(runXProgramSrc(program, "47") == 0);
-  BOOST_TEST(runXProgramSrc(program, "48") == 0);
-  BOOST_TEST(runXProgramSrc(program, "49") == 0);
+  for (auto a : getCharValues()) {
+    for (auto b : getCharValues()) {
+      BOOST_TEST((runXProgramSrc(program, {a, b}) != 0) == (a == b));
+    }
+  }
 }
 
 BOOST_AUTO_TEST_CASE(binary_ne) {
   auto program = R"(func ne(val a, val b) is return a ~= b
                     proc main () is 0(ne(2(0), 2(0))))";
-  BOOST_TEST(runXProgramSrc(program, "40") == 1);
-  BOOST_TEST(runXProgramSrc(program, "41") == 1);
-  BOOST_TEST(runXProgramSrc(program, "42") == 1);
-  BOOST_TEST(runXProgramSrc(program, "43") == 1);
-  BOOST_TEST(runXProgramSrc(program, "44") == 0);
-  BOOST_TEST(runXProgramSrc(program, "45") == 1);
-  BOOST_TEST(runXProgramSrc(program, "46") == 1);
-  BOOST_TEST(runXProgramSrc(program, "47") == 1);
-  BOOST_TEST(runXProgramSrc(program, "48") == 1);
-  BOOST_TEST(runXProgramSrc(program, "49") == 1);
+  for (auto a : getCharValues()) {
+    for (auto b : getCharValues()) {
+      BOOST_TEST((runXProgramSrc(program, {a, b}) != 0) == (a != b));
+    }
+  }
 }
 
-// Associative operators.
+BOOST_AUTO_TEST_CASE(binary_and) {
+  auto program = R"(func and2(val a, val b) is return a and b
+                    proc main () is 0(and2(2(0), 2(0))))";
+  for (auto a : getCharValues()) {
+    for (auto b : getCharValues()) {
+      BOOST_TEST((runXProgramSrc(program, {a, b}) != 0) == (a && b));
+    }
+  }
+}
+
+BOOST_AUTO_TEST_CASE(binary_or) {
+  auto program = R"(func or2(val a, val b) is return a or b
+                    proc main () is 0(or2(2(0), 2(0))))";
+  for (auto a : getCharValues()) {
+    for (auto b : getCharValues()) {
+      BOOST_TEST((runXProgramSrc(program, {a, b}) != 0) == (a || b));
+    }
+  }
+}
+
+// Binary operators with constant propagation.
+
+BOOST_AUTO_TEST_CASE(binary_add_constants) {
+  for (int a : getCharValues()) {
+    for (int b : getCharValues()) {
+      auto program = boost::format("proc main () is 0((%d) + (%d))") % a % b;
+      BOOST_TEST(runXProgramSrc(program.str()) == (a + b));
+    }
+  }
+}
+
+BOOST_AUTO_TEST_CASE(bianry_sub_constants) {
+  for (int a : getCharValues()) {
+    for (int b : getCharValues()) {
+      auto program = boost::format("proc main () is 0((%d) - (%d))") % a % b;
+      BOOST_TEST(runXProgramSrc(program.str()) == (a - b));
+    }
+  }
+}
+
+BOOST_AUTO_TEST_CASE(bianry_ls_constants) {
+  for (int a : getCharValues()) {
+    for (int b : getCharValues()) {
+      auto program = boost::format("proc main () is 0((%d) < (%d))") % a % b;
+      BOOST_TEST((runXProgramSrc(program.str()) != 0) == (a < b));
+    }
+  }
+}
+
+BOOST_AUTO_TEST_CASE(bianry_le_constants) {
+  for (int a : getCharValues()) {
+    for (int b : getCharValues()) {
+      auto program = boost::format("proc main () is 0((%d) <= (%d))") % a % b;
+      BOOST_TEST((runXProgramSrc(program.str()) != 0) == (a <= b));
+    }
+  }
+}
+
+BOOST_AUTO_TEST_CASE(bianry_gt_constants) {
+  for (int a : getCharValues()) {
+    for (int b : getCharValues()) {
+      auto program = boost::format("proc main () is 0((%d) > (%d))") % a % b;
+      BOOST_TEST((runXProgramSrc(program.str()) != 0) == (a > b));
+    }
+  }
+}
+
+BOOST_AUTO_TEST_CASE(bianry_ge_constants) {
+  for (int a : getCharValues()) {
+    for (int b : getCharValues()) {
+      auto program = boost::format("proc main () is 0((%d) >= (%d))") % a % b;
+      BOOST_TEST((runXProgramSrc(program.str()) != 0) == (a >= b));
+    }
+  }
+}
+
+BOOST_AUTO_TEST_CASE(bianry_eq_constants) {
+  for (int a : getCharValues()) {
+    for (int b : getCharValues()) {
+      auto program = boost::format("proc main () is 0((%d) = (%d))") % a % b;
+      BOOST_TEST((runXProgramSrc(program.str()) != 0) == (a == b));
+    }
+  }
+}
+
+BOOST_AUTO_TEST_CASE(bianry_ne_constants) {
+  for (int a : getCharValues()) {
+    for (int b : getCharValues()) {
+      auto program = boost::format("proc main () is 0((%d) ~= (%d))") % a % b;
+      BOOST_TEST((runXProgramSrc(program.str()) != 0) == (a != b));
+    }
+  }
+}
+
+BOOST_AUTO_TEST_CASE(bianry_and_constants) {
+  for (int a : getCharValues()) {
+    for (int b : getCharValues()) {
+      auto program = boost::format("proc main () is 0((%d) and (%d))") % a % b;
+      BOOST_TEST((runXProgramSrc(program.str()) != 0) == (a && b));
+    }
+  }
+}
+
+BOOST_AUTO_TEST_CASE(bianry_or_constants) {
+  for (int a : getCharValues()) {
+    for (int b : getCharValues()) {
+      auto program = boost::format("proc main () is 0((%d) or (%d))") % a % b;
+      BOOST_TEST((runXProgramSrc(program.str()) != 0) == (a || b));
+    }
+  }
+}
+
+// Chained associative operators.
 
 BOOST_AUTO_TEST_CASE(binary_associative_plus4) {
   auto program = R"(func add4(val a, val b, val c, val d) is
                       return a + b + c + d
                     proc main () is 0(add4(2(0), 2(0), 2(0), 2(0))))";
-  BOOST_TEST(runXProgramSrc(program, "1234") == '1'+'2'+'3'+'4');
+  BOOST_TEST(runXProgramSrc(program, {1, 2, 3, 4}) == 1+2+3+4);
 }
 
 BOOST_AUTO_TEST_CASE(binary_associative_and4) {

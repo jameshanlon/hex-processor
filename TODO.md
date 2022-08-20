@@ -1,5 +1,9 @@
 # To do list
 
+Fix:
+
+- Modification of AST with shared_ptrs
+
 Features:
 
 - Arithmetic binary and unary operations [DONE]
@@ -13,6 +17,7 @@ Features:
 - String constants [DONE]
 - Procedure call as <expr>(...)
 - Error on redefined procedure symbol
+- Error on process containing a return statement
 
 Tests:
 
