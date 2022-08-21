@@ -34,6 +34,10 @@ class Processor {
 
   // IO.
   hex::HexSimIO io;
+  // Control whether characters are sign extended into 32 bits. The behaviour of
+  // xhexb.x is for character values to be truncated on conversion to 32 bits.
+  // However, it is useful for testing to allow negative values.
+  bool truncateInputs;
 
   // Logging.
   std::ostream &out;
@@ -70,11 +74,13 @@ class Processor {
 public:
 
   Processor(std::istream &in, std::ostream &out, size_t maxCycles=0) :
-    pc(0), areg(0), breg(0), oreg(0), io(in, out), out(out),
+    pc(0), areg(0), breg(0), oreg(0),
+    io(in, out), truncateInputs(true), out(out),
     running(true), tracing(false), lastPC(0), cycles(0),
     maxCycles(maxCycles) {}
 
   void setTracing(bool value) { tracing = value; }
+  void setTruncateInputs(bool value) { truncateInputs = value; }
 
   void load(const char *filename, bool dumpContents=false) {
     // Load the binary file.
@@ -241,9 +247,11 @@ public:
       case hex::Syscall::WRITE:
         io.output(memory[spWordIndex+2], memory[spWordIndex+3]);
         break;
-      case hex::Syscall::READ:
-        memory[spWordIndex+1] = io.input(memory[spWordIndex+2]);
+      case hex::Syscall::READ: {
+        auto value = io.input(memory[spWordIndex+2]);
+        memory[spWordIndex+1] = truncateInputs ? value & 0xFF : value;
         break;
+      }
       default:
         throw std::runtime_error("invalid syscall: " + std::to_string(areg));
     }

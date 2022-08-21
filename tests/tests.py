@@ -42,7 +42,7 @@ class Tests(unittest.TestCase):
         self.run_x_program('hello.x', 'hello\n')
 
     def test_x_echo_char(self):
-        "Test that stdin and stdout work with a program that echos a single character"
+        # Test that stdin and stdout work with a program that echos a single character
         subprocess.run([CMP_BINARY, os.path.join(defs.X_TEST_SRC_PREFIX, 'echo_char.x'), '-o', 'a.out'])
         output = subprocess.run([SIM_BINARY, 'a.out'], input=bytes('x', encoding='utf-8'), capture_output=True)
         self.assertTrue(output.stdout.decode('utf-8') == 'x')

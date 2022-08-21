@@ -50,7 +50,6 @@ public:
       return fileIO[index].get();
     }
   }
-
 };
 
 } // End namespace hex.

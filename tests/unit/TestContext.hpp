@@ -83,9 +83,10 @@ struct TestContext {
     auto codeGen = hexasm::CodeGen(tree);
     codeGen.emitBin("a.bin");
     // Run the program.
-    hexsim::Processor p(simInBuffer, simOutBuffer);
-    p.load("a.bin");
-    return p.run();
+    hexsim::Processor processor(simInBuffer, simOutBuffer);
+    processor.setTruncateInputs(false);
+    processor.load("a.bin");
+    return processor.run();
   }
 
   /// Convert an X program into tokens.
@@ -133,6 +134,7 @@ struct TestContext {
     hexsim::Processor processor(simInBuffer, simOutBuffer);
     processor.load("a.bin");
     processor.setTracing(trace);
+    processor.setTruncateInputs(false);
     return processor.run();
   }
 
@@ -148,6 +150,7 @@ struct TestContext {
     hexsim::Processor processor(simInBuffer, simOutBuffer);
     processor.load("a.bin");
     processor.setTracing(trace);
+    processor.setTruncateInputs(false);
     return processor.run();
   }
 };
