@@ -2083,7 +2083,7 @@ public:
         auto offset = currentFrame->getOffset();
         currentFrame->incOffset(1);
         cb.genLDBM(SP_OFFSET);
-        cb.genSTAI_FB(currentFrame, -stackOffset);
+        cb.genSTAI_FB(currentFrame, -offset);
         // Gen LHS.
         cb.genExpr(expr.getLHS());
         // Restore RHS from stack into breg.
