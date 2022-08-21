@@ -70,7 +70,8 @@ struct TestContext {
 
   /// Run an assembly program.
   int runHexProgram(const std::string &program,
-                    bool isFilename=false) {
+                    bool isFilename=false,
+                    bool trace=false) {
     // Assemble the program.
     hexasm::Lexer lexer;
     hexasm::Parser parser(lexer);
@@ -84,8 +85,9 @@ struct TestContext {
     codeGen.emitBin("a.bin");
     // Run the program.
     hexsim::Processor processor(simInBuffer, simOutBuffer);
-    processor.setTruncateInputs(false);
     processor.load("a.bin");
+    processor.setTracing(trace);
+    processor.setTruncateInputs(false);
     return processor.run();
   }
 

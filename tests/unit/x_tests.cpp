@@ -36,88 +36,60 @@ BOOST_AUTO_TEST_CASE(main_stop) {
 //===---------------------------------------------------------------------===//
 
 BOOST_AUTO_TEST_CASE(syscall_exit_0_no_val) {
-  auto program = R"(
-proc main () is 0(0)
-)";
+  auto program = "proc main() is 0(0)";
   BOOST_TEST(runXProgramSrc(program) == 0);
 }
 
 BOOST_AUTO_TEST_CASE(syscall_exit_0) {
-  auto program = R"(
-val exit = 0;
-proc main () is exit(0)
-)";
+  auto program = "val exit=0; proc main() is exit(0)";
   BOOST_TEST(runXProgramSrc(program) == 0);
 }
 
 BOOST_AUTO_TEST_CASE(syscall_exit_1) {
-  auto program = R"(
-val exit = 0;
-proc main () is exit(1)
-)";
+  auto program = "val exit=0; proc main() is exit(1)";
   BOOST_TEST(runXProgramSrc(program) == 1);
 }
 
 BOOST_AUTO_TEST_CASE(syscall_exit_255) {
-  auto program = R"(
-val exit = 0;
-proc main () is exit(255)
-)";
+  auto program = "val exit=0; proc main() is exit(255)";
   BOOST_TEST(runXProgramSrc(program) == 255);
 }
 
 BOOST_AUTO_TEST_CASE(syscall_exit_neg_255) {
-  auto program = R"(
-val exit = 0;
-proc main () is exit(-255)
-)";
+  auto program = "val exit=0; proc main() is exit(-255)";
   BOOST_TEST(runXProgramSrc(program) == -255);
 }
 
 BOOST_AUTO_TEST_CASE(syscall_put_stream_0_no_val) {
-  auto program = "proc main () is 1('x', 0)";
+  auto program = "proc main() is 1('x', 0)";
   runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == "x");
 }
 
 BOOST_AUTO_TEST_CASE(syscall_put_stream_0) {
-  auto program = R"(
-val put = 1;
-proc main () is put('x', 0)
-)";
+  auto program = "val put=1; proc main() is put('x', 0)";
   runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == "x");
 }
 
 BOOST_AUTO_TEST_CASE(syscall_put_stream_255) {
-  auto program = R"(
-val put = 1;
-proc main () is put('x', 255)
-)";
+  auto program = "val put=1; proc main() is put('x', 255)";
   runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == "x");
 }
 
 BOOST_AUTO_TEST_CASE(syscall_get_stream_0_no_vals) {
-  auto program = "proc main () is 0(2(0))";
+  auto program = "proc main() is 0(2(0))";
   BOOST_TEST(runXProgramSrc(program, "a") == 'a');
 }
 
 BOOST_AUTO_TEST_CASE(syscall_get_stream_0) {
-  auto program = R"(
-val exit = 0;
-val get = 2;
-proc main () is exit(get(0))
-)";
+  auto program = "val exit=0; val get=2; proc main() is exit(get(0))";
   BOOST_TEST(runXProgramSrc(program, "a") == 'a');
 }
 
 BOOST_AUTO_TEST_CASE(syscall_get_stream_255) {
-  auto program = R"(
-val exit = 0;
-val get = 2;
-proc main () is exit(get(255))
-)";
+  auto program = "val exit=0; val get=2; proc main() is exit(get(255))";
   BOOST_TEST(runXProgramSrc(program, "a") == 'a');
 }
 
@@ -137,12 +109,17 @@ proc main () is {
 }
 
 BOOST_AUTO_TEST_CASE(syscall_invalid_3) {
-  auto program = "proc main () is 3(0)";
+  auto program = "proc main() is 3(0)";
+  BOOST_CHECK_THROW(runXProgramSrc(program), xcmp::InvalidSyscallError);
+}
+
+BOOST_AUTO_TEST_CASE(syscall_invalid_val_minus_1) {
+  auto program = "val x=-1; proc main() is x(0)";
   BOOST_CHECK_THROW(runXProgramSrc(program), xcmp::InvalidSyscallError);
 }
 
 BOOST_AUTO_TEST_CASE(syscall_invalid_val_3) {
-  auto program = "val syscall=3; proc main () is syscall(0)";
+  auto program = "val x=3; proc main() is x(0)";
   BOOST_CHECK_THROW(runXProgramSrc(program), xcmp::InvalidSyscallError);
 }
 
@@ -691,22 +668,19 @@ var x; var y; var z; {
 //===---------------------------------------------------------------------===//
 
 BOOST_AUTO_TEST_CASE(if_statement) {
-  auto program = R"(
-proc main () is if 2() = 48 then 0(0) else 0(1))";
+  auto program = "proc main () is if 2() = 48 then 0(0) else 0(1)";
   BOOST_TEST(runXProgramSrc(program, "0") == 0);
   BOOST_TEST(runXProgramSrc(program, "1") == 1);
 }
 
 BOOST_AUTO_TEST_CASE(if_statement_skip_else) {
-  auto program = R"(
-proc main () is if 2() = 48 then 0(1) else skip)";
+  auto program = "proc main () is if 2() = 48 then 0(1) else skip";
   BOOST_TEST(runXProgramSrc(program, "0") == 1);
   BOOST_TEST(runXProgramSrc(program, "1") == 0);
 }
 
 BOOST_AUTO_TEST_CASE(if_statement_skip_then) {
-  auto program = R"(
-proc main () is if 2() = 48 then skip else 0(1))";
+  auto program = "proc main () is if 2() = 48 then skip else 0(1)";
   BOOST_TEST(runXProgramSrc(program, "0") == 0);
   BOOST_TEST(runXProgramSrc(program, "1") == 1);
 }

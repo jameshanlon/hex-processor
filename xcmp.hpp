@@ -1845,7 +1845,8 @@ public:
       }
     }
     // Check Syscall ID is valid.
-    if (expr.getSysCallId() >= static_cast<int>(hex::Syscall::NUM_VALUES)) {
+    if (expr.getSysCallId() >= static_cast<int>(hex::Syscall::NUM_VALUES) ||
+        expr.getSysCallId() < 0) {
       throw InvalidSyscallError(expr.getLocation(), expr.getSysCallId());
     }
   }
