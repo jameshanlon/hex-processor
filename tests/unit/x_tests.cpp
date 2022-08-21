@@ -448,11 +448,7 @@ BOOST_AUTO_TEST_CASE(binary_sub_rhs_then_lhs) {
   // A test to show that binops with operatings both requiring aregs are
   // evaluated RHS then LHS (eg b - a in this case).
   auto program = "proc main () is 0(2(0) - 2(0))";
-  for (auto a : getCharValues()) {
-    for (auto b : getCharValues()) {
-      BOOST_TEST(runXProgramSrc(program, {a, b}) == (b - a));
-    }
-  }
+  BOOST_TEST(runXProgramSrc(program, {5, 9}) == (9 - 5));
 }
 
 BOOST_AUTO_TEST_CASE(binary_ls) {
@@ -463,6 +459,14 @@ BOOST_AUTO_TEST_CASE(binary_ls) {
       BOOST_TEST((runXProgramSrc(program, {a, b}) != 0) == (a < b));
     }
   }
+}
+
+BOOST_AUTO_TEST_CASE(binary_ls_rhs_then_lhs) {
+  // Similar to binary_sub_rhs_then_lhs, this was causing a segfault due to the
+  // codegen for LS creating an intermediate AST node for the subtraction, then
+  // expression generation walking an incomplete AST due to moved unique_ptrs.
+  auto program = "proc main () is 0(2(0) < 2(0)))";
+  BOOST_TEST((runXProgramSrc(program, {5, 9}) != 0) == (9 < 5));
 }
 
 BOOST_AUTO_TEST_CASE(binary_le) {

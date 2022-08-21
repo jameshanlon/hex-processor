@@ -753,6 +753,8 @@ public:
   Token getOp() const { return op; }
   std::unique_ptr<Expr> &getLHS() { return LHS; }
   std::unique_ptr<Expr> &getRHS() { return RHS; }
+  void setLHS(std::unique_ptr<Expr> &newLHS) { LHS = std::move(newLHS); }
+  void setRHS(std::unique_ptr<Expr> &newRHS) { RHS = std::move(newRHS); }
 };
 
 // Declarations ============================================================ //
@@ -2161,11 +2163,14 @@ public:
               // If RHS is zero, then only consider is LHS is negative.
               cb.genExpr(expr.getLHS());
             } else {
-              // Compute LHS - RHS.
+              // Compute LHS - RHS by creating a subtraction AST node.
               auto subtract = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::MINUS,
                                                              std::move(expr.getLHS()),
                                                              std::move(expr.getRHS()));
               cb.genExpr(subtract.get());
+              // Restore the operand pointers.
+              expr.setLHS(subtract->getLHS());
+              expr.setRHS(subtract->getRHS());
             }
             auto trueLabel = cb.getLabel();
             auto endLabel = cb.getLabel();
