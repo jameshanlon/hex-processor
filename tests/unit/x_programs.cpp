@@ -4,13 +4,17 @@
 #include <boost/test/unit_test.hpp>
 #include "TestContext.hpp"
 
-// Unit tests for X programs.
 
 BOOST_FIXTURE_TEST_SUITE(x_programs, TestContext)
 
 //===---------------------------------------------------------------------===//
-// Parse xhexb and return the tree.
+// Unit tests for X programs.
 //===---------------------------------------------------------------------===//
+
+BOOST_AUTO_TEST_CASE(hello) {
+  runXProgramFile(getXTestPath("hello.x"), {1, 1});
+  BOOST_TEST(simOutBuffer.str() == "hello\n");
+}
 
 BOOST_AUTO_TEST_CASE(mul) {
   BOOST_TEST(runXProgramFile(getXTestPath("mul.x"), {1, 1}) == 1);

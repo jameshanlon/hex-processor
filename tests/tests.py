@@ -23,9 +23,9 @@ class Tests(unittest.TestCase):
             self.assertTrue(output.stdout.decode('utf-8').endswith(expected_output))
 
     def run_x_program(self, filename, expected_output):
-        # Compiler
-        infile = open(os.path.join(defs.X_TEST_SRC_PREFIX, filename), 'rb')
-        subprocess.run([SIM_BINARY, 'xhexb.bin'], input=infile.read())
+        # xhexb compiler
+        with open(os.path.join(defs.X_TEST_SRC_PREFIX, filename), 'rb') as infile:
+            subprocess.run([SIM_BINARY, 'xhexb.bin'], input=infile.read())
         output = subprocess.run([SIM_BINARY, 'simout2'], capture_output=True)
         self.assertTrue(output.stdout.decode('utf-8') == expected_output)
         # Verilator
