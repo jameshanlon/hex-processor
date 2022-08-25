@@ -33,6 +33,7 @@ Tests:
 - Array arguments
 - String constants
 - Constant propagation for expressions
+- Reuse binary files from tests compiling the same file
 
 Optimisations:
 

@@ -5,7 +5,8 @@ add_executable(UnitTests
                main.cpp
                ../../hex.cpp
                asm_tests.cpp
-               x_tests.cpp)
+               x_features.cpp
+               x_programs.cpp)
 
 target_link_libraries(UnitTests
                       ${Boost_LIBRARIES})

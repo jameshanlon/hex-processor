@@ -2342,11 +2342,21 @@ public:
       if (auto *varRefLHS = dynamic_cast<VarRefExpr*>(expr.getLHS().get())) {
         // LHS variable reference.
         auto symbol = st.lookup(varRefLHS->getName(), expr.getLocation());
-        auto frameIndex = symbol->getStackOffset();
-        cb.genLDBM(SP_OFFSET);
-        cb.genSTAI_FB(symbol->getFrame(), frameIndex);
+        switch (symbol->getScope()) {
+          case SymbolScope::LOCAL: {
+            auto frameIndex = symbol->getStackOffset();
+            cb.genLDBM(SP_OFFSET);
+            cb.genSTAI_FB(cb.getCurrentFrame(), frameIndex);
+            break;
+          }
+          case SymbolScope::GLOBAL: {
+            cb.genSTAM(symbol->getGlobalLabel());
+            break;
+          }
+        }
       } else if (auto *arraySubLHS = dynamic_cast<ArraySubscriptExpr*>(expr.getLHS().get())) {
         // Handle LHS subscript.
+        // Arrays are always global.
         cb.genVar(Reg::B, st.lookup(arraySubLHS->getName(), arraySubLHS->getLocation()));
         cb.genExpr(arraySubLHS->getExpr());
         cb.genADD();
