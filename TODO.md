@@ -36,9 +36,13 @@ Tests:
 - Reuse binary files from tests compiling the same file
 
 Optimisations:
-
 - Tail recursion (jump to end of EPILOGUE)
 - Eliminate BR lab; lab, for procedure exits
+- Eliminate
+  LDBM 1
+  STAI x
+  LDAM 1
+  LDAI x
 - x + 0 -> x
 - x | 0 -> x
 - x - 0 -> x

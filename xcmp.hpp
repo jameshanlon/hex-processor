@@ -2020,7 +2020,7 @@ public:
   void genLDAC(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAC, value)); }
   void genLDBC(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDBC, value)); }
   void genLDAP(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAP, value)); }
-  void genLDAC(std::string label) { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDAC, label, true)); }
+  void genLDAC(std::string label) { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDAC, label, false)); }
   void genLDBC(std::string label) { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDBC, label, true)); }
   void genLDAP(std::string label) { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDAP, label, true)); }
   void genLDAI(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAI, value)); }
@@ -2344,9 +2344,9 @@ public:
         auto symbol = st.lookup(varRefLHS->getName(), expr.getLocation());
         switch (symbol->getScope()) {
           case SymbolScope::LOCAL: {
-            auto frameIndex = symbol->getStackOffset();
+            auto stackOffset = symbol->getStackOffset();
             cb.genLDBM(SP_OFFSET);
-            cb.genSTAI_FB(cb.getCurrentFrame(), frameIndex);
+            cb.genSTAI_FB(cb.getCurrentFrame(), stackOffset);
             break;
           }
           case SymbolScope::GLOBAL: {
@@ -2440,9 +2440,10 @@ public:
     genDataLabel(label);
     // Back the string bytes into 32-bit words.
     uint32_t packedWord = 0;
+    packedWord |= value.size() & 0xFF;
     for (size_t strByteIndex = 0; strByteIndex < value.size(); strByteIndex++) {
-      auto bytePos = strByteIndex % 4;
-      packedWord |= value[strByteIndex] << bytePos;
+      auto bytePos = (strByteIndex + 1) % 4;
+      packedWord |= value[strByteIndex] << (bytePos * 8);
       if (bytePos == 3 || strByteIndex == (value.size() - 1)) {
         genData(packedWord);
         packedWord = 0;
@@ -2635,7 +2636,7 @@ class LocalDeclLocations : public AstVisitor {
   size_t count;
   void assignLocation(Decl &decl, size_t size) {
     auto symbol = st.lookup(decl.getName(), decl.getLocation());
-    symbol->setStackOffset(count);
+    symbol->setStackOffset(-count);
     symbol->setFrame(frame);
     frame->incOffset(size);
     count += size;
@@ -2860,10 +2861,16 @@ class ReportMemoryInfo : public AstVisitor {
     if (proc.getDecls().empty()) {
       outs << "  No local variables\n";
     } else {
-      outs << "  Local variables:\n";
+      outs << "  Formals:\n";
+      for (auto &decl : proc.getFormals()) {
+        auto symbol = st.lookup(decl->getName(), decl->getLocation());
+        auto index = symbol->getFrame()->getSize() - 1 + symbol->getStackOffset();
+        outs << boost::format("    %s at index %d\n") % symbol->getName() % index;
+      }
+      outs << "  Locals:\n";
       for (auto &decl : proc.getDecls()) {
         auto symbol = st.lookup(decl->getName(), decl->getLocation());
-        auto index = symbol->getFrame()->getSize() - symbol->getStackOffset();
+        auto index = symbol->getFrame()->getSize() - 1 + symbol->getStackOffset();
         outs << boost::format("    %s at index %d\n") % symbol->getName() % index;
       }
     }
