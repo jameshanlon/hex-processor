@@ -524,6 +524,8 @@ class AstVisitor {
   bool recurseOp; // Expr
   bool recurseCalls; // Expr
   bool recurseStmts; // Stmts
+  // Track the current scope.
+  std::stack<const std::string> scope;
   // Useful reference "Visitor Pattern, replacing objects" on this strategy.
   // https://softwareengineering.stackexchange.com/questions/313783/visitor-pattern-replacing-objects
   std::unique_ptr<Expr> exprReplacement;
@@ -538,6 +540,16 @@ public:
   bool hasExprReplacement() const { return exprReplacement != nullptr; }
   void setExprReplacement(std::unique_ptr<Expr> expr) { exprReplacement = std::move(expr); }
   std::unique_ptr<Expr> &getExprReplacement() { return exprReplacement; }
+  // Scoping
+  void enterProgram() { scope.push(""); }
+  void exitProgram() { scope.pop(); }
+  void enterProc(const std::string &name) { scope.push(name); }
+  void exitProc() { scope.pop(); }
+  const std::string getCurrentScope() const {
+    assert(scope.size() > 0 && "scope stack empty");
+    return scope.top();
+  }
+  // Vist methods.
   virtual void visitPre(Program&) {}
   virtual void visitPost(Program&) {}
   virtual void visitPre(Proc&) {}
@@ -1019,6 +1031,7 @@ public:
       statement(std::move(statement)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
+    visitor->enterProc(name);
     for (auto &formal : formals) {
       formal->accept(visitor);
     }
@@ -1026,6 +1039,7 @@ public:
       decl->accept(visitor);
     }
     statement->accept(visitor);
+    visitor->exitProc();
     visitor->visitPost(*this);
   }
   bool isFunction() const { return function; }
@@ -1044,12 +1058,14 @@ public:
       globalDecls(std::move(globals)), procDecls(std::move(procs)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
+    visitor->enterProgram();
     for (auto &decl : globalDecls) {
       decl->accept(visitor);
     }
     for (auto &proc : procDecls) {
       proc->accept(visitor);
     }
+    visitor->exitProgram();
     visitor->visitPost(*this);
   }
 };
@@ -1654,11 +1670,6 @@ enum class SymbolType {
   PROC
 };
 
-enum class SymbolScope {
-  GLOBAL,
-  LOCAL
-};
-
 class Symbol;
 
 class Frame {
@@ -1691,18 +1702,18 @@ public:
 /// declaration and Frame infromation where applicable.
 class Symbol {
   SymbolType type;
-  SymbolScope scope;
   AstNode *node;
-  std::string name;
+  const std::string scope;
+  const std::string name;
   std::shared_ptr<Frame> frame;
   int stackOffset;
   std::string globalLabel;
 
 public:
-  Symbol(SymbolType type, SymbolScope scope, AstNode *node, const std::string &name) :
-      type(type), scope(scope), node(node), name(name) {}
+  Symbol(SymbolType type, AstNode *node, const std::string &scope, const std::string &name) :
+      type(type), node(node), scope(scope), name(name) {}
   SymbolType getType() const { return type; }
-  SymbolScope getScope() const { return scope; }
+  const std::string &getScope() const { return scope; }
   AstNode *getNode() const { return node; }
   const std::string &getName() const { return name; }
   void setFrame(std::shared_ptr<Frame> newFrame) { frame = newFrame; }
@@ -1713,21 +1724,33 @@ public:
   void setGlobalLabel(const std::string &value) { globalLabel = value; }
 };
 
+using SymbolID = std::pair<const std::string, const std::string>;
+using SymbolIDRef = std::pair<const std::string&, const std::string&>;
+
 class SymbolTable {
-  std::map<const std::string, std::unique_ptr<Symbol>> symbolMap;
+  std::map<SymbolID, std::unique_ptr<Symbol>> symbolMap;
 
 public:
-  void insert(const std::string &name, std::unique_ptr<Symbol> symbol) {
-    symbolMap[name] = std::move(symbol);
+  void insert(SymbolIDRef identifier, std::unique_ptr<Symbol> symbol) {
+    //std::cout << "insert " << identifier.first << ", " << identifier.second <<"\n";
+    symbolMap[identifier] = std::move(symbol);
   }
 
   /// Lookup a symbol, and throw an exception if not found.
-  Symbol* lookup(const std::string &name, const Location &location) {
-    auto it = symbolMap.find(name);
+  Symbol* lookup(SymbolIDRef identifier, const Location &location) {
+    //std::cout << "lookup " << identifier.first << ", " << identifier.second <<"\n";
+    auto it = symbolMap.find(identifier);
     if (it != symbolMap.end()) {
       return it->second.get();
     }
-    throw UnknownSymbolError(location, name);
+    // Check the global scope if no match found.
+    if (!identifier.first.empty()) {
+      it = symbolMap.find(std::make_pair("", identifier.second));
+      if (it != symbolMap.end()) {
+        return it->second.get();
+      }
+    }
+    throw UnknownSymbolError(location, identifier.second);
   }
 };
 
@@ -1737,43 +1760,41 @@ public:
 
 class CreateSymbols : public AstVisitor {
   SymbolTable &symbolTable;
-  std::stack<SymbolScope> scope;
 public:
-  CreateSymbols(SymbolTable &symbolTable) : symbolTable(symbolTable) {}
-  virtual void visitPre(Program&) {
-    scope.push(SymbolScope::GLOBAL);
-  }
-  virtual void visitPost(Program&) {
-    scope.pop();
-  }
+  CreateSymbols(SymbolTable &symbolTable) :
+    AstVisitor(false, false, false), symbolTable(symbolTable) {}
   void visitPre(Proc &proc) {
-    scope.push(SymbolScope::LOCAL);
     auto symbolType = proc.isFunction() ? SymbolType::FUNC : SymbolType::PROC;
-    symbolTable.insert(proc.getName(), std::make_unique<Symbol>(symbolType, scope.top(), &proc, proc.getName()));
-  }
-  void visitPost(Proc &proc) {
-    scope.pop();
+    symbolTable.insert(std::make_pair(getCurrentScope(), proc.getName()),
+                       std::make_unique<Symbol>(symbolType, &proc, getCurrentScope(), proc.getName()));
   }
   void visitPre(ArrayDecl &decl) {
-    symbolTable.insert(decl.getName(), std::make_unique<Symbol>(SymbolType::ARRAY, scope.top(), &decl, decl.getName()));
+    symbolTable.insert(std::make_pair(getCurrentScope(), decl.getName()),
+                       std::make_unique<Symbol>(SymbolType::ARRAY, &decl, getCurrentScope(), decl.getName()));
   }
   void visitPre(VarDecl &decl) {
-    symbolTable.insert(decl.getName(), std::make_unique<Symbol>(SymbolType::VAR, scope.top(), &decl, decl.getName()));
+    symbolTable.insert(std::make_pair(getCurrentScope(), decl.getName()),
+                       std::make_unique<Symbol>(SymbolType::VAR, &decl, getCurrentScope(), decl.getName()));
   }
   void visitPre(ValDecl &decl) {
-    symbolTable.insert(decl.getName(), std::make_unique<Symbol>(SymbolType::VAL, scope.top(), &decl, decl.getName()));
+    symbolTable.insert(std::make_pair(getCurrentScope(), decl.getName()),
+                       std::make_unique<Symbol>(SymbolType::VAL, &decl, getCurrentScope(), decl.getName()));
   }
   void visitPre(ValFormal &formal) {
-    symbolTable.insert(formal.getName(), std::make_unique<Symbol>(SymbolType::VAL, scope.top(), &formal, formal.getName()));
+    symbolTable.insert(std::make_pair(getCurrentScope(), formal.getName()),
+                       std::make_unique<Symbol>(SymbolType::VAL, &formal, getCurrentScope(), formal.getName()));
   }
   void visitPre(ArrayFormal &formal) {
-    symbolTable.insert(formal.getName(), std::make_unique<Symbol>(SymbolType::ARRAY, scope.top(), &formal, formal.getName()));
+    symbolTable.insert(std::make_pair(getCurrentScope(), formal.getName()),
+                       std::make_unique<Symbol>(SymbolType::ARRAY, &formal, getCurrentScope(), formal.getName()));
   }
   void visitPre(ProcFormal &formal) {
-    symbolTable.insert(formal.getName(), std::make_unique<Symbol>(SymbolType::PROC, scope.top(), &formal, formal.getName()));
+    symbolTable.insert(std::make_pair(getCurrentScope(), formal.getName()),
+                       std::make_unique<Symbol>(SymbolType::PROC, &formal, getCurrentScope(), formal.getName()));
   }
   void visitPre(FuncFormal &formal) {
-    symbolTable.insert(formal.getName(), std::make_unique<Symbol>(SymbolType::FUNC, scope.top(), &formal, formal.getName()));
+    symbolTable.insert(std::make_pair(getCurrentScope(), formal.getName()),
+                       std::make_unique<Symbol>(SymbolType::FUNC, &formal, getCurrentScope(), formal.getName()));
   }
 };
 
@@ -1837,7 +1858,8 @@ public:
   void visitPost(CallExpr &expr) {
     // Propagate constant values for syscalls.
     if (!expr.isSysCall()) {
-      auto symbol = symbolTable.lookup(expr.getName(), expr.getLocation());
+      auto symbol = symbolTable.lookup(std::make_pair(getCurrentScope(), expr.getName()),
+                                       expr.getLocation());
       if (auto symbolExpr = dynamic_cast<const ValDecl*>(symbol->getNode())) {
         expr.setSysCallId(symbolExpr->getValue());
       } else {
@@ -1853,7 +1875,8 @@ public:
   void visitPost(ArraySubscriptExpr &expr) {}
   void visitPost(VarRefExpr &expr) {
     // Propagate constant values to variable references.
-    auto symbol = symbolTable.lookup(expr.getName(), expr.getLocation());
+    auto symbol = symbolTable.lookup(std::make_pair(getCurrentScope(), expr.getName()),
+                                     expr.getLocation());
     if (auto symbolExpr = dynamic_cast<const ValDecl*>(symbol->getNode())) {
       expr.setValue(symbolExpr->getValue());
     }
@@ -2062,10 +2085,13 @@ public:
   class ExprCodeGen : public AstVisitor {
     SymbolTable &st;
     CodeBuffer &cb;
+    const std::string &currentScope;
     Reg reg;
   public:
-    ExprCodeGen(SymbolTable &st, CodeBuffer &cb, Reg reg) :
-      AstVisitor(false, false, false), st(st), cb(cb), reg(reg) {}
+    ExprCodeGen(SymbolTable &st, CodeBuffer &cb,
+                const std::string &currentScope, Reg reg) :
+      AstVisitor(false, false, false), st(st), cb(cb),
+      currentScope(currentScope), reg(reg) {}
     /// Return true if the expr needs to be materialised in an A register.
     bool needsAReg(std::unique_ptr<Expr> &expr) {
       return !(expr->isConst() || dynamic_cast<StringExpr*>(expr.get()) || dynamic_cast<VarRefExpr*>(expr.get()));
@@ -2080,20 +2106,20 @@ public:
         auto currentFrame = cb.getCurrentFrame();
         size_t stackOffset = cb.getCurrentFrame()->getOffset();
         // Gen RHS and save to stack.
-        cb.genExpr(expr.getRHS());
+        cb.genExpr(expr.getRHS(), currentScope);
         auto offset = currentFrame->getOffset();
         currentFrame->incOffset(1);
         cb.genLDBM(SP_OFFSET);
         cb.genSTAI_FB(currentFrame, -offset);
         // Gen LHS.
-        cb.genExpr(expr.getLHS());
+        cb.genExpr(expr.getLHS(), currentScope);
         // Restore RHS from stack into breg.
         cb.genLDBM(SP_OFFSET);
         cb.genLDBI_FB(currentFrame, -offset);
         currentFrame->setOffset(stackOffset);
       } else {
-        cb.genExpr(expr.getLHS());
-        cb.genExpr(expr.getRHS(), Reg::B);
+        cb.genExpr(expr.getLHS(), currentScope);
+        cb.genExpr(expr.getRHS(), currentScope, Reg::B);
       }
     }
     void visitPost(BinaryOpExpr &expr) {
@@ -2114,9 +2140,9 @@ public:
             // Logical AND of operands. If first operand is false, result is
             // false, otherwise the result is the value of the second operand.
             auto endLabel = cb.getLabel();
-            cb.genExpr(expr.getLHS());
+            cb.genExpr(expr.getLHS(), currentScope);
             cb.genBRZ(endLabel);
-            cb.genExpr(expr.getRHS());
+            cb.genExpr(expr.getRHS(), currentScope);
             cb.genLabel(endLabel);
             break;
           }
@@ -2126,19 +2152,19 @@ public:
             // the second operand.
             auto falseLabel = cb.getLabel();
             auto endLabel = cb.getLabel();
-            cb.genExpr(expr.getLHS());
+            cb.genExpr(expr.getLHS(), currentScope);
             cb.genBRZ(falseLabel);
             cb.genBR(endLabel);
             cb.genLabel(falseLabel);
-            cb.genExpr(expr.getRHS());
+            cb.genExpr(expr.getRHS(), currentScope);
             cb.genLabel(endLabel);
             break;
           }
           case Token::EQ: {
             if (expr.getLHS()->isConstZero()) {
-              cb.genExpr(expr.getRHS());
+              cb.genExpr(expr.getRHS(), currentScope);
             }else if (expr.getRHS()->isConstZero()) {
-              cb.genExpr(expr.getLHS());
+              cb.genExpr(expr.getLHS(), currentScope);
             } else {
               // Create a new AST node on the fly to generate the expression
               // 'LHS - RHS'. Note that this modifies the program's AST,
@@ -2146,7 +2172,7 @@ public:
               auto subtract = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::MINUS,
                                                              std::move(expr.getLHS()),
                                                              std::move(expr.getRHS()));
-              cb.genExpr(subtract.get());
+              cb.genExpr(subtract.get(), currentScope);
             }
             auto trueLabel = cb.getLabel();
             auto endLabel = cb.getLabel();
@@ -2162,13 +2188,13 @@ public:
             // LHS < RHS -> LHS - RHS < 0
             if (expr.getRHS()->isConstZero()) {
               // If RHS is zero, then only consider is LHS is negative.
-              cb.genExpr(expr.getLHS());
+              cb.genExpr(expr.getLHS(), currentScope);
             } else {
               // Compute LHS - RHS by creating a subtraction AST node.
               auto subtract = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::MINUS,
                                                              std::move(expr.getLHS()),
                                                              std::move(expr.getRHS()));
-              cb.genExpr(subtract.get());
+              cb.genExpr(subtract.get(), currentScope);
               // Restore the operand pointers.
               expr.setLHS(subtract->getLHS());
               expr.setRHS(subtract->getRHS());
@@ -2197,7 +2223,7 @@ public:
         if (expr.getOp() == Token::NOT) {
           auto trueLabel = cb.getLabel();
           auto endLabel = cb.getLabel();
-          cb.genExpr(expr.getElement());
+          cb.genExpr(expr.getElement(), currentScope);
           cb.genBRZ(trueLabel); // False -> True
           cb.genLDAC(0);
           cb.genBR(endLabel);
@@ -2220,13 +2246,14 @@ public:
     }
     void visitPost(CallExpr &expr) {
       if (expr.isSysCall()) {
-        cb.genSysCall(expr.getSysCallId(), expr.getArgs());
+        cb.genSysCall(expr.getSysCallId(), expr.getArgs(), currentScope);
       } else {
-        auto symbol = st.lookup(expr.getName(), expr.getLocation());
+        auto symbol = st.lookup(std::make_pair(currentScope, expr.getName()),
+                                expr.getLocation());
         if (symbol->getType() == SymbolType::FUNC) {
-          cb.genFuncCall(expr.getName(), expr.getArgs());
+          cb.genFuncCall(expr.getName(), expr.getArgs(), currentScope);
         } else {
-          cb.genProcCall(expr.getName(), expr.getArgs());
+          cb.genProcCall(expr.getName(), expr.getArgs(), currentScope);
         }
       }
       // The recursion must halt here, which is controlled by
@@ -2234,8 +2261,9 @@ public:
     }
     void visitPost(ArraySubscriptExpr &expr) {
       // Generate array subscript.
-      cb.genVar(Reg::B, st.lookup(expr.getName(), expr.getLocation()));
-      cb.genExpr(expr.getExpr());
+      cb.genVar(Reg::B, st.lookup(std::make_pair(currentScope, expr.getName()),
+                                  expr.getLocation()));
+      cb.genExpr(expr.getExpr(), currentScope);
       if (expr.getExpr()->isConst()) {
         cb.genLDAI(expr.getExpr()->getValue());
       } else {
@@ -2247,7 +2275,8 @@ public:
       if (expr.isConst()) {
         cb.genConst(reg, expr.getValue());
       } else {
-        cb.genVar(reg, st.lookup(expr.getName(), expr.getLocation()));
+        cb.genVar(reg, st.lookup(std::make_pair(currentScope, expr.getName()),
+                                 expr.getLocation()));
       }
     }
   };
@@ -2255,9 +2284,10 @@ public:
   class StmtCodeGen : public AstVisitor {
     SymbolTable &st;
     CodeBuffer &cb;
+    const std::string &currentScope;
   public:
-    StmtCodeGen(SymbolTable &st, CodeBuffer &cb) :
-      AstVisitor(false, false, false), st(st), cb(cb) {}
+    StmtCodeGen(SymbolTable &st, CodeBuffer &cb, const std::string &currentScope) :
+      AstVisitor(false, false, false), st(st), cb(cb), currentScope(currentScope) {}
 
     void visitPost(SkipStatement&) {
       // Do nothing.
@@ -2275,7 +2305,7 @@ public:
       // TODO: Check a process cannot contain a return.
       // TODO: Check a function must end with a return.
       // TODO: handle tail function calls
-      cb.genExpr(stmt.getExpr());
+      cb.genExpr(stmt.getExpr(), currentScope);
       cb.genBR(cb.getCurrentFrame()->getExitLabel());
     }
 
@@ -2287,29 +2317,29 @@ public:
       } else if (skipElse) {
         // No else branch.
         auto endLabel = cb.getLabel();
-        cb.genExpr(stmt.getCondition());
+        cb.genExpr(stmt.getCondition(), currentScope);
         cb.genBRZ(endLabel);
-        cb.genStmt(stmt.getThenStmt());
+        cb.genStmt(stmt.getThenStmt(), currentScope);
         cb.genLabel(endLabel);
       } else if (skipThen) {
         // No then branch.
         auto elseLabel = cb.getLabel();
         auto endLabel = cb.getLabel();
-        cb.genExpr(stmt.getCondition());
+        cb.genExpr(stmt.getCondition(), currentScope);
         cb.genBRZ(elseLabel);
         cb.genBR(endLabel);
         cb.genLabel(elseLabel);
-        cb.genStmt(stmt.getElseStmt());
+        cb.genStmt(stmt.getElseStmt(), currentScope);
         cb.genLabel(endLabel);
       } else {
         auto elseLabel = cb.getLabel();
         auto endLabel = cb.getLabel();
-        cb.genExpr(stmt.getCondition());
+        cb.genExpr(stmt.getCondition(), currentScope);
         cb.genBRZ(elseLabel);
-        cb.genStmt(stmt.getThenStmt());
+        cb.genStmt(stmt.getThenStmt(), currentScope);
         cb.genBR(endLabel);
         cb.genLabel(elseLabel);
-        cb.genStmt(stmt.getElseStmt());
+        cb.genStmt(stmt.getElseStmt(), currentScope);
         cb.genLabel(endLabel);
       }
     }
@@ -2318,9 +2348,9 @@ public:
       auto beginLabel = cb.getLabel();
       auto endLabel = cb.getLabel();
       cb.genLabel(beginLabel);
-      cb.genExpr(expr.getCondition());
+      cb.genExpr(expr.getCondition(), currentScope);
       cb.genBRZ(endLabel);
-      cb.genStmt(expr.getStmt());
+      cb.genStmt(expr.getStmt(), currentScope);
       cb.genBR(beginLabel);
       cb.genLabel(endLabel);
     }
@@ -2331,40 +2361,38 @@ public:
 
     void visitPost(CallStatement &stmt) {
       if (stmt.getCall()->isSysCall()) {
-        cb.genSysCall(stmt.getCall()->getSysCallId(), stmt.getCall()->getArgs());
+        cb.genSysCall(stmt.getCall()->getSysCallId(), stmt.getCall()->getArgs(), currentScope);
       } else {
-        cb.genProcCall(stmt.getCall()->getName(), stmt.getCall()->getArgs());
+        cb.genProcCall(stmt.getCall()->getName(), stmt.getCall()->getArgs(), currentScope);
       }
     }
 
     void visitPost(AssStatement &expr) {
-      cb.genExpr(expr.getRHS());
+      cb.genExpr(expr.getRHS(), currentScope);
       if (auto *varRefLHS = dynamic_cast<VarRefExpr*>(expr.getLHS().get())) {
         // LHS variable reference.
-        auto symbol = st.lookup(varRefLHS->getName(), expr.getLocation());
-        switch (symbol->getScope()) {
-          case SymbolScope::LOCAL: {
-            auto stackOffset = symbol->getStackOffset();
-            cb.genLDBM(SP_OFFSET);
-            cb.genSTAI_FB(cb.getCurrentFrame(), stackOffset);
-            break;
-          }
-          case SymbolScope::GLOBAL: {
-            cb.genSTAM(symbol->getGlobalLabel());
-            break;
-          }
+        auto symbol = st.lookup(std::make_pair(currentScope, varRefLHS->getName()),
+                                expr.getLocation());
+        if (symbol->getScope().empty()) {
+          // Global scope.
+          cb.genSTAM(symbol->getGlobalLabel());
+        } else {
+          auto stackOffset = symbol->getStackOffset();
+          cb.genLDBM(SP_OFFSET);
+          cb.genSTAI_FB(cb.getCurrentFrame(), stackOffset);
         }
       } else if (auto *arraySubLHS = dynamic_cast<ArraySubscriptExpr*>(expr.getLHS().get())) {
         // Handle LHS subscript.
         // Arrays are always global.
-        cb.genVar(Reg::B, st.lookup(arraySubLHS->getName(), arraySubLHS->getLocation()));
-        cb.genExpr(arraySubLHS->getExpr());
+        cb.genVar(Reg::B, st.lookup(std::make_pair(currentScope, arraySubLHS->getName()),
+                                    arraySubLHS->getLocation()));
+        cb.genExpr(arraySubLHS->getExpr(), currentScope);
         cb.genADD();
         auto stackOffset = cb.getCurrentFrame()->getOffset();
         cb.getCurrentFrame()->incOffset(1);
         cb.genLDBM(SP_OFFSET);
         cb.genSTAI_FB(cb.getCurrentFrame(), -stackOffset);
-        cb.genExpr(expr.getRHS());
+        cb.genExpr(expr.getRHS(), currentScope);
         cb.genLDBM(SP_OFFSET);
         cb.genLDBI_FB(cb.getCurrentFrame(), -stackOffset);
         cb.genSTAI(0);
@@ -2376,19 +2404,23 @@ public:
   };
 
   /// Generate code for an expression using the ExprCodeGen visitor.
-  void genExpr(const std::unique_ptr<Expr> &expr, Reg reg=Reg::A) {
-    ExprCodeGen visitor(symbolTable, *this, reg);
+  void genExpr(const std::unique_ptr<Expr> &expr,
+               const std::string &currentScope,
+               Reg reg=Reg::A) {
+    ExprCodeGen visitor(symbolTable, *this, currentScope, reg);
     expr->accept(&visitor);
   }
 
-  void genExpr(Expr *expr, Reg reg=Reg::A) {
-    ExprCodeGen visitor(symbolTable, *this, reg);
+  void genExpr(Expr *expr, const std::string &currentScope,
+               Reg reg=Reg::A) {
+    ExprCodeGen visitor(symbolTable, *this, currentScope, reg);
     expr->accept(&visitor);
   }
 
   /// Generate code for a statement using the StmtCodeGen visitor.
-  void genStmt(const std::unique_ptr<Statement> &stmt) {
-    StmtCodeGen visitor(symbolTable, *this);
+  void genStmt(const std::unique_ptr<Statement> &stmt,
+               const std::string &currentScope) {
+    StmtCodeGen visitor(symbolTable, *this, currentScope);
     stmt->accept(&visitor);
   }
 
@@ -2458,9 +2490,18 @@ public:
 
   /// Generate the value of a variable.
   void genVar(Reg reg, Symbol *symbol) {
-    switch (symbol->getScope()) {
-    // Load from stack.
-    case SymbolScope::LOCAL: {
+    if (symbol->getScope().empty()) {
+      // Load from globals.
+      switch (reg) {
+      case Reg::A:
+        genLDAM(symbol->getGlobalLabel());
+        break;
+      case Reg::B:
+        genLDBM(symbol->getGlobalLabel());
+        break;
+      }
+    } else {
+      // Load from stack.
       switch (reg) {
       case Reg::A:
         genLDAM(SP_OFFSET);
@@ -2471,25 +2512,12 @@ public:
         genLDBI_FB(symbol->getFrame(), symbol->getStackOffset());
         break;
       }
-      break;
-    }
-    // Load from globals.
-    case SymbolScope::GLOBAL: {
-      switch (reg) {
-      case Reg::A:
-        genLDAM(symbol->getGlobalLabel());
-        break;
-      case Reg::B:
-        genLDBM(symbol->getGlobalLabel());
-        break;
-      }
-      break;
-    }
     }
   }
 
   /// Generate actual parameters that contain calls.
-  void genCallActuals(const std::vector<std::unique_ptr<Expr>> &args) {
+  void genCallActuals(const std::vector<std::unique_ptr<Expr>> &args,
+                      const std::string &currentScope) {
     size_t stackOffset = currentFrame->getOffset();
     for (auto &arg : args) {
       if (containsCall(arg)) {
@@ -2497,7 +2525,7 @@ public:
         // stack word (FB relative) for the result of that call since it cannot
         // be written directly into the parameter slots until all calls have
         // been resolved.
-        genExpr(arg.get());
+        genExpr(arg.get(), currentScope);
         genLDBM(SP_OFFSET);
         genSTAI_FB(currentFrame, -currentFrame->getOffset());
         currentFrame->incOffset(1);
@@ -2508,7 +2536,8 @@ public:
     currentFrame->setOffset(stackOffset);
   }
 
-  void loadActuals(const std::vector<std::unique_ptr<Expr>> &args, size_t parameterOffset) {
+  void loadActuals(const std::vector<std::unique_ptr<Expr>> &args, size_t parameterOffset,
+                   const std::string &currentScope) {
     size_t parameterIndex = parameterOffset;
     for (auto &arg : args) {
       if (containsCall(arg)) {
@@ -2523,7 +2552,7 @@ public:
       } else {
         // For all other actual expressions, generate the value and store it to
         // the actual parameter location.
-        genExpr(arg.get());
+        genExpr(arg.get(), currentScope);
         genLDBM(SP_OFFSET);
         genSTAI(parameterIndex);
       }
@@ -2531,11 +2560,12 @@ public:
     }
   }
 
-  void genSysCall(int syscallId, const std::vector<std::unique_ptr<Expr>> &args) {
+  void genSysCall(int syscallId, const std::vector<std::unique_ptr<Expr>> &args,
+                  const std::string &currentScope) {
     auto stackOffset = currentFrame->getOffset();
     // Actual parameters.
-    genCallActuals(args);
-    loadActuals(args, FB_PARAM_OFFSET_FUNC);
+    genCallActuals(args, currentScope);
+    loadActuals(args, FB_PARAM_OFFSET_FUNC, currentScope);
     currentFrame->incOffset(args.size() + FB_PARAM_OFFSET_FUNC);
     // Perform syscall.
     genLDAC(syscallId);
@@ -2546,11 +2576,12 @@ public:
     currentFrame->setOffset(stackOffset);
   }
 
-  void genFuncCall(const std::string &name, const std::vector<std::unique_ptr<Expr>> &args) {
+  void genFuncCall(const std::string &name, const std::vector<std::unique_ptr<Expr>> &args,
+                   const std::string &currentScope) {
     auto stackOffset = currentFrame->getOffset();
     // Actual parameters.
-    genCallActuals(args);
-    loadActuals(args, FB_PARAM_OFFSET_FUNC);
+    genCallActuals(args, currentScope);
+    loadActuals(args, FB_PARAM_OFFSET_FUNC, currentScope);
     currentFrame->incOffset(args.size() + FB_PARAM_OFFSET_FUNC);
     // Branch and link.
     auto linkLabel = getLabel();
@@ -2563,11 +2594,12 @@ public:
     currentFrame->setOffset(stackOffset);
   }
 
-  void genProcCall(const std::string &name, const std::vector<std::unique_ptr<Expr>> &args) {
+  void genProcCall(const std::string &name, const std::vector<std::unique_ptr<Expr>> &args,
+                   const std::string &currentScope) {
     auto stackOffset = currentFrame->getOffset();
     // Actual parameters.
-    genCallActuals(args);
-    loadActuals(args, FB_PARAM_OFFSET_PROC);
+    genCallActuals(args, currentScope);
+    loadActuals(args, FB_PARAM_OFFSET_PROC, currentScope);
     currentFrame->incOffset(args.size() + FB_PARAM_OFFSET_PROC);
     // Branch and link.
     auto linkLabel = getLabel();
@@ -2613,16 +2645,20 @@ public:
 /// frame-base indexing.
 class FormalLocations : public AstVisitor {
   SymbolTable &st;
+  const std::string &currentScope;
   std::shared_ptr<Frame> &frame;
   size_t frameBaseOffset;
   void assignLocation(Formal &formal) {
-    auto symbol = st.lookup(formal.getName(), formal.getLocation());
+    auto symbol = st.lookup(std::make_pair(currentScope, formal.getName()),
+                            formal.getLocation());
     symbol->setStackOffset(frameBaseOffset++);
     symbol->setFrame(frame);
   }
 public:
-  FormalLocations(SymbolTable &st, std::shared_ptr<Frame> &frame, bool isFunction) :
-    st(st), frame(frame), frameBaseOffset(1 + (isFunction ? FB_PARAM_OFFSET_FUNC : FB_PARAM_OFFSET_PROC)) {}
+  FormalLocations(SymbolTable &st, const std::string &currentScope,
+                  std::shared_ptr<Frame> &frame, bool isFunction) :
+    AstVisitor(false, false, false), st(st), currentScope(currentScope), frame(frame),
+    frameBaseOffset(1 + (isFunction ? FB_PARAM_OFFSET_FUNC : FB_PARAM_OFFSET_PROC)) {}
   void visitPost(ValFormal &formal) { assignLocation(formal); }
   void visitPost(ArrayFormal &formal) { assignLocation(formal); }
   void visitPost(ProcFormal &formal) { assignLocation(formal); }
@@ -2632,18 +2668,22 @@ public:
 /// Assign stack locations to local variables, starting from the base of the frame.
 class LocalDeclLocations : public AstVisitor {
   SymbolTable &st;
+  const std::string &currentScope;
   std::shared_ptr<Frame> &frame;
   size_t count;
   void assignLocation(Decl &decl, size_t size) {
-    auto symbol = st.lookup(decl.getName(), decl.getLocation());
+    auto symbol = st.lookup(std::make_pair(currentScope, decl.getName()),
+                            decl.getLocation());
     symbol->setStackOffset(-count);
     symbol->setFrame(frame);
     frame->incOffset(size);
     count += size;
   }
 public:
-  LocalDeclLocations(SymbolTable &st, std::shared_ptr<Frame> &frame) :
-    st(st), frame(frame), count(0) {}
+  LocalDeclLocations(SymbolTable &st, const std::string &currentScope,
+                     std::shared_ptr<Frame> &frame) :
+    AstVisitor(false, false, false), st(st), currentScope(currentScope),
+    frame(frame), count(0) {}
   void visitPost(ArrayDecl &decl) { assignLocation(decl, decl.getSize()); }
   void visitPost(VarDecl &decl) { assignLocation(decl, 1); }
   void visitPost(ValDecl &decl) { assignLocation(decl, 1); }
@@ -2681,32 +2721,35 @@ public:
   /// Procedure call setup.
   void visitPre(Proc &proc) {
     // Setup a frame object for the proc/func.
-    auto symbol = st.lookup(proc.getName(), proc.getLocation());
+    auto symbol = st.lookup(std::make_pair(getCurrentScope(), proc.getName()),
+                            proc.getLocation());
     auto frame = std::make_shared<Frame>(cb.getLabel());
     symbol->setFrame(frame);
     cb.setCurrentFrame(symbol->getFrame());
     // Allocate storage locations to formals.
-    FormalLocations formalLocations(st, frame, proc.isFunction());
+    FormalLocations formalLocations(st, proc.getName(), frame, proc.isFunction());
     proc.accept(&formalLocations);
     // Allocate storage locations to local declarations.
-    LocalDeclLocations localDeclLocations(st, frame);
+    LocalDeclLocations localDeclLocations(st, proc.getName(), frame);
     proc.accept(&localDeclLocations);
     // Generate the prologue.
     cb.genPrologue(symbol);
     // Generate the body.
-    cb.genStmt(proc.getStatement());
+    cb.genStmt(proc.getStatement(), proc.getName());
   }
 
   /// Proceudre call completion.
   void visitPost(Proc &proc) {
-    auto symbol = st.lookup(proc.getName(), proc.getLocation());
+    auto symbol = st.lookup(std::make_pair(getCurrentScope(), proc.getName()),
+                            proc.getLocation());
     cb.genEpilogue(symbol);
   }
 
   /// Global variables. Allocate a word with a DATA directive and assign them
   /// a label.
   void visitPost(VarDecl &decl) {
-    auto symbol = st.lookup(decl.getName(), decl.getLocation());
+    auto symbol = st.lookup(std::make_pair(getCurrentScope(), decl.getName()),
+                            decl.getLocation());
     auto label = cb.getLabel();
     symbol->setGlobalLabel(label);
     cb.genDataLabel(label);
@@ -2716,7 +2759,8 @@ public:
   /// Global arrays. Allocate space at the end of memory, generate a DATA
   /// directive with the address and assign it a label.
   void visitPost(ArrayDecl &decl) {
-    auto symbol = st.lookup(decl.getName(), decl.getLocation());
+    auto symbol = st.lookup(std::make_pair(getCurrentScope(), decl.getName()),
+                            decl.getLocation());
     globalsOffset += decl.getSize();
     size_t address = MAX_ADDRESS - globalsOffset;
     auto label = cb.getLabel();
@@ -2863,13 +2907,15 @@ class ReportMemoryInfo : public AstVisitor {
     } else {
       outs << "  Formals:\n";
       for (auto &decl : proc.getFormals()) {
-        auto symbol = st.lookup(decl->getName(), decl->getLocation());
+        auto symbol = st.lookup(std::make_pair(getCurrentScope(), decl->getName()),
+                                decl->getLocation());
         auto index = symbol->getFrame()->getSize() - 1 + symbol->getStackOffset();
         outs << boost::format("    %s at index %d\n") % symbol->getName() % index;
       }
       outs << "  Locals:\n";
       for (auto &decl : proc.getDecls()) {
-        auto symbol = st.lookup(decl->getName(), decl->getLocation());
+        auto symbol = st.lookup(std::make_pair(getCurrentScope(), decl->getName()),
+                                decl->getLocation());
         auto index = symbol->getFrame()->getSize() - 1 + symbol->getStackOffset();
         outs << boost::format("    %s at index %d\n") % symbol->getName() % index;
       }
@@ -2889,7 +2935,8 @@ public:
     outs << "\n";
   }
   void visitPre(Proc &proc) {
-    auto procSymbol = st.lookup(proc.getName(), proc.getLocation());
+    auto procSymbol = st.lookup(std::make_pair(getCurrentScope(), proc.getName()),
+                                proc.getLocation());
     reportFrame(procSymbol->getFrame(), proc);
   }
 };

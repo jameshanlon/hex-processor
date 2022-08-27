@@ -11,7 +11,6 @@ Features:
 - Global variables [DONE]
 - Array variables and subscript elements (LHS and RHS) [DONE]
 - String constants [DONE]
-- Procedure call as <expr>(...)
 - Error on redefined procedure symbol
 - Error on process containing a return statement
 - Error on incorrect number/types of actual parameters
@@ -33,6 +32,7 @@ Tests:
 - Array arguments
 - String constants
 - Constant propagation for expressions
+- Scoping of different symbol types
 - Reuse binary files from tests compiling the same file
 
 Optimisations:
