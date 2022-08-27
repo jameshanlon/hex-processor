@@ -525,7 +525,7 @@ class AstVisitor {
   bool recurseCalls; // Expr
   bool recurseStmts; // Stmts
   // Track the current scope.
-  std::stack<const std::string> scope;
+  std::stack<std::string> scope;
   // Useful reference "Visitor Pattern, replacing objects" on this strategy.
   // https://softwareengineering.stackexchange.com/questions/313783/visitor-pattern-replacing-objects
   std::unique_ptr<Expr> exprReplacement;
@@ -1805,7 +1805,8 @@ public:
 class ConstProp : public AstVisitor {
   SymbolTable &symbolTable;
 public:
-  ConstProp(SymbolTable &symbolTable) : symbolTable(symbolTable) {}
+  ConstProp(SymbolTable &symbolTable) :
+    AstVisitor(true, true, true), symbolTable(symbolTable) {}
   void visitPost(ValDecl &decl) {
     if (decl.getExpr()->isConst()) {
       decl.setValue(decl.getExpr()->getValue());
