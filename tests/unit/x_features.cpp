@@ -789,7 +789,7 @@ BOOST_AUTO_TEST_CASE(global_array_copy_and_print) {
     { base := 0;
       i := 0;
       while i < n do {
-        d[i+base] := s[i+base];
+        d[i+base] := s[i+base]; | << Important line.
         i := i + 1
       }
     }
@@ -855,6 +855,20 @@ BOOST_AUTO_TEST_CASE(scope_matching_locals) {
   )";
   runXProgramSrc(program);
   BOOST_TEST(simOutBuffer.str() == std::string({-6, -6}));
+}
+
+//===---------------------------------------------------------------------===//
+// Procs
+//===---------------------------------------------------------------------===//
+
+BOOST_AUTO_TEST_CASE(proc_no_frame_return) {
+  // Check that procs with no stack allocation retrun correctly.
+  auto program = R"(
+    var x; var y;
+    proc bar(val z) is if z > y then x := z else skip
+    proc main() is { y := 0; bar(42); 0(x) }
+  )";
+  BOOST_TEST(runXProgramSrc(program) == 42);
 }
 
 //===---------------------------------------------------------------------===//

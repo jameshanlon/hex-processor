@@ -2850,9 +2850,9 @@ public:
         }
         // Process
         if (epilogue->getSymbol()->getType() == SymbolType::PROC) {
+          cb.genLDBM(SP_OFFSET);
           if (epilogue->getFrame()->getSize() > 0) {
             // Contract the stack poiner.
-            cb.genLDBM(SP_OFFSET);
             cb.genLDAC(frameSize);
             cb.genOPR(hexasm::Token::ADD);
             cb.genSTAM(SP_OFFSET);
