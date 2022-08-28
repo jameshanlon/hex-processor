@@ -38,8 +38,8 @@ class Tests(unittest.TestCase):
         # Create a xhexb compiler binary.
         subprocess.run([ASM_BINARY, defs.XHEXB_SRC, '-o', 'xhexb.bin'])
 
-    def test_x_hello(self):
-        self.run_x_program('hello.x', 'hello\n')
+    def test_x_hello_putval(self):
+        self.run_x_program('hello_putval.x', 'hello world\n')
 
     def test_x_echo_char(self):
         # Test that stdin and stdout work with a program that echos a single character
