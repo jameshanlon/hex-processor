@@ -131,8 +131,10 @@ struct TestContext {
     xcmp::Driver driver(std::cout);
     driver.run(xcmp::DriverAction::EMIT_BINARY, program, false, "a.bin");
     // Run the program.
-    simInBuffer.clear();
     simInBuffer.str(input);
+    simInBuffer.clear();
+    simOutBuffer.str("");
+    simOutBuffer.clear();
     hexsim::Processor processor(simInBuffer, simOutBuffer);
     processor.load("a.bin");
     processor.setTracing(trace);
@@ -147,8 +149,10 @@ struct TestContext {
     xcmp::Driver driver(std::cout);
     driver.run(xcmp::DriverAction::EMIT_BINARY, filename, true, "a.bin");
     // Run the program.
-    simInBuffer.clear();
     simInBuffer.str(input);
+    simInBuffer.clear();
+    simOutBuffer.str("");
+    simOutBuffer.clear();
     hexsim::Processor processor(simInBuffer, simOutBuffer);
     processor.load("a.bin");
     processor.setTracing(trace);

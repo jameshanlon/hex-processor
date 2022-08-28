@@ -1,4 +1,7 @@
+val put = 1;
 var div_x;
+
+proc putval(val c) is put(c, 0)
 
 func lsu(val x, val y) is
   if (x < 0) = (y < 0)
@@ -33,4 +36,25 @@ func div(val n, val m) is
     return div_step(1, m)
 }
 
-func main() is 0(div(2(0), 2(0)))
+func rem(val n, val m) is
+  var x;
+{ x := div(n, m);
+  return div_x
+}
+
+proc printn(val n) is
+{ if n < 0
+  then
+  { putval('-');
+    printn(-n)
+  }
+  else
+  { if n > 9
+    then
+      printn(div(n, 10))
+    else skip;
+    putval(rem(n, 10) + '0')
+  }
+}
+
+proc main() is printn(2(0))

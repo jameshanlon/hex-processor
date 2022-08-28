@@ -2262,12 +2262,14 @@ public:
     }
     void visitPost(ArraySubscriptExpr &expr) {
       // Generate array subscript.
-      cb.genVar(Reg::B, st.lookup(std::make_pair(currentScope, expr.getName()),
-                                  expr.getLocation()));
-      cb.genExpr(expr.getExpr(), currentScope);
+      auto baseSymbol = st.lookup(std::make_pair(currentScope, expr.getName()),
+                                                 expr.getLocation());
       if (expr.getExpr()->isConst()) {
+        cb.genVar(Reg::A, baseSymbol);
         cb.genLDAI(expr.getExpr()->getValue());
       } else {
+        cb.genVar(Reg::B, baseSymbol);
+        cb.genExpr(expr.getExpr(), currentScope);
         cb.genADD();
         cb.genLDAI(0);
       }
@@ -2369,8 +2371,9 @@ public:
     }
 
     void visitPost(AssStatement &expr) {
-      cb.genExpr(expr.getRHS(), currentScope);
       if (auto *varRefLHS = dynamic_cast<VarRefExpr*>(expr.getLHS().get())) {
+        // Generate RHS value into areg.
+        cb.genExpr(expr.getRHS(), currentScope);
         // LHS variable reference.
         auto symbol = st.lookup(std::make_pair(currentScope, varRefLHS->getName()),
                                 expr.getLocation());
@@ -2378,13 +2381,14 @@ public:
           // Global scope.
           cb.genSTAM(symbol->getGlobalLabel());
         } else {
-          auto stackOffset = symbol->getStackOffset();
+          // Local scope.
           cb.genLDBM(SP_OFFSET);
-          cb.genSTAI_FB(cb.getCurrentFrame(), stackOffset);
+          cb.genSTAI_FB(cb.getCurrentFrame(), symbol->getStackOffset());
         }
       } else if (auto *arraySubLHS = dynamic_cast<ArraySubscriptExpr*>(expr.getLHS().get())) {
         // Handle LHS subscript.
-        // Arrays are always global.
+        // Note that arrays are always global.
+        // Generate the array element address and save it to the stack.
         cb.genVar(Reg::B, st.lookup(std::make_pair(currentScope, arraySubLHS->getName()),
                                     arraySubLHS->getLocation()));
         cb.genExpr(arraySubLHS->getExpr(), currentScope);
@@ -2393,9 +2397,12 @@ public:
         cb.getCurrentFrame()->incOffset(1);
         cb.genLDBM(SP_OFFSET);
         cb.genSTAI_FB(cb.getCurrentFrame(), -stackOffset);
+        // Generate the RHS expression.
         cb.genExpr(expr.getRHS(), currentScope);
+        // Load the array address into breg.
         cb.genLDBM(SP_OFFSET);
         cb.genLDBI_FB(cb.getCurrentFrame(), -stackOffset);
+        // Save areg into mem[breg].
         cb.genSTAI(0);
         cb.getCurrentFrame()->decOffset(1);
       } else {

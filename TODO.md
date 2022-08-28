@@ -13,7 +13,9 @@ Features:
 - String constants [DONE]
 - Error on redefined procedure symbol
 - Error on process containing a return statement
-- Error on incorrect number/types of actual parameters
+- Error on incorrect number of actual parameters
+- Error on incorrect types of actual parameters
+- Error on string length > 255
 
 Tests:
 
