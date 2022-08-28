@@ -2268,8 +2268,8 @@ public:
         cb.genVar(Reg::A, baseSymbol);
         cb.genLDAI(expr.getExpr()->getValue());
       } else {
-        cb.genVar(Reg::B, baseSymbol);
         cb.genExpr(expr.getExpr(), currentScope);
+        cb.genVar(Reg::B, baseSymbol);
         cb.genADD();
         cb.genLDAI(0);
       }
@@ -2389,9 +2389,9 @@ public:
         // Handle LHS subscript.
         // Note that arrays are always global.
         // Generate the array element address and save it to the stack.
+        cb.genExpr(arraySubLHS->getExpr(), currentScope);
         cb.genVar(Reg::B, st.lookup(std::make_pair(currentScope, arraySubLHS->getName()),
                                     arraySubLHS->getLocation()));
-        cb.genExpr(arraySubLHS->getExpr(), currentScope);
         cb.genADD();
         auto stackOffset = cb.getCurrentFrame()->getOffset();
         cb.getCurrentFrame()->incOffset(1);
@@ -2496,7 +2496,7 @@ public:
     }
   }
 
-  /// Generate the value of a variable.
+  /// Generate the value of a variable, using only areg or breg.
   void genVar(Reg reg, Symbol *symbol) {
     if (symbol->getScope().empty()) {
       // Load from globals.

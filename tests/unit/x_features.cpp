@@ -777,6 +777,41 @@ proc main() is
   BOOST_TEST(simOutBuffer.str() == "0123456789");
 }
 
+BOOST_AUTO_TEST_CASE(global_array_copy_and_print) {
+  // Exercise generation of array subscripts on LHS and RHS.
+  auto program = R"(
+    array a[100];
+    array b[100];
+    val put = 1;
+    proc copy (array s, array d, val n) is
+      var i;
+      var base;
+    { base := 0;
+      i := 0;
+      while i < n do {
+        d[i+base] := s[i+base];
+        i := i + 1
+      }
+    }
+    proc print(array a, val n) is
+      var i;
+    { i := 0;
+      while i < n do
+      { put(a[i], 0);
+        i := i + 1
+      };
+      put('\n', 0)
+    }
+    proc main () is
+    { a[0] := 'f'; a[1] := 'o'; a[2] := 'o';
+      copy(a, b, 3);
+      print(b, 3)
+    }
+  )";
+  runXProgramSrc(program);
+  BOOST_TEST(simOutBuffer.str() == "foo\n");
+}
+
 //===---------------------------------------------------------------------===//
 // Scope
 //===---------------------------------------------------------------------===//
