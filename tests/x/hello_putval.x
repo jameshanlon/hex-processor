@@ -6,6 +6,12 @@ proc main() is
   putval('l');
   putval('l');
   putval('o');
+  putval(' ');
+  putval('w');
+  putval('o');
+  putval('r');
+  putval('l');
+  putval('d');
   newline()
 }
 proc newline() is putval('\n')

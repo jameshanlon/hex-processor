@@ -2908,14 +2908,14 @@ class ReportMemoryInfo : public AstVisitor {
     } else {
       outs << "  Formals:\n";
       for (auto &decl : proc.getFormals()) {
-        auto symbol = st.lookup(std::make_pair(getCurrentScope(), decl->getName()),
+        auto symbol = st.lookup(std::make_pair(proc.getName(), decl->getName()),
                                 decl->getLocation());
         auto index = symbol->getFrame()->getSize() - 1 + symbol->getStackOffset();
         outs << boost::format("    %s at index %d\n") % symbol->getName() % index;
       }
       outs << "  Locals:\n";
       for (auto &decl : proc.getDecls()) {
-        auto symbol = st.lookup(std::make_pair(getCurrentScope(), decl->getName()),
+        auto symbol = st.lookup(std::make_pair(proc.getName(), decl->getName()),
                                 decl->getLocation());
         auto index = symbol->getFrame()->getSize() - 1 + symbol->getStackOffset();
         outs << boost::format("    %s at index %d\n") % symbol->getName() % index;

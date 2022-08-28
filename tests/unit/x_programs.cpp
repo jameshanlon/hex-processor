@@ -12,14 +12,14 @@ BOOST_FIXTURE_TEST_SUITE(x_programs, TestContext)
 //===---------------------------------------------------------------------===//
 
 BOOST_AUTO_TEST_CASE(hello_putval) {
-  runXProgramFile(getXTestPath("hello.x"), {1, 1});
-  BOOST_TEST(simOutBuffer.str() == "hello\n");
+  runXProgramFile(getXTestPath("hello_putval.x"));
+  BOOST_TEST(simOutBuffer.str() == "hello world\n");
 }
 
-//BOOST_AUTO_TEST_CASE(hello_prints) {
-//  runXProgramFile(getXTestPath("prints.x"), {1, 1});
-//  BOOST_TEST(simOutBuffer.str() == "hello\n");
-//}
+BOOST_AUTO_TEST_CASE(hello_prints) {
+  runXProgramFile(getXTestPath("hello_prints.x"));
+  BOOST_TEST(simOutBuffer.str() == "hello world\n");
+}
 
 BOOST_AUTO_TEST_CASE(mul) {
   BOOST_TEST(runXProgramFile(getXTestPath("mul.x"), {1, 1}) == 1);

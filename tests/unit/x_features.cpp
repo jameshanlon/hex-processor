@@ -778,12 +778,49 @@ proc main() is
 }
 
 //===---------------------------------------------------------------------===//
-// Strings
+// Scope
 //===---------------------------------------------------------------------===//
 
-//BOOST_AUTO_TEST_CASE() {
-//
-//}
+BOOST_AUTO_TEST_CASE(scope_local_global_matching) {
+  // Matching variables in local and global scopes.
+  auto program = R"(
+    var a; var b; var c; var d;
+    proc foo(val a, val b, val c) is 1(((a - b) - c) - d, 0)
+    proc main() is { a := 42; b := 43; c := 44; d := 3; foo(0, 1, 2) }
+  )";
+  runXProgramSrc(program);
+  BOOST_TEST(simOutBuffer.str() == std::string({-6}));
+}
+
+BOOST_AUTO_TEST_CASE(scope_matching_formals) {
+  // Matching formal variables in two local scopes, but with different stack offsets.
+  auto program = R"(
+    proc foo(val a, val b, val c, val d) is 1(((a - b) - c) - d, 0)
+    proc bar(val d, val c, val b, val a) is 1(((a - b) - c) - d, 0)
+    proc main() is { foo(0, 1, 2, 3); bar(0, 1, 2, 3) }
+  )";
+  runXProgramSrc(program);
+  BOOST_TEST(simOutBuffer.str() == std::string({-6, 0}));
+}
+
+BOOST_AUTO_TEST_CASE(scope_matching_locals) {
+  // Matching local variables in two local scopes, but with different stack offsets.
+  auto program = R"(
+    proc foo(val a, val b, val c, val d) is
+      var w; var x; var y; var z;
+    { w := a; x := b; y := c; z := d;
+      1(((w - x) - y) - z, 0)
+    }
+    proc bar(val a, val b, val c, val d) is
+      var z; var y; var x; var w;
+    { w := a; x := b; y := c; z := d;
+      1(((w - x) - y) - z, 0)
+    }
+    proc main() is { foo(0, 1, 2, 3); bar(0, 1, 2, 3) }
+  )";
+  runXProgramSrc(program);
+  BOOST_TEST(simOutBuffer.str() == std::string({-6, -6}));
+}
 
 //===---------------------------------------------------------------------===//
 // Error handling.

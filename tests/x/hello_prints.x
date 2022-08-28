@@ -70,4 +70,4 @@ proc prints(array s) is
   }
 }
 
-proc main() is prints("x")
+proc main() is prints("hello world\n")
