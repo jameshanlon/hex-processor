@@ -20,7 +20,7 @@ namespace hexsim {
 class Processor {
 
   // Constants.
-  static const size_t MEMORY_SIZE_WORDS = 200000;
+  static const size_t MEMORY_SIZE_WORDS = hex::MAX_MEMORY_SIZE_WORDS;
 
   // State.
   uint32_t pc;

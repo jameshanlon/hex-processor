@@ -43,6 +43,8 @@ const char *instrEnumToStr(Instr instr);
 const char *oprInstrEnumToStr(OprInstr oprInstr);
 const char *syscallEnumToStr(Syscall syscall);
 
+const int MAX_MEMORY_SIZE_WORDS = 200000;
+
 } // End namespace hex.
 
 #endif // HEX_HPP

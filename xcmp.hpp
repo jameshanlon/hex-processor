@@ -1956,7 +1956,7 @@ public:
 //===---------------------------------------------------------------------===//
 
 const int SP_OFFSET = 1;
-const int MAX_ADDRESS = 200000;
+const int MAX_ADDRESS = hex::MAX_MEMORY_SIZE_WORDS;
 const int SP_LINK_VALUE_OFFSET = 0;
 const int SP_RETURN_VALUE_OFFSET = 1;
 const int FB_PARAM_OFFSET_FUNC = 2;
