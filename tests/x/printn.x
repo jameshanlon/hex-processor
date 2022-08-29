@@ -1,5 +1,8 @@
 val put = 1;
+val get = 2;
 var div_x;
+
+proc main() is printn(get(0))
 
 proc putval(val c) is put(c, 0)
 
@@ -56,5 +59,3 @@ proc printn(val n) is
     putval(rem(n, 10) + '0')
   }
 }
-
-proc main() is printn(2(0))

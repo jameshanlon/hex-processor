@@ -21,7 +21,7 @@ static void help(char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
-  char *inputFilename;
+  char *inputFilename = nullptr;
   bool trace = false;
   size_t maxCycles = 0;
   xcmp::Driver driver(std::cout);

@@ -201,6 +201,11 @@ BOOST_AUTO_TEST_CASE(constants_max_negative_pool) {
   BOOST_TEST(runXProgramSrc(program) == -2147483648);
 }
 
+BOOST_AUTO_TEST_CASE(constants_hex) {
+  auto program = "val x = #01000000; proc main () is 0(x)";
+  BOOST_TEST(runXProgramSrc(program) == 16777216);
+}
+
 //===---------------------------------------------------------------------===//
 // Procedure calling
 //===---------------------------------------------------------------------===//

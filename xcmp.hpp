@@ -264,13 +264,17 @@ class Lexer {
       value = std::strtoul(number.c_str(), nullptr, 10);
    }
 
+  bool isHexDigit(char c) {
+    return ('0' <= c && c <= '9') ||
+           ('a' <= c && c <= 'z') ||
+           ('A' <= c && c <= 'Z');
+  }
+
   void readHexInt() {
-    std::string number(1, lastChar);
-    do {
-      number += readChar();
-    } while(('0' <= lastChar && lastChar <= '9')
-         || ('a' <= lastChar && lastChar <= 'z')
-         || ('A' <= lastChar && lastChar <= 'Z'));
+    std::string number;
+    while (isHexDigit(readChar())) {
+      number += lastChar;
+    }
     value = std::strtoul(number.c_str(), nullptr, 16);
   }
 
@@ -1952,7 +1956,7 @@ public:
 //===---------------------------------------------------------------------===//
 
 const int SP_OFFSET = 1;
-const int MAX_ADDRESS = 1 << 16;
+const int MAX_ADDRESS = 200000;
 const int SP_LINK_VALUE_OFFSET = 0;
 const int SP_RETURN_VALUE_OFFSET = 1;
 const int FB_PARAM_OFFSET_FUNC = 2;
@@ -2910,8 +2914,8 @@ class ReportMemoryInfo : public AstVisitor {
   void reportFrame(Frame *frame, Proc &proc) {
     outs << boost::format("Frame for %s\n") % proc.getName();
     outs << "  Size: " << frame->getSize() << "\n";
-    if (proc.getDecls().empty()) {
-      outs << "  No local variables\n";
+    if (proc.getFormals().empty()) {
+      outs << "  No formal parameters\n";
     } else {
       outs << "  Formals:\n";
       for (auto &decl : proc.getFormals()) {
@@ -2920,6 +2924,10 @@ class ReportMemoryInfo : public AstVisitor {
         auto index = symbol->getFrame()->getSize() - 1 + symbol->getStackOffset();
         outs << boost::format("    %s at index %d\n") % symbol->getName() % index;
       }
+    }
+    if (proc.getDecls().empty()) {
+      outs << "  No local variables\n";
+    } else {
       outs << "  Locals:\n";
       for (auto &decl : proc.getDecls()) {
         auto symbol = st.lookup(std::make_pair(proc.getName(), decl->getName()),

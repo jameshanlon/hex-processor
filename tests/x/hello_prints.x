@@ -2,6 +2,8 @@ val put = 1;
 val bytesperword = 4;
 var div_x;
 
+proc main() is prints("hello world\n")
+
 proc putval(val c) is put(c, 0)
 
 func lsu(val x, val y) is
@@ -69,5 +71,3 @@ proc prints(array s) is
     else skip
   }
 }
-
-proc main() is prints("hello world\n")

@@ -1,8 +1,10 @@
+val exit = 0;
+val get = 2;
 
 var mul_x;
 
-func main() is
-  0(factorial(2(0)))
+proc main() is
+  exit(factorial(get(0)))
 
 func mul_step(val b, val y) is
   var r;
