@@ -85,10 +85,9 @@ int main(int argc, const char *argv[]) {
       std::exit(1);
     }
     // Run.
-    driver.runCatchExceptions(driverAction, inputFilename, outputFilename, "a.out", reportMemoryInfo);
+    return driver.runCatchExceptions(driverAction, inputFilename, outputFilename, "a.out", reportMemoryInfo);
   } catch (const std::exception &e) {
     std::cerr << boost::format("Error: %s\n") % e.what();
     return 1;
   }
-  return 0;
 }

@@ -195,5 +195,4 @@ int main(int argc, const char** argv) {
     std::cerr << "Error: " << e.what() << "\n";
     return 1;
   }
-  return 0;
 }

@@ -46,11 +46,12 @@ int main(int argc, char *argv[]) {
         }
       }
     }
-    driver.runCatchExceptions(xcmp::DriverAction::EMIT_BINARY, inputFilename, true, "a.bin", false);
-    hexsim::Processor processor(std::cin, std::cout, maxCycles);
-    processor.setTracing(trace);
-    processor.load("a.bin");
-    processor.run();
+    if (driver.runCatchExceptions(xcmp::DriverAction::EMIT_BINARY, inputFilename, true, "a.bin", false) == 0) {
+      hexsim::Processor processor(std::cin, std::cout, maxCycles);
+      processor.setTracing(trace);
+      processor.load("a.bin");
+      processor.run();
+    }
   } catch (const std::exception &e) {
     std::cerr << boost::format("Error: %s\n") % e.what();
     return 1;
