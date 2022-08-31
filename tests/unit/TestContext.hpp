@@ -1,10 +1,14 @@
 #ifndef TEST_CONTEXT_HPP
 #define TEST_CONTEXT_HPP
 
+#include <filesystem>
+
 #include "definitions.hpp"
 #include "hexasm.hpp"
 #include "hexsim.hpp"
 #include "xcmp.hpp"
+
+namespace fs = std::filesystem;
 
 struct TestContext {
   std::istringstream simInBuffer;
@@ -80,12 +84,14 @@ struct TestContext {
     } else {
       lexer.loadBuffer(program);
     }
+    fs::path path(CURRENT_BINARY_DIRECTORY);
+    path /= fs::path("a.bin").stem();
     auto tree = parser.parseProgram();
     auto codeGen = hexasm::CodeGen(tree);
-    codeGen.emitBin("a.bin");
+    codeGen.emitBin(path.c_str());
     // Run the program.
     hexsim::Processor processor(simInBuffer, simOutBuffer);
-    processor.load("a.bin");
+    processor.load(path.c_str());
     processor.setTracing(trace);
     processor.setTruncateInputs(false);
     return processor.run();
@@ -129,14 +135,16 @@ struct TestContext {
                      bool trace=false) {
     // Compile and assemble the program.
     xcmp::Driver driver(std::cout);
-    driver.run(xcmp::DriverAction::EMIT_BINARY, program, false, "a.bin");
+    fs::path path(CURRENT_BINARY_DIRECTORY);
+    path /= fs::path("a.bin").stem();
+    driver.run(xcmp::DriverAction::EMIT_BINARY, program, false, path.c_str());
     // Run the program.
     simInBuffer.str(input);
     simInBuffer.clear();
     simOutBuffer.str("");
     simOutBuffer.clear();
     hexsim::Processor processor(simInBuffer, simOutBuffer);
-    processor.load("a.bin");
+    processor.load(path.c_str());
     processor.setTracing(trace);
     processor.setTruncateInputs(false);
     return processor.run();
@@ -147,14 +155,19 @@ struct TestContext {
                       bool trace=false) {
     // Compile and assemble the program.
     xcmp::Driver driver(std::cout);
-    driver.run(xcmp::DriverAction::EMIT_BINARY, filename, true, "a.bin");
+    fs::path path(CURRENT_BINARY_DIRECTORY);
+    path /= fs::path(filename).stem();
+    if (!fs::exists(path)) {
+      // Reuse an existing binary if available.
+      driver.run(xcmp::DriverAction::EMIT_BINARY, filename, true, path.c_str());
+    }
     // Run the program.
     simInBuffer.str(input);
     simInBuffer.clear();
     simOutBuffer.str("");
     simOutBuffer.clear();
     hexsim::Processor processor(simInBuffer, simOutBuffer);
-    processor.load("a.bin");
+    processor.load(path.c_str());
     processor.setTracing(trace);
     processor.setTruncateInputs(false);
     return processor.run();

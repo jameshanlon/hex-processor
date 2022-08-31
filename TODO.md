@@ -35,7 +35,7 @@ Tests:
 - String constants
 - Constant propagation for expressions
 - Scoping of different symbol types
-- Reuse binary files from tests compiling the same file
+- Reuse binary files from tests compiling the same file [DONE]
 
 Optimisations:
 - Tail recursion (jump to end of EPILOGUE)

@@ -3,5 +3,6 @@
 
 static const char *ASM_TEST_SRC_PREFIX = "${CMAKE_SOURCE_DIR}/tests/asm";
 static const char *X_TEST_SRC_PREFIX = "${CMAKE_SOURCE_DIR}/tests/x";
+static const char *CURRENT_BINARY_DIRECTORY = "${CMAKE_CURRENT_BINARY_DIRECTORY}";
 
 #endif // DEFINITIONS_HPP
