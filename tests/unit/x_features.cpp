@@ -9,15 +9,6 @@
 BOOST_FIXTURE_TEST_SUITE(x_features, TestContext)
 
 //===---------------------------------------------------------------------===//
-// Parse xhexb and return the tree.
-//===---------------------------------------------------------------------===//
-
-BOOST_AUTO_TEST_CASE(xhexb_run) {
-  // Demonstrate the xhexb.x can be parsed into an AST.
-  treeXProgram(getXTestPath("xhexb.x"), true);
-}
-
-//===---------------------------------------------------------------------===//
 // Null programs
 //===---------------------------------------------------------------------===//
 
@@ -179,31 +170,36 @@ proc main() is {
 
 BOOST_AUTO_TEST_CASE(constants_min_positive_pool) {
   auto program = "val x = 65536; proc main () is 0(x)";
-  BOOST_TEST(asmXProgram(program, false, true).str().find("_const0") != std::string::npos);
+  BOOST_TEST(asmXProgramSrc(program, true).str().find("_const0") != std::string::npos);
   BOOST_TEST(runXProgramSrc(program) == 65536);
 }
 
 BOOST_AUTO_TEST_CASE(constants_max_positive_pool) {
   auto program = "val x = 2147483647; proc main () is 0(x)";
-  BOOST_TEST(asmXProgram(program, false, true).str().find("_const0") != std::string::npos);
+  BOOST_TEST(asmXProgramSrc(program, true).str().find("_const0") != std::string::npos);
   BOOST_TEST(runXProgramSrc(program) == 2147483647);
 }
 
 BOOST_AUTO_TEST_CASE(constants_min_negative_pool) {
   auto program = "val x = -65536; proc main () is 0(x)";
-  BOOST_TEST(asmXProgram(program, false, true).str().find("_const0") != std::string::npos);
+  BOOST_TEST(asmXProgramSrc(program, true).str().find("_const0") != std::string::npos);
   BOOST_TEST(runXProgramSrc(program) == -65536);
 }
 
 BOOST_AUTO_TEST_CASE(constants_max_negative_pool) {
   auto program = "val x = -2147483648; proc main () is 0(x)";
-  BOOST_TEST(asmXProgram(program, false, true).str().find("_const0") != std::string::npos);
+  BOOST_TEST(asmXProgramSrc(program, true).str().find("_const0") != std::string::npos);
   BOOST_TEST(runXProgramSrc(program) == -2147483648);
 }
 
 BOOST_AUTO_TEST_CASE(constants_hex) {
   auto program = "val x = #01000000; proc main () is 0(x)";
   BOOST_TEST(runXProgramSrc(program) == 16777216);
+}
+
+BOOST_AUTO_TEST_CASE(constants_propagation_binop) {
+  auto program = "val x = 1; val y = 2; val z = 3; val r = (x + y) - z; proc main () is 0(r)";
+  BOOST_TEST(runXProgramSrc(program) == 0);
 }
 
 //===---------------------------------------------------------------------===//
@@ -884,116 +880,116 @@ BOOST_AUTO_TEST_CASE(proc_no_frame_return) {
 
 BOOST_AUTO_TEST_CASE(token_error_char_const_escape) {
   auto program = "val foo = '\\x';";
-  BOOST_CHECK_THROW(asmXProgram(program), xcmp::CharConstError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program), xcmp::CharConstError);
 }
 
 BOOST_AUTO_TEST_CASE(token_error_eq) {
   auto program = "val foo :~";
-  BOOST_CHECK_THROW(asmXProgram(program), xcmp::TokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program), xcmp::TokenError);
 }
 
 BOOST_AUTO_TEST_CASE(token_error_char_const) {
   auto program = "val foo = 'x~";
-  BOOST_CHECK_THROW(asmXProgram(program), xcmp::TokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program), xcmp::TokenError);
 }
 
 BOOST_AUTO_TEST_CASE(token_error_string) {
   auto program = "val foo = \"x";
-  BOOST_CHECK_THROW(asmXProgram(program), xcmp::TokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program), xcmp::TokenError);
 }
 
 BOOST_AUTO_TEST_CASE(token_error_unexpected_char) {
   auto program = "val foo = ?";
-  BOOST_CHECK_THROW(asmXProgram(program), xcmp::TokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program), xcmp::TokenError);
 }
 
 // Unexpected token errors
 
 BOOST_AUTO_TEST_CASE(unexpected_token_error_elem) {
   auto program1 = "val foo = bar[100~";
-  BOOST_CHECK_THROW(asmXProgram(program1), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program1), xcmp::UnexpectedTokenError);
   auto program2 = "proc foo() is bar(0~";
-  BOOST_CHECK_THROW(asmXProgram(program2), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program2), xcmp::UnexpectedTokenError);
   auto program3 = "val foo = (0~";
-  BOOST_CHECK_THROW(asmXProgram(program3), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program3), xcmp::UnexpectedTokenError);
 }
 
 BOOST_AUTO_TEST_CASE(unexpected_token_error_val_decl) {
   auto program1 = "val foo ~";
-  BOOST_CHECK_THROW(asmXProgram(program1), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program1), xcmp::UnexpectedTokenError);
   auto program2 = "val foo = 1";
-  BOOST_CHECK_THROW(asmXProgram(program2), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program2), xcmp::UnexpectedTokenError);
 }
 
 BOOST_AUTO_TEST_CASE(unexpected_token_error_array_decl) {
   auto program1 = "array foo~";
-  BOOST_CHECK_THROW(asmXProgram(program1), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program1), xcmp::UnexpectedTokenError);
   auto program2 = "array foo[100~";
-  BOOST_CHECK_THROW(asmXProgram(program2), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program2), xcmp::UnexpectedTokenError);
   auto program3 = "array foo[100]~";
-  BOOST_CHECK_THROW(asmXProgram(program3), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program3), xcmp::UnexpectedTokenError);
 }
 
 BOOST_AUTO_TEST_CASE(unexpected_token_error_stmt_if) {
   auto program1 = "proc foo() is if 0 xxx";
-  BOOST_CHECK_THROW(asmXProgram(program1), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program1), xcmp::UnexpectedTokenError);
   auto program2 = "proc foo() is if 0 then skip xxx";
-  BOOST_CHECK_THROW(asmXProgram(program2), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program2), xcmp::UnexpectedTokenError);
 }
 
 BOOST_AUTO_TEST_CASE(unexpected_token_error_stmt_while) {
   auto program = "proc foo() is while 0 xxx";
-  BOOST_CHECK_THROW(asmXProgram(program), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program), xcmp::UnexpectedTokenError);
 }
 
 BOOST_AUTO_TEST_CASE(unexpected_token_error_stmt_block) {
   auto program = "proc foo() is { skip ~";
-  BOOST_CHECK_THROW(asmXProgram(program), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program), xcmp::UnexpectedTokenError);
 }
 
 BOOST_AUTO_TEST_CASE(unexpected_token_error_stmt_ass) {
   auto program = "proc foo() is bar ~";
-  BOOST_CHECK_THROW(asmXProgram(program), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program), xcmp::UnexpectedTokenError);
 }
 
 BOOST_AUTO_TEST_CASE(unexpected_token_error_proc_decl) {
   auto program0 = "proc foo~";
-  BOOST_CHECK_THROW(asmXProgram(program0), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program0), xcmp::UnexpectedTokenError);
   auto program1 = "proc foo(val a ~";
-  BOOST_CHECK_THROW(asmXProgram(program1), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program1), xcmp::UnexpectedTokenError);
   auto program2 = "proc foo() ~";
-  BOOST_CHECK_THROW(asmXProgram(program2), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program2), xcmp::UnexpectedTokenError);
   auto program3 = "proc foo() is skip x x";
-  BOOST_CHECK_THROW(asmXProgram(program3), xcmp::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program3), xcmp::UnexpectedTokenError);
 }
 
 // Expected name error.
 
 BOOST_AUTO_TEST_CASE(expected_name_error) {
   auto program0 = "proc ~";
-  BOOST_CHECK_THROW(asmXProgram(program0), xcmp::ExpectedNameError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program0), xcmp::ExpectedNameError);
 }
 
 // Parser token errors.
 
 BOOST_AUTO_TEST_CASE(parser_token_error_elem) {
   auto program = "val foo = +";
-  BOOST_CHECK_THROW(asmXProgram(program), xcmp::ParserTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program), xcmp::ParserTokenError);
 }
 
 BOOST_AUTO_TEST_CASE(parser_token_error_decl) {
   auto program = "proc foo() is xxx :=";
-  BOOST_CHECK_THROW(asmXProgram(program), xcmp::ParserTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program), xcmp::ParserTokenError);
 }
 
 BOOST_AUTO_TEST_CASE(parser_token_error_formal) {
   auto program = "proc foo(val a, foo b) is skip";
-  BOOST_CHECK_THROW(asmXProgram(program), xcmp::ParserTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program), xcmp::ParserTokenError);
 }
 
 BOOST_AUTO_TEST_CASE(parser_token_error_stmt_invalid) {
   auto program = "proc foo() is ~";
-  BOOST_CHECK_THROW(asmXProgram(program), xcmp::ParserTokenError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program), xcmp::ParserTokenError);
 }
 
 // Semantic errors.
@@ -1001,7 +997,7 @@ BOOST_AUTO_TEST_CASE(parser_token_error_stmt_invalid) {
 // Enable when (global) arrays are handled.
 BOOST_AUTO_TEST_CASE(semantics_non_const_array_length_error) {
   auto program = "var x; array foo[x]; proc main () is skip";
-  BOOST_CHECK_THROW(asmXProgram(program), xcmp::NonConstArrayLengthError);
+  BOOST_CHECK_THROW(asmXProgramSrc(program), xcmp::NonConstArrayLengthError);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

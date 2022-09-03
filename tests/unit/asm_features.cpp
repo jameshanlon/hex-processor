@@ -4,14 +4,12 @@
 #include <boost/test/unit_test.hpp>
 #include "TestContext.hpp"
 
-//===---------------------------------------------------------------------===//
-// Unit tests for assembly programs.
-//===---------------------------------------------------------------------===//
+// Unit tests for assembly languages features.
 
-BOOST_FIXTURE_TEST_SUITE(asm_tests, TestContext)
+BOOST_FIXTURE_TEST_SUITE(asm_features, TestContext)
 
 BOOST_AUTO_TEST_CASE(exit_tokens) {
-  auto output = tokHexProgram(getAsmTestPath("exit0.S"), true).str();
+  auto output = tokHexProgramFile(getAsmTestPath("exit0.S")).str();
   std::string expected = ""
 R"(BR
 IDENTIFIER start
@@ -34,7 +32,7 @@ EOF
 }
 
 BOOST_AUTO_TEST_CASE(exit_tree) {
-  auto output = asmHexProgram(getAsmTestPath("exit0.S"), true, true).str();
+  auto output = asmHexProgramFile(getAsmTestPath("exit0.S"), true).str();
   std::string expected = ""
 R"(00000000 BR start (7)         (1 bytes)
 0x000004 DATA 16383           (4 bytes)
@@ -51,28 +49,28 @@ R"(00000000 BR start (7)         (1 bytes)
 }
 
 BOOST_AUTO_TEST_CASE(exit_bin) {
-  auto output = asmHexProgram(getAsmTestPath("exit0.S"), true);
+  auto output = asmHexProgramFile(getAsmTestPath("exit0.S"));
   output.seekp(0, std::ios::end);
   BOOST_TEST(output.tellp() == 16);
 }
 
 BOOST_AUTO_TEST_CASE(exit0_run) {
-  auto ret = runHexProgram(getAsmTestPath("exit0.S"), true);
+  auto ret = runHexProgramFile(getAsmTestPath("exit0.S"));
   BOOST_TEST(ret == 0);
 }
 
 BOOST_AUTO_TEST_CASE(exit255_run) {
-  auto ret = runHexProgram(getAsmTestPath("exit255.S"), true);
+  auto ret = runHexProgramFile(getAsmTestPath("exit255.S"));
   BOOST_TEST(ret == 255);
 }
 
 BOOST_AUTO_TEST_CASE(hello_run) {
-  runHexProgram(getAsmTestPath("hello.S"), true);
+  runHexProgramFile(getAsmTestPath("hello.S"));
   BOOST_TEST(simOutBuffer.str() == "hello\n");
 }
 
 BOOST_AUTO_TEST_CASE(hello_procedure_run) {
-  runHexProgram(getAsmTestPath("hello_procedure.S"), true);
+  runHexProgramFile(getAsmTestPath("hello_procedure.S"));
   BOOST_TEST(simOutBuffer.str() == "hello\n");
 }
 
@@ -82,27 +80,27 @@ BOOST_AUTO_TEST_CASE(hello_procedure_run) {
 
 BOOST_AUTO_TEST_CASE(error_unexpected_opr_operand) {
   auto program = "OPR OPR";
-  BOOST_CHECK_THROW(asmHexProgram(program), hexasm::InvalidOprError);
+  BOOST_CHECK_THROW(asmHexProgramSrc(program), hexasm::InvalidOprError);
 }
 
 BOOST_AUTO_TEST_CASE(error_unrecognised_token) {
   auto program = "123";
-  BOOST_CHECK_THROW(asmHexProgram(program), hexasm::UnrecognisedTokenError);
+  BOOST_CHECK_THROW(asmHexProgramSrc(program), hexasm::UnrecognisedTokenError);
 }
 
 BOOST_AUTO_TEST_CASE(error_expected_number) {
   auto program = "BR .";
-  BOOST_CHECK_THROW(asmHexProgram(program), hexasm::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmHexProgramSrc(program), hexasm::UnexpectedTokenError);
 }
 
 BOOST_AUTO_TEST_CASE(error_expected_negative_integer) {
   auto program = "BR -foo";
-  BOOST_CHECK_THROW(asmHexProgram(program), hexasm::UnexpectedTokenError);
+  BOOST_CHECK_THROW(asmHexProgramSrc(program), hexasm::UnexpectedTokenError);
 }
 
 BOOST_AUTO_TEST_CASE(error_unknown_label) {
   auto program = "BR foo";
-  BOOST_CHECK_THROW(asmHexProgram(program), hexasm::UnknownLabelError);
+  BOOST_CHECK_THROW(asmHexProgramSrc(program), hexasm::UnknownLabelError);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

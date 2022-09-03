@@ -16,6 +16,11 @@ struct TestContext {
 
   TestContext() {}
 
+  /// Return some interesting char values for testing operators.
+  const std::vector<char> getCharValues() {
+    return {-128, -10, -3, -2, -1, 0, 1, 2, 3, 10, 127};
+  }
+
   /// Return the path to a test filename.
   std::string getAsmTestPath(std::string filename) {
     boost::filesystem::path testPath(ASM_TEST_SRC_PREFIX);
@@ -30,37 +35,77 @@ struct TestContext {
     return testPath.string();
   }
 
-  /// Return some interesting char values for testing operators.
-  const std::vector<char> getCharValues() {
-    return {-128, -10, -3, -2, -1, 0, 1, 2, 3, 10, 127};
+  /// Read the contents of a file into a string.
+  std::string readFile(const std::string filename) {
+    // Read program to be compiled into the input buffer.
+    std::ifstream file(filename);
+    // Get file size.
+    file.seekg(0,std::ios::end);
+    auto length = file.tellg();
+    file.seekg(0,std::ios::beg);
+    // Read the whole file into the buffer.
+    std::vector<char> buffer(length);
+    file.read(&buffer[0], length);
+    // Close the file.
+    file.close();
+    return std::string(buffer.begin(), buffer.end());
   }
 
-  /// TODO: merge these routines into a single one based on an action.
-  /// Convert an assembly program into tokens.
-  std::ostringstream tokHexProgram(const std::string &program,
-                                   bool isFilename=false) {
+  /// Simulate a hex program binary.
+  int simXBinary(const char *filename,
+                 const std::string input="",
+                 bool trace=false) {
+    //// Initialise in/out buffers.
+    simInBuffer.str(input);
+    simInBuffer.clear();
+    simOutBuffer.str("");
+    simOutBuffer.clear();
+    // Run the program.
+    hexsim::Processor processor(simInBuffer, simOutBuffer);
+    processor.load(filename);
+    processor.setTracing(trace);
+    processor.setTruncateInputs(false);
+    return processor.run();
+  }
+
+  /// Simulate a hex program binary.
+  /// FIXME: using simXBinary above causes failures in x_features/unary_minus.
+  hexsim::Processor simXBinary2(const char *filename,
+                                const std::string input="",
+                                bool trace=false) {
+    // Initialise in/out buffers.
+    simInBuffer.str(input);
+    simInBuffer.clear();
+    simOutBuffer.str("");
+    simOutBuffer.clear();
+    // Run the program.
+    hexsim::Processor processor(simInBuffer, simOutBuffer);
+    processor.load(filename);
+    processor.setTracing(trace);
+    processor.setTruncateInputs(false);
+    return processor;
+  }
+
+  /// Convert an assembly program from string into tokens.
+  std::ostringstream tokHexProgramSrc(const std::string program) {
     hexasm::Lexer lexer;
-    if (isFilename) {
-      lexer.openFile(program);
-    } else {
-      lexer.loadBuffer(program);
-    }
+    lexer.loadBuffer(program);
     std::ostringstream outBuffer;
     lexer.emitTokens(outBuffer);
     return outBuffer;
   }
 
-  /// Parse and emit the tree of an assembly program into an output buffer.
-  std::ostringstream asmHexProgram(const std::string &program,
-                                   bool isFilename=false,
-                                   bool emitText=false) {
+  /// Convert an assembly program from file into tokens.
+  std::ostringstream tokHexProgramFile(const std::string filename) {
+    return tokHexProgramSrc(readFile(filename));
+  }
+
+  /// Parse and emit the tree of an assembly program from string into an output buffer.
+  std::ostringstream asmHexProgramSrc(const std::string program,
+                                      bool emitText=false) {
     hexasm::Lexer lexer;
     hexasm::Parser parser(lexer);
-    if (isFilename) {
-      lexer.openFile(program);
-    } else {
-      lexer.loadBuffer(program);
-    }
+    lexer.loadBuffer(program);
     auto tree = parser.parseProgram();
     auto codeGen = hexasm::CodeGen(tree);
     std::ostringstream outBuffer;
@@ -72,105 +117,100 @@ struct TestContext {
     return outBuffer;
   }
 
+  /// Parse and emit the tree of an assembly program from file into an output buffer.
+  std::ostringstream asmHexProgramFile(const std::string filename,
+                                       bool emitText=false) {
+    return asmHexProgramSrc(readFile(filename), emitText);
+  }
+
   /// Run an assembly program.
-  int runHexProgram(const std::string &program,
-                    bool isFilename=false,
-                    bool trace=false) {
+  int runHexProgramSrc(const std::string program,
+                       const std::string input="",
+                       bool trace=false) {
     // Assemble the program.
     hexasm::Lexer lexer;
     hexasm::Parser parser(lexer);
-    if (isFilename) {
-      lexer.openFile(program);
-    } else {
-      lexer.loadBuffer(program);
-    }
+    lexer.loadBuffer(program);
     fs::path path(CURRENT_BINARY_DIRECTORY);
     path /= fs::path("a.bin").stem();
     auto tree = parser.parseProgram();
     auto codeGen = hexasm::CodeGen(tree);
     codeGen.emitBin(path.c_str());
-    // Run the program.
-    hexsim::Processor processor(simInBuffer, simOutBuffer);
-    processor.load(path.c_str());
-    processor.setTracing(trace);
-    processor.setTruncateInputs(false);
-    return processor.run();
+    // Simulate
+    return simXBinary(path.c_str(), input, trace);
   }
 
-  /// Convert an X program into tokens.
-  std::ostringstream tokeniseXProgram(const std::string &program,
-                                      bool isFilename=false) {
+  /// Run an assembly program.
+  int runHexProgramFile(const std::string filename,
+                        const std::string input="",
+                        bool trace=false) {
+    return runHexProgramSrc(readFile(filename), input, trace);
+  }
+
+  /// Convert an X program from string into tokens.
+  std::ostringstream tokeniseXProgramSrc(const std::string program) {
     std::ostringstream outBuffer;
     xcmp::Driver driver(outBuffer);
-    driver.run(xcmp::DriverAction::EMIT_TOKENS, program, isFilename);
+    driver.run(xcmp::DriverAction::EMIT_TOKENS, program, false);
     return outBuffer;
   }
 
-  /// Parse and emit the AST of an X program into an output buffer.
-  std::ostringstream treeXProgram(const std::string &program,
-                                  bool isFilename=false) {
+  /// Convert an X program from file into tokens.
+  std::ostringstream tokeniseXProgramFile(const std::string filename) {
+    return tokeniseXProgramSrc(readFile(filename));
+  }
+
+  /// Parse and emit the AST of an X program from string into an output buffer.
+  std::ostringstream treeXProgramSrc(const std::string &program) {
     std::ostringstream outBuffer;
     xcmp::Driver driver(outBuffer);
-    driver.run(xcmp::DriverAction::EMIT_TREE, program, isFilename);
+    driver.run(xcmp::DriverAction::EMIT_TREE, program, false);
     return outBuffer;
+  }
+
+  /// Parse and emit the AST of an X program from file into an output buffer.
+  std::ostringstream treeXProgramFile(const std::string filename) {
+    return treeXProgramSrc(readFile(filename));
   }
 
   /// Parse and emit the assembly of an X program into an output buffer.
-  std::ostringstream asmXProgram(const std::string &program,
-                                 bool isFilename=false,
-                                 bool text=false) {
+  std::ostringstream asmXProgramSrc(const std::string program,
+                                    bool text=false) {
     std::ostringstream outBuffer;
     xcmp::Driver driver(outBuffer);
     if (text) {
-      driver.run(xcmp::DriverAction::EMIT_ASM, program, isFilename);
+      driver.run(xcmp::DriverAction::EMIT_ASM, program, false);
     } else {
-      driver.run(xcmp::DriverAction::EMIT_BINARY, program, isFilename);
+      driver.run(xcmp::DriverAction::EMIT_BINARY, program, false);
     }
     return outBuffer;
   }
 
-  /// Run an X program.
-  int runXProgramSrc(const std::string &program,
+  /// Parse and emit the assembly of an X program into an output buffer.
+  std::ostringstream asmXProgramFile(const std::string &filename,
+                                     bool text=false) {
+    return asmXProgramSrc(readFile(filename), text);
+  }
+
+  /// Run an X program from a string.
+  int runXProgramSrc(const std::string program,
                      const std::string input="",
                      bool trace=false) {
     // Compile and assemble the program.
     xcmp::Driver driver(std::cout);
     fs::path path(CURRENT_BINARY_DIRECTORY);
-    path /= fs::path("a.bin").stem();
+    path /= fs::path("a.bin");
     driver.run(xcmp::DriverAction::EMIT_BINARY, program, false, path.c_str());
-    // Run the program.
-    simInBuffer.str(input);
-    simInBuffer.clear();
-    simOutBuffer.str("");
-    simOutBuffer.clear();
-    hexsim::Processor processor(simInBuffer, simOutBuffer);
-    processor.load(path.c_str());
-    processor.setTracing(trace);
-    processor.setTruncateInputs(false);
+    // Simulate.
+    auto processor = simXBinary2(path.c_str(), input, trace);
     return processor.run();
   }
 
-  int runXProgramFile(const std::string &filename,
+  /// Run an X program from a file.
+  int runXProgramFile(const std::string filename,
                       const std::string input="",
                       bool trace=false) {
-    // Compile and assemble the program.
-    xcmp::Driver driver(std::cout);
-    fs::path path(CURRENT_BINARY_DIRECTORY);
-    path /= fs::path(filename).stem();
-    if (!fs::exists(path)) {
-      // Reuse an existing binary if available.
-      driver.run(xcmp::DriverAction::EMIT_BINARY, filename, true, path.c_str());
-    }
-    // Run the program.
-    simInBuffer.str(input);
-    simInBuffer.clear();
-    simOutBuffer.str("");
-    simOutBuffer.clear();
-    hexsim::Processor processor(simInBuffer, simOutBuffer);
-    processor.load(path.c_str());
-    processor.setTracing(trace);
-    processor.setTruncateInputs(false);
-    return processor.run();
+    return runXProgramSrc(readFile(filename), input, trace);
   }
 };
 

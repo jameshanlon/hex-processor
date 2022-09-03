@@ -4,7 +4,8 @@ configure_file(definitions.hpp.in
 add_executable(UnitTests
                main.cpp
                ../../hex.cpp
-               asm_tests.cpp
+               asm_features.cpp
+               asm_programs.cpp
                x_features.cpp
                x_programs.cpp)
 

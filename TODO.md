@@ -35,7 +35,8 @@ Tests:
 - String constants
 - Constant propagation for expressions
 - Scoping of different symbol types
-- Reuse binary files from tests compiling the same file [DONE]
+- Reuse binary files from tests compiling the same file
+- Resolve 'error near [end] line: illegal character' message with xhexb unit tests
 
 Optimisations:
 - Tail recursion (jump to end of EPILOGUE)

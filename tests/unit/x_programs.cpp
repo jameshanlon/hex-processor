@@ -1,5 +1,7 @@
 #include <ostream>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <boost/filesystem.hpp>
 #include <boost/test/unit_test.hpp>
 #include "TestContext.hpp"
@@ -90,6 +92,53 @@ BOOST_AUTO_TEST_CASE(printhex) {
 
 BOOST_AUTO_TEST_CASE(strlen) {
   BOOST_TEST(runXProgramFile(getXTestPath("strlen.x")) == 3);
+}
+
+BOOST_AUTO_TEST_CASE(xhexb_tree) {
+  // Demonstrate the xhexb.x can be parsed into an AST.
+  BOOST_TEST(!treeXProgramFile(getXTestPath("xhexb.x")).str().empty());
+}
+
+BOOST_AUTO_TEST_CASE(xhexb_hello_putval) {
+  // Compile xhexb, compile program.
+  auto fileContents = readFile(getXTestPath("hello_putval.x"));
+  runXProgramFile(getXTestPath("xhexb.x"), fileContents);
+  // Simulate the compiled program.
+  simXBinary("simout2");
+  BOOST_TEST(simOutBuffer.str() == "hello world\n");
+}
+
+BOOST_AUTO_TEST_CASE(xhexb_hello_prints) {
+  // Compile xhexb, compile program.
+  auto fileContents = readFile(getXTestPath("hello_prints.x"));
+  runXProgramFile(getXTestPath("xhexb.x"), fileContents);
+  // Simulate the compiled program.
+  simXBinary("simout2");
+  BOOST_TEST(simOutBuffer.str() == "hello world\n");
+}
+
+BOOST_AUTO_TEST_CASE(xhexb_xhexb_hello_prints) {
+  auto xhexbContents = readFile(getXTestPath("xhexb.x"));
+  auto helloContents = readFile(getXTestPath("hello_prints.x"));
+  // Compile xhexb, compile program.
+  runXProgramFile(getXTestPath("xhexb.x"), xhexbContents);
+  // Simulate the compiled program (compile xhexb using xcmp:xhexb binary).
+  simXBinary("simout2", xhexbContents);
+  BOOST_TEST(simOutBuffer.str() == R"(error near line 3054: illegal character
+tree size: 18631
+program size: 17093
+size: 177097
+)");
+  // Simulate the compiled program (compile hello_prints using xhexb:xhexb binary).
+  simXBinary("simout2", helloContents);
+  BOOST_TEST(simOutBuffer.str() == R"(error near line 74: illegal character
+tree size: 602
+program size: 414
+size: 414
+)");
+  // Simulate the compiled program (hello_prints binary).
+  simXBinary("simout2");
+  BOOST_TEST(simOutBuffer.str() == "hello world\n");
 }
 
 BOOST_AUTO_TEST_SUITE_END()
