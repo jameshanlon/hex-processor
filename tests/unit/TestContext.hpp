@@ -53,7 +53,7 @@ struct TestContext {
 
   /// Simulate a hex program binary.
   int simXBinary(const char *filename,
-                 const std::string input="",
+                 const std::string input={},
                  bool trace=false) {
     //// Initialise in/out buffers.
     simInBuffer.str(input);
@@ -66,24 +66,6 @@ struct TestContext {
     processor.setTracing(trace);
     processor.setTruncateInputs(false);
     return processor.run();
-  }
-
-  /// Simulate a hex program binary.
-  /// FIXME: using simXBinary above causes failures in x_features/unary_minus.
-  hexsim::Processor simXBinary2(const char *filename,
-                                const std::string input="",
-                                bool trace=false) {
-    // Initialise in/out buffers.
-    simInBuffer.str(input);
-    simInBuffer.clear();
-    simOutBuffer.str("");
-    simOutBuffer.clear();
-    // Run the program.
-    hexsim::Processor processor(simInBuffer, simOutBuffer);
-    processor.load(filename);
-    processor.setTracing(trace);
-    processor.setTruncateInputs(false);
-    return processor;
   }
 
   /// Convert an assembly program from string into tokens.
@@ -125,7 +107,7 @@ struct TestContext {
 
   /// Run an assembly program.
   int runHexProgramSrc(const std::string program,
-                       const std::string input="",
+                       const std::string input={},
                        bool trace=false) {
     // Assemble the program.
     hexasm::Lexer lexer;
@@ -142,7 +124,7 @@ struct TestContext {
 
   /// Run an assembly program.
   int runHexProgramFile(const std::string filename,
-                        const std::string input="",
+                        const std::string input={},
                         bool trace=false) {
     return runHexProgramSrc(readFile(filename), input, trace);
   }
@@ -194,15 +176,23 @@ struct TestContext {
 
   /// Run an X program from a string.
   int runXProgramSrc(const std::string program,
-                     const std::string input="",
+                     const std::string input={},
                      bool trace=false) {
     // Compile and assemble the program.
     xcmp::Driver driver(std::cout);
     fs::path path(CURRENT_BINARY_DIRECTORY);
     path /= fs::path("a.bin");
     driver.run(xcmp::DriverAction::EMIT_BINARY, program, false, path.c_str());
-    // Simulate.
-    auto processor = simXBinary2(path.c_str(), input, trace);
+    // Initialise in/out buffers.
+    simInBuffer.str(input);
+    simInBuffer.clear();
+    simOutBuffer.str("");
+    simOutBuffer.clear();
+    // Run the program.
+    hexsim::Processor processor(simInBuffer, simOutBuffer);
+    processor.load(path.c_str());
+    processor.setTracing(trace);
+    processor.setTruncateInputs(false);
     return processor.run();
   }
 
