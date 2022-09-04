@@ -4,7 +4,10 @@
 #include <boost/test/unit_test.hpp>
 #include "TestContext.hpp"
 
+
+//===---------------------------------------------------------------------===//
 // Unit tests for X language features.
+//===---------------------------------------------------------------------===//
 
 BOOST_FIXTURE_TEST_SUITE(x_features, TestContext)
 

@@ -22,24 +22,32 @@ class Tests(unittest.TestCase):
             output = subprocess.run([VTB_BINARY, 'a.bin'], capture_output=True)
             self.assertTrue(output.stdout.decode('utf-8').endswith(expected_output))
 
-    def run_x_program(self, filename, expected_output):
+    def run_x_program_simulator(self, filename, expected_output):
         # xhexb compiler
         with open(os.path.join(defs.X_TEST_SRC_PREFIX, filename), 'rb') as infile:
             subprocess.run([SIM_BINARY, 'xhexb.bin'], input=infile.read())
         output = subprocess.run([SIM_BINARY, 'simout2'], capture_output=True)
         self.assertTrue(output.stdout.decode('utf-8') == expected_output)
-        # Verilator
+
+    def run_x_program_verilator(self, filename, expected_output):
         if (defs.USE_VERILATOR):
+            # xhexb compiler
+            with open(os.path.join(defs.X_TEST_SRC_PREFIX, filename), 'rb') as infile:
+                subprocess.run([SIM_BINARY, 'xhexb.bin'], input=infile.read())
             output = subprocess.run([VTB_BINARY, 'simout2'], capture_output=True)
             self.assertTrue(output.stdout.decode('utf-8').endswith(expected_output))
-        infile.close()
 
     def setUp(self):
         # Create a xhexb compiler binary.
         subprocess.run([ASM_BINARY, defs.XHEXB_SRC, '-o', 'xhexb.bin'])
 
     def test_x_hello_putval(self):
-        self.run_x_program('hello_putval.x', 'hello world\n')
+        self.run_x_program_simulator('hello_putval.x', 'hello world\n')
+        self.run_x_program_verilator('hello_putval.x', 'hello world\n')
+
+    def test_x_hello_prints(self):
+        self.run_x_program_simulator('hello_prints.x', 'hello world\n')
+        self.run_x_program_verilator('hello_prints.x', 'hello world\n')
 
     def test_x_echo_char(self):
         # Test that stdin and stdout work with a program that echos a single character

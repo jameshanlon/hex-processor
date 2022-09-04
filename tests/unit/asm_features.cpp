@@ -4,7 +4,10 @@
 #include <boost/test/unit_test.hpp>
 #include "TestContext.hpp"
 
+
+//===---------------------------------------------------------------------===//
 // Unit tests for assembly languages features.
+//===---------------------------------------------------------------------===//
 
 BOOST_FIXTURE_TEST_SUITE(asm_features, TestContext)
 

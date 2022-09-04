@@ -4,7 +4,10 @@
 #include <boost/test/unit_test.hpp>
 #include "TestContext.hpp"
 
+
+//===---------------------------------------------------------------------===//
 // Unit tests for X programs compiled with xhexb.S
+//===---------------------------------------------------------------------===//
 
 BOOST_FIXTURE_TEST_SUITE(asm_programs, TestContext)
 

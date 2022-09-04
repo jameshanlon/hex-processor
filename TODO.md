@@ -32,7 +32,7 @@ Tests:
 - Global array allocation
 - Array subscripts (assign and access)
 - Array arguments
-- String constants
+- String constants [DONE]
 - Constant propagation for expressions
 - Scoping of different symbol types
 - Reuse binary files from tests compiling the same file

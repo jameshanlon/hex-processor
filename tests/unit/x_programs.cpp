@@ -7,11 +7,11 @@
 #include "TestContext.hpp"
 
 
-BOOST_FIXTURE_TEST_SUITE(x_programs, TestContext)
-
 //===---------------------------------------------------------------------===//
 // Unit tests for X programs.
 //===---------------------------------------------------------------------===//
+
+BOOST_FIXTURE_TEST_SUITE(x_programs, TestContext)
 
 BOOST_AUTO_TEST_CASE(mul) {
   BOOST_TEST(runXProgramFile(getXTestPath("mul.x"), {1, 1}) == 1);
@@ -122,14 +122,14 @@ BOOST_AUTO_TEST_CASE(xhexb_xhexb_hello_prints) {
   auto helloContents = readFile(getXTestPath("hello_prints.x"));
   // Compile xhexb, compile program.
   runXProgramFile(getXTestPath("xhexb.x"), xhexbContents);
-  // Simulate the compiled program (compile xhexb using xcmp:xhexb binary).
+  // Simulate the compiled program (compile xhexb using xcmp.cpp:xhexb.x binary).
   simXBinary("simout2", xhexbContents);
   BOOST_TEST(simOutBuffer.str() == R"(error near line 3054: illegal character
 tree size: 18631
 program size: 17093
 size: 177097
 )");
-  // Simulate the compiled program (compile hello_prints using xhexb:xhexb binary).
+  // Simulate the compiled program (compile hello_prints using xhexb.x:xhexb.x binary).
   simXBinary("simout2", helloContents);
   BOOST_TEST(simOutBuffer.str() == R"(error near line 74: illegal character
 tree size: 602
