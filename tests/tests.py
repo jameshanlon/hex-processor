@@ -11,19 +11,22 @@ RUN_BINARY = os.path.join(defs.INSTALL_PREFIX, 'xrun')
 
 class Tests(unittest.TestCase):
 
-    def run_asm_program(self, filename, expected_output):
+    def run_asm_program_simulator(self, filename, expected_output):
         test_path = os.path.join(defs.ASM_TEST_SRC_PREFIX, filename)
         subprocess.run([ASM_BINARY, test_path, '-o', 'a.bin'])
-        # Sim
         output = subprocess.run([SIM_BINARY, 'a.bin'], capture_output=True)
         self.assertTrue(output.stdout.decode('utf-8') == expected_output)
-        # Verilator
+
+    def run_asm_program_verilator(self, filename, expected_output):
         if (defs.USE_VERILATOR):
+            test_path = os.path.join(defs.ASM_TEST_SRC_PREFIX, filename)
+            subprocess.run([ASM_BINARY, test_path, '-o', 'a.bin'])
             output = subprocess.run([VTB_BINARY, 'a.bin'], capture_output=True)
             self.assertTrue(output.stdout.decode('utf-8').endswith(expected_output))
+        else:
+            pass
 
     def run_x_program_simulator(self, filename, expected_output):
-        # xhexb compiler
         with open(os.path.join(defs.X_TEST_SRC_PREFIX, filename), 'rb') as infile:
             subprocess.run([SIM_BINARY, 'xhexb.bin'], input=infile.read())
         output = subprocess.run([SIM_BINARY, 'simout2'], capture_output=True)
@@ -31,11 +34,12 @@ class Tests(unittest.TestCase):
 
     def run_x_program_verilator(self, filename, expected_output):
         if (defs.USE_VERILATOR):
-            # xhexb compiler
             with open(os.path.join(defs.X_TEST_SRC_PREFIX, filename), 'rb') as infile:
                 subprocess.run([SIM_BINARY, 'xhexb.bin'], input=infile.read())
             output = subprocess.run([VTB_BINARY, 'simout2'], capture_output=True)
             self.assertTrue(output.stdout.decode('utf-8').endswith(expected_output))
+        else:
+            pass
 
     def setUp(self):
         # Create a xhexb compiler binary.
@@ -57,18 +61,18 @@ class Tests(unittest.TestCase):
 
     def test_x_compiler_sim(self):
         # Compile xhexb.x with xhexb.bin on simulator.
-        infile = open(os.path.join(defs.X_TEST_SRC_PREFIX, 'xhexb.x'), 'rb')
-        output = subprocess.run([SIM_BINARY, 'xhexb.bin'], input=infile.read(), capture_output=True)
-        self.assertTrue(output.stdout.decode('utf-8') == 'tree size: 18631\nprogram size: 17101\nsize: 177105\n')
-        infile.close()
+        with open(os.path.join(defs.X_TEST_SRC_PREFIX, 'xhexb.x'), 'rb') as infile:
+            output = subprocess.run([SIM_BINARY, 'xhexb.bin'], input=infile.read(), capture_output=True)
+            self.assertTrue(output.stdout.decode('utf-8') == 'tree size: 18631\nprogram size: 17101\nsize: 177105\n')
 
     def test_x_compiler_verilator(self):
         # Compile xhexb.x with xhexb.bin on hex RTL.
         if (defs.USE_VERILATOR):
-            infile = open(os.path.join(defs.X_TEST_SRC_PREFIX, 'xhexb.x'), 'rb')
-            output = subprocess.run([VTB_BINARY, 'xhexb.bin'], input=infile.read(), capture_output=True)
-            self.assertTrue(output.stdout.decode('utf-8').endswith('tree size: 18631\nprogram size: 17101\nsize: 177105\n'))
-            infile.close()
+            with open(os.path.join(defs.X_TEST_SRC_PREFIX, 'xhexb.x'), 'rb') as infile:
+                output = subprocess.run([VTB_BINARY, 'xhexb.bin'], input=infile.read(), capture_output=True)
+                self.assertTrue(output.stdout.decode('utf-8').endswith('tree size: 18631\nprogram size: 17101\nsize: 177105\n'))
+        else:
+            pass
 
 if __name__ == '__main__':
     unittest.main()
