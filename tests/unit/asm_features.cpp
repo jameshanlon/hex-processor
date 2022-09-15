@@ -46,7 +46,7 @@ R"(00000000 BR start (7)         (1 bytes)
 0x00000b LDAC 0               (1 bytes)
 0x00000c OPR SVC              (1 bytes)
 00000000 PADDING 3            (3 bytes)
-3 bytes
+13 bytes
 )";
   BOOST_TEST(output == expected);
 }

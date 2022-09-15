@@ -805,13 +805,15 @@ public:
 
   /// Emit the program to an output stream.
   void emitProgramText(std::ostream &out) {
+    size_t programSize = 0;
     for (auto &directive : program) {
+      programSize += directive->getSize();
       out << boost::format("%#08x %-20s (%d bytes)\n")
                % directive->getByteOffset()
                % directive->toString()
                % directive->getSize();
     }
-    out << boost::format("%d bytes\n") % getProgramSize();
+    out << boost::format("%d bytes\n") % programSize;
   }
 
   /// Emit each directive of the program as binary.

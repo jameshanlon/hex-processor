@@ -1,5 +1,9 @@
 # To do list
 
+Fix:
+
+- Output of intermediate stages to file with -o <filename>
+
 Features:
 
 - Arithmetic binary and unary operations [DONE]
@@ -40,12 +44,12 @@ Tests:
 
 Optimisations:
 - Tail recursion (jump to end of EPILOGUE)
-- Eliminate BR lab; lab, for procedure exits
+- Eliminate BR lab; lab, for procedure exits [DONE]
 - Eliminate
   LDBM 1
   STAI x
   LDAM 1
-  LDAI x
+  LDAI x [DONE]
 - x + 0 -> x
 - x | 0 -> x
 - x - 0 -> x

@@ -2897,7 +2897,93 @@ public:
   /// Reporting -------------------------------------------------------------//
   void emitInstrs(std::ostream &out) { cb.emitInstrs(out); }
 
-  /// Member reporting ------------------------------------------------------//
+  /// Member access ---------------------------------------------------------//
+  CodeBuffer &getCodeBuffer() { return cb; }
+  std::vector<std::unique_ptr<hexasm::Directive>> &getInstrs() {
+    return cb.getInstrs();
+  }
+};
+
+//===---------------------------------------------------------------------===//
+// Optimise directives.
+//===---------------------------------------------------------------------===//
+
+class OptimiseDirectives {
+  std::vector<std::unique_ptr<hexasm::Directive>> &instrs;
+  CodeBuffer cb;
+
+  /// Match BR <label>; <label>
+  bool matchBranchZero(size_t index) {
+    if (instrs[index+0]->getToken() == hexasm::Token::BR &&
+        instrs[index+1]->getToken() == hexasm::Token::IDENTIFIER) {
+      auto branch = dynamic_cast<hexasm::InstrLabel*>(instrs[index].get());
+      auto label = dynamic_cast<hexasm::Label*>(instrs[index+1].get());
+      return branch != nullptr && label != nullptr && branch->getLabel() == label->getLabel();
+    }
+    return false;
+  }
+
+  /// Match STAM <x>; LDAM <x>
+  bool matchStoreThenLoad(size_t index) {
+    if (instrs[index+0]->getToken() == hexasm::Token::STAM &&
+        instrs[index+1]->getToken() == hexasm::Token::LDAM) {
+      auto inst0 = dynamic_cast<hexasm::Directive*>(instrs[index+0].get());
+      auto inst1 = dynamic_cast<hexasm::Directive*>(instrs[index+1].get());
+      return !inst0->operandIsLabel() &&
+             !inst1->operandIsLabel() &&
+             inst0->getValue() == inst1->getValue();
+    }
+    return false;
+  }
+
+  /// Match LDBM 1; STAI <x>; LDAM 1; LDAI <x>
+  bool matchIndexStoreThenLoad(size_t index) {
+    if (instrs[index+0]->getToken() == hexasm::Token::LDBM &&
+        instrs[index+1]->getToken() == hexasm::Token::STAI &&
+        instrs[index+2]->getToken() == hexasm::Token::LDAM &&
+        instrs[index+3]->getToken() == hexasm::Token::LDAI) {
+      auto inst0 = dynamic_cast<hexasm::Directive*>(instrs[index+0].get());
+      auto inst1 = dynamic_cast<hexasm::Directive*>(instrs[index+1].get());
+      auto inst2 = dynamic_cast<hexasm::Directive*>(instrs[index+2].get());
+      auto inst3 = dynamic_cast<hexasm::Directive*>(instrs[index+3].get());
+      return inst0->getValue() == 1 &&
+             inst2->getValue() == 1 &&
+             !inst1->operandIsLabel() &&
+             !inst3->operandIsLabel() &&
+             inst1->getValue() == inst3->getValue();
+    }
+    return false;
+  }
+
+public:
+  OptimiseDirectives(SymbolTable &symbolTable, CodeBuffer &previousCodeBuffer) :
+      instrs(previousCodeBuffer.getInstrs()), cb(symbolTable) {
+    // Lower intermediate instruction directives.
+    for (size_t i=0; i<instrs.size(); i++) {
+      if (matchBranchZero(i)) {
+        // Omit these directives.
+        i += 1;
+      } else if (matchStoreThenLoad(i)) {
+        cb.insertInstr(std::move(instrs[i]));
+        // Omit load.
+        i += 1;
+      } else if (matchIndexStoreThenLoad(i)) {
+        cb.insertInstr(std::move(instrs[i]));
+        cb.insertInstr(std::move(instrs[i+1]));
+        // Omit load.
+        i += 3;
+      } else {
+        // Otherwise just copy the directive.
+        cb.insertInstr(std::move(instrs[i]));
+      }
+    }
+  }
+
+  /// Reporting -------------------------------------------------------------//
+  void emitInstrs(std::ostream &out) { cb.emitInstrs(out); }
+
+  /// Member access ---------------------------------------------------------//
+  CodeBuffer &getCodeBuffer() { return cb; }
   std::vector<std::unique_ptr<hexasm::Directive>> &getInstrs() {
     return cb.getInstrs();
   }
@@ -2967,6 +3053,7 @@ enum class DriverAction {
   EMIT_OPTIMISED_TREE,
   EMIT_INTERMEDIATE_INSTS,
   EMIT_LOWERED_INSTS,
+  EMIT_OPTIMISED_INSTS,
   EMIT_ASM,
   EMIT_BINARY
 };
@@ -3055,8 +3142,17 @@ public:
       return 0;
     }
 
+    // Optimise the final set of assembly directives.
+    xcmp::OptimiseDirectives optimiseDirectives(symbolTable, lowerDirectives.getCodeBuffer());
+
+    // Emit the lowered instructions only.
+    if (action == DriverAction::EMIT_OPTIMISED_INSTS) {
+      optimiseDirectives.emitInstrs(outStream);
+      return 0;
+    }
+
     // Assemble the instructions.
-    hexasm::CodeGen asmCodeGen(lowerDirectives.getInstrs());
+    hexasm::CodeGen asmCodeGen(optimiseDirectives.getInstrs());
 
     // Print the assembly instructions only.
     if (action == DriverAction::EMIT_ASM) {

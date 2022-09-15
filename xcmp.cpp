@@ -60,6 +60,8 @@ int main(int argc, const char *argv[]) {
         driverAction = xcmp::DriverAction::EMIT_INTERMEDIATE_INSTS;
       } else if (std::strcmp(argv[i], "--insts-lowered") == 0) {
         driverAction = xcmp::DriverAction::EMIT_LOWERED_INSTS;
+      } else if (std::strcmp(argv[i], "--insts-optimised") == 0) {
+        driverAction = xcmp::DriverAction::EMIT_OPTIMISED_INSTS;
       } else if (std::strcmp(argv[i], "-S") == 0) {
         driverAction = xcmp::DriverAction::EMIT_ASM;
       } else if (std::strcmp(argv[i], "--insts-asm") == 0) {
