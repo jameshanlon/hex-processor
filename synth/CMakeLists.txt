@@ -2,7 +2,6 @@
 if (USE_YOSYS)
   configure_file(synth.in.ys
                  synth.ys)
-
   add_custom_target(processor.netlist.v ALL
                     COMMAND ${YOSYS_BIN} synth.ys
                     COMMENT "Running Yosys"
