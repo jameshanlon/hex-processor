@@ -373,9 +373,10 @@ proc main() is 0(add3(add3(add3(nop(1)+1, nop(2)+1, nop(3)+1), nop(4)+1, nop(5)+
 //===---------------------------------------------------------------------===//
 
 BOOST_AUTO_TEST_CASE(unary_minus) {
-  BOOST_TEST(runXProgramSrc("proc main () is 0(-(2()))", "0") == -'0');
-  BOOST_TEST(runXProgramSrc("proc main () is 0(-(-(2())))", "0") == '0');
-  BOOST_TEST(runXProgramSrc("proc main () is 0(-(-(-(2()))))", "0") == -'0');
+  BOOST_TEST(runXProgramSrc("proc main () is 0(2(0))", "0") == '0');
+  BOOST_TEST(runXProgramSrc("proc main () is 0(-(2(0)))", "0") == -'0');
+  BOOST_TEST(runXProgramSrc("proc main () is 0(-(-(2(0))))", "0") == '0');
+  BOOST_TEST(runXProgramSrc("proc main () is 0(-(-(-(2(0)))))", "0") == -'0');
   // Constant popagation.
   BOOST_TEST(runXProgramSrc("proc main () is 0(-42)") == -42);
   BOOST_TEST(runXProgramSrc("proc main () is 0(-(-42))") == 42);
@@ -383,12 +384,13 @@ BOOST_AUTO_TEST_CASE(unary_minus) {
 }
 
 BOOST_AUTO_TEST_CASE(unary_not) {
-  BOOST_TEST(runXProgramSrc("proc main () is 0(~2())", "0") == 0);
-  BOOST_TEST(runXProgramSrc("proc main () is 0(~(~2()))", "0") == 1);
-  BOOST_TEST(runXProgramSrc("proc main () is 0(~(~(~2())))", "0") == 0);
+  BOOST_TEST(runXProgramSrc("proc main () is 0(2(0))", "0") == '0');
+  BOOST_TEST(runXProgramSrc("proc main () is 0(~2(0))", "0") == 0);
+  BOOST_TEST(runXProgramSrc("proc main () is 0(~(~2(0)))", "0") == 1);
+  BOOST_TEST(runXProgramSrc("proc main () is 0(~(~(~2(0))))", "0") == 0);
   // With boolean literals.
-  BOOST_TEST(runXProgramSrc("proc main () is 0(~(2()))", {1}) == 0);
-  BOOST_TEST(runXProgramSrc("proc main () is 0(~(2()))", {0}) == 1);
+  BOOST_TEST(runXProgramSrc("proc main () is 0(~(2(0)))", {1}) == 0);
+  BOOST_TEST(runXProgramSrc("proc main () is 0(~(2(0)))", {0}) == 1);
   // Constant popagation.
   BOOST_TEST(runXProgramSrc("proc main () is 0(~42)") == 0);
   BOOST_TEST(runXProgramSrc("proc main () is 0(~(~42))") == 1);
@@ -672,19 +674,19 @@ var x; var y; var z; {
 //===---------------------------------------------------------------------===//
 
 BOOST_AUTO_TEST_CASE(if_statement) {
-  auto program = "proc main () is if 2() = 48 then 0(0) else 0(1)";
+  auto program = "proc main () is if 2(0) = 48 then 0(0) else 0(1)";
   BOOST_TEST(runXProgramSrc(program, "0") == 0);
   BOOST_TEST(runXProgramSrc(program, "1") == 1);
 }
 
 BOOST_AUTO_TEST_CASE(if_statement_skip_else) {
-  auto program = "proc main () is if 2() = 48 then 0(1) else skip";
+  auto program = "proc main () is if 2(0) = 48 then 0(1) else skip";
   BOOST_TEST(runXProgramSrc(program, "0") == 1);
   BOOST_TEST(runXProgramSrc(program, "1") == 0);
 }
 
 BOOST_AUTO_TEST_CASE(if_statement_skip_then) {
-  auto program = "proc main () is if 2() = 48 then skip else 0(1)";
+  auto program = "proc main () is if 2(0) = 48 then skip else 0(1)";
   BOOST_TEST(runXProgramSrc(program, "0") == 0);
   BOOST_TEST(runXProgramSrc(program, "1") == 1);
 }

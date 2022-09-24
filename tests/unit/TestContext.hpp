@@ -11,7 +11,6 @@
 namespace fs = std::filesystem;
 
 struct TestContext {
-  std::istringstream simInBuffer;
   std::ostringstream simOutBuffer;
 
   TestContext() {}
@@ -55,9 +54,8 @@ struct TestContext {
   int simXBinary(const char *filename,
                  const std::string input={},
                  bool trace=false) {
-    //// Initialise in/out buffers.
-    simInBuffer.str(input);
-    simInBuffer.clear();
+    // Initialise in/out buffers.
+    std::istringstream simInBuffer(input);
     simOutBuffer.str("");
     simOutBuffer.clear();
     // Run the program.
@@ -184,8 +182,7 @@ struct TestContext {
     path /= fs::path("a.bin");
     driver.run(xcmp::DriverAction::EMIT_BINARY, program, false, path.c_str());
     // Initialise in/out buffers.
-    simInBuffer.str(input);
-    simInBuffer.clear();
+    std::istringstream simInBuffer(input);
     simOutBuffer.str("");
     simOutBuffer.clear();
     // Run the program.

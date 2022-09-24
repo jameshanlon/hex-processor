@@ -2960,7 +2960,7 @@ public:
       instrs(previousCodeBuffer.getInstrs()), cb(symbolTable) {
     // Lower intermediate instruction directives.
     for (size_t i=0; i<instrs.size(); i++) {
-      /*if (matchBranchZero(i)) {
+      if (matchBranchZero(i)) {
         // Omit directives.
         i += 1;
       } else if (matchStoreThenLoad(i)) {
@@ -2972,10 +2972,10 @@ public:
         cb.insertInstr(std::move(instrs[i+1]));
         // Omit load.
         i += 3;
-      } else {*/
+      } else {
         // Otherwise just copy the directive.
         cb.insertInstr(std::move(instrs[i]));
-      /*}*/
+      }
     }
   }
 
