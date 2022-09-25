@@ -285,9 +285,9 @@ class Label : public Directive {
   int labelValue;
 public:
   Label(Token token, std::string label) :
-      Directive(token), label(label) {}
+      Directive(token), label(label), labelValue(0) {}
   Label(Location location, Token token, std::string label) :
-      Directive(location, token), label(label) {}
+      Directive(location, token), label(label), labelValue(0) {}
   bool operandIsLabel() const { return false; }
   size_t getSize() const { return 0; }
   /// Update the label value and return true if it was changed.
