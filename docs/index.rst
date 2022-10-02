@@ -6,6 +6,14 @@ Hex Processor
    :maxdepth: 2
    :caption: Contents:
 
+This repository contains an assembler, simulator and hardware implementation of
+the Hex processor architecture, as well as a compiler for a simple programming
+language 'X' that is targeted at it.  With complexities of modern computer
+architectures and compilers/tool chains being difficult to penetrate, the
+intention of this project is to provide a simple example Verilog implementation
+and supporting C++ tooling that can be used as the basis for another project or
+just as a curiosity in itself.
+
 
 Indices and tables
 ==================
