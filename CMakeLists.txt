@@ -16,7 +16,6 @@ find_package(Python3 REQUIRED COMPONENTS
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 option(USE_VERILATOR "Use Verilator for simulation" ON)
-option(USE_YOSYS     "Use Yosys for synthesis" ON)
 option(BUILD_DOCS    "Create and install HTML documentation" OFF)
 
 # Verilator
@@ -26,15 +25,6 @@ if (USE_VERILATOR)
     message(FATAL_ERROR "Verilator was not found.")
   endif()
   message(STATUS "Found Verilator binary = ${VERILATOR_BIN}")
-endif()
-
-# Yosys
-if (USE_YOSYS)
-  find_program(YOSYS_BIN yosys HINTS $ENV{YOSYS_ROOT} ${YOSYS_ROOT})
-  if (NOT YOSYS_BIN)
-    message(FATAL_ERROR "Yosys was not found.")
-  endif()
-  message(STATUS "Found Yosys binary = ${YOSYS_BIN}")
 endif()
 
 # Compiler config
@@ -80,7 +70,6 @@ if (USE_VERILATOR)
 endif()
 
 enable_testing()
-add_subdirectory(synth)
 add_subdirectory(tests)
 
 if (BUILD_DOCS)

@@ -24,7 +24,7 @@ int main(int argc, const char *argv[]) {
 
     // Handle arguments.
     bool tokensOnly = false;
-    bool treeOnly = false;
+    bool instrsOnly = false;
     const char *filename = nullptr;
     const char *outputFilename = "a.out";
     for (int i = 1; i < argc; ++i) {
@@ -34,8 +34,8 @@ int main(int argc, const char *argv[]) {
         std::exit(1);
       } else if (std::strcmp(argv[i], "--tokens") == 0) {
         tokensOnly = true;
-      } else if (std::strcmp(argv[i], "--tree") == 0) {
-        treeOnly = true;
+      } else if (std::strcmp(argv[i], "--instrs") == 0) {
+        instrsOnly = true;
       } else if (std::strcmp(argv[i], "--output") == 0 ||
                  std::strcmp(argv[i], "-o") == 0) {
         outputFilename = argv[++i];
@@ -60,7 +60,7 @@ int main(int argc, const char *argv[]) {
     lexer.openFile(filename);
 
     // Tokenise only.
-    if (tokensOnly && !treeOnly) {
+    if (tokensOnly && !instrsOnly) {
       lexer.emitTokens(std::cout);
       return 0;
     }
@@ -72,7 +72,7 @@ int main(int argc, const char *argv[]) {
     hexasm::CodeGen codeGen(program);
 
     // Print program summary only.
-    if (treeOnly) {
+    if (instrsOnly) {
       codeGen.emitProgramText(std::cout);
       return 0;
     }

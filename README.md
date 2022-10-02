@@ -38,9 +38,8 @@ $ mkdir Build
 $ cd Build
 $ cmake .. -DCMAKE_BUILD_TYPE=Debug \
            -DVERILATOR_ROOT=<path-to-verilator-repo> \
-           -DYOSYS_ROOT=<path-to-yosys-repo> \
            -DBUILD_DOCS=OFF
-$ make
+$ make -j8
 $ make test # Run all the unit tests.
 ```
 
@@ -49,8 +48,7 @@ excluded if these tools are not available:
 
 ```bash
 $ cmake .. -DCMAKE_BUILD_TYPE=Debug \
-           -DUSE_VERILATOR=NO \
-           -DUSE_YOSYS=NO
+           -DUSE_VERILATOR=NO
 ```
 
 ## Running a program
@@ -67,7 +65,7 @@ hello
 Run the 'hello' X program:
 
 ```bash
-$ export PATH=install/bin:$PATH
+$ export PATH=`pwd`/install/bin:$PATH
 $ xcmp tests/x/hello.x -o hello.bin
 $ hexsim hello.bin
 hello
