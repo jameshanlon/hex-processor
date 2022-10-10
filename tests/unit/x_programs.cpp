@@ -94,6 +94,10 @@ BOOST_AUTO_TEST_CASE(strlen) {
   BOOST_TEST(runXProgramFile(getXTestPath("strlen.x")) == 3);
 }
 
+BOOST_AUTO_TEST_CASE(bubblesort) {
+  BOOST_TEST(runXProgramFile(getXTestPath("bubblesort.x")) == 0);
+}
+
 BOOST_AUTO_TEST_CASE(xhexb_tree) {
   // Demonstrate the xhexb.x can be parsed into an AST.
   BOOST_TEST(!treeXProgramFile(getXTestPath("xhexb.x")).str().empty());
