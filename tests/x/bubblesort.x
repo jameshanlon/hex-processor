@@ -1,4 +1,4 @@
-val length = 4;
+val length = 10;
 array data[length];
 
 proc sort(array a, val n) is
@@ -32,10 +32,16 @@ func check(array a, val n) is
 }
 
 proc main() is
-{ data[0] := 3 
-; data[1] := 2 
-; data[2] := 1 
-; data[3] := 0 
+{ data[0] := 9
+; data[1] := 8
+; data[2] := 7
+; data[3] := 6
+; data[4] := 5
+; data[5] := 4
+; data[6] := 3
+; data[7] := 2
+; data[8] := 1
+; data[9] := 0
 ; sort(data, length)
 ; return check(data, length)
 }
