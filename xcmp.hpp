@@ -2961,7 +2961,8 @@ public:
     // Lower intermediate instruction directives.
     for (size_t i=0; i<instrs.size(); i++) {
       if (matchBranchZero(i)) {
-        // Omit directives.
+        // Omit branch.
+        cb.insertInstr(std::move(instrs[i+1]));
         i += 1;
       } else if (matchStoreThenLoad(i)) {
         cb.insertInstr(std::move(instrs[i]));

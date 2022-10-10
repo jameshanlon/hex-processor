@@ -30,6 +30,7 @@ static void help(const char *argv[]) {
   std::cout << "  --tree-opt        Display the optimised syntax tree only\n";
   std::cout << "  --insts           Display the intermediate instructions only\n";
   std::cout << "  --insts-lowered   Display the lowered instructions only\n";
+  std::cout << "  --insts-optimised Display the lowered optimised instructions only\n";
   std::cout << "  --memory-info     Report memory information\n";
   std::cout << "  -S                Emit the assembly program\n";
   std::cout << "  --insts-asm       Display the assembled instructions only\n";
