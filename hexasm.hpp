@@ -227,7 +227,10 @@ static int numNibbles(int value) {
 /// Return the length of an instruction that has a relative label reference.
 /// The length of the encoding depends on the distance to the label, which in
 /// turn depends on the length of the instruction. Calculate the value by
-/// increasing the length until they match.
+/// increasing the length until they match. Note that for positive references,
+/// the length of the encoding reduces the range that must be represented, and
+/// for negative references the encoding length adds to the range that must be
+/// represented.
 static int instrLen(int labelOffset, int byteOffset) {
   int length = 1;
   while (length < numNibbles(labelOffset - byteOffset - length)) {
