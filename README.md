@@ -37,18 +37,24 @@ Then, configure and run a build with CMake:
 $ mkdir Build
 $ cd Build
 $ cmake .. -DCMAKE_BUILD_TYPE=Debug \
+           -DCMAKE_INSTALL_PREFIX=$(pwd)/install \
            -DVERILATOR_ROOT=<path-to-verilator-repo> \
            -DBUILD_DOCS=OFF
 $ make -j8
-$ make test # Run all the unit tests.
+$ make install
+$ ctest --output-on-failure # Run all the unit tests.
 ```
 
-Alternatively, the Verilator and/or Yosys components of the build can be
-excluded if these tools are not available:
+Alternatively, the Verilator component of the build can be excluded if it is
+not available:
 
 ```bash
 $ cmake .. -DCMAKE_BUILD_TYPE=Debug \
-           -DUSE_VERILATOR=NO
+           -DCMAKE_INSTALL_PREFIX=$(pwd)/install \
+           -DUSE_VERILATOR=OFF
+$ make -j8
+$ make install
+$ ctest --output-on-failure
 ```
 
 ## Running a program
@@ -56,7 +62,7 @@ $ cmake .. -DCMAKE_BUILD_TYPE=Debug \
 Run the 'hello' assembly program:
 
 ```bash
-$ export PATH=install/bin:$PATH
+$ export PATH=$(pwd)/install/bin:$PATH
 $ hexasm tests/asm/hello.S -o hello.bin
 $ hexsim hello.bin
 hello
@@ -65,7 +71,7 @@ hello
 Run the 'hello' X program:
 
 ```bash
-$ export PATH=`pwd`/install/bin:$PATH
+$ export PATH=$(pwd)/install/bin:$PATH
 $ xcmp tests/x/hello.x -o hello.bin
 $ hexsim hello.bin
 hello
