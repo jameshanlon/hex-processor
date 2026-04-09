@@ -14,6 +14,18 @@ the basis for another project or just as a curiosity in itself.
 
 ## Building and running the tests
 
+### Dependencies
+
+This project requires:
+- CMake 3.14+
+- C++20 compatible compiler
+- Verilator (optional, for hardware simulation)
+- Python 3 (for documentation)
+
+All other dependencies (fmt, Catch2) are fetched automatically via CMake FetchContent.
+
+### Building
+
 Clone and build Verilator and Yosys in repository.
 
 To build with the documentation, first create a virtualenv with the requirements:
@@ -28,8 +40,10 @@ $ pip install -r docs/requirements.txt
 Ubuntu requirements:
 
 ```bash
-apt update && apt install build-essential cmake libboost-all-dev
+apt update && apt install build-essential cmake
 ```
+
+No additional dependencies are required - fmt and Catch2 are fetched automatically.
 
 Then, configure and run a build with CMake:
 

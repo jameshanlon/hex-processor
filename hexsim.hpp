@@ -98,10 +98,6 @@ public:
     unsigned programSize;
     file.read(reinterpret_cast<char*>(&programSize), 4);
     programSize <<= 2;
-    //if (programSize != remainingFileSize) {
-    //  std::cerr << boost::format("Warning: mismatching program size %d != %d\n")
-    //                 % programSize % remainingFileSize;
-    //}
 
     // Read the instructions into memory.
     file.read(reinterpret_cast<char*>(memory.data()), programSize);
