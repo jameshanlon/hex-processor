@@ -3,7 +3,8 @@
 
 #include <cstdint>
 #include <exception>
-#include <boost/format.hpp>
+#include <string>
+#include <fmt/format.h>
 
 namespace hexutil {
 
@@ -15,7 +16,7 @@ public:
   Location() : line(0), position(0), null(true) {}
   Location(size_t line, size_t position) : line(line), position(position), null(false) {}
   std::string str() const {
-    return null ? "no location" : (boost::format("line %d:%d") % line % position).str();
+    return null ? "no location" : fmt::format("line {}:{}", line, position);
   }
   bool isNull() const { return null; }
 };

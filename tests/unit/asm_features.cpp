@@ -37,15 +37,15 @@ EOF
 BOOST_AUTO_TEST_CASE(exit_tree) {
   auto output = asmHexProgramFile(getAsmTestPath("exit0.S"), true).str();
   std::string expected = ""
-R"(00000000 BR start (7)         (1 bytes)
-0x000004 DATA 16383           (4 bytes)
-0x000008 start                (0 bytes)
-0x000008 LDAC 0               (1 bytes)
-0x000009 LDBM 1               (1 bytes)
-0x00000a STAI 2               (1 bytes)
-0x00000b LDAC 0               (1 bytes)
-0x00000c OPR SVC              (1 bytes)
-00000000 PADDING 3            (3 bytes)
+R"(0x00000000 BR start (7)         (1 bytes)
+0x00000004 DATA 16383           (4 bytes)
+0x00000008 start                (0 bytes)
+0x00000008 LDAC 0               (1 bytes)
+0x00000009 LDBM 1               (1 bytes)
+0x0000000a STAI 2               (1 bytes)
+0x0000000b LDAC 0               (1 bytes)
+0x0000000c OPR SVC              (1 bytes)
+0x00000000 PADDING 3            (3 bytes)
 13 bytes
 )";
   BOOST_TEST(output == expected);

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fmt/format.h>
 
 #include "hexasm.hpp"
 #include "xcmp.hpp"
@@ -53,7 +54,7 @@ int main(int argc, char *argv[]) {
       processor.run();
     }
   } catch (const std::exception &e) {
-    std::cerr << boost::format("Error: %s\n") % e.what();
+    std::cerr << fmt::format("Error: {}\n", e.what());
     return 1;
   }
   return 0;

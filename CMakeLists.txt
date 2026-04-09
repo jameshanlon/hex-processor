@@ -2,6 +2,14 @@ cmake_minimum_required(VERSION 3.14.0)
 project(hex-processor)
 include(GNUInstallDirs)
 
+# FetchContent for fmt
+include(FetchContent)
+FetchContent_Declare(fmt
+  GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+  GIT_TAG 11.0.2
+)
+FetchContent_MakeAvailable(fmt)
+
 # Boost
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.68.0 REQUIRED COMPONENTS
@@ -37,19 +45,19 @@ include_directories(${Boost_INCLUDE_DIRS})
 
 # Simulator
 add_executable(hexsim hex.cpp hexsim.cpp)
-target_link_libraries(hexsim ${Boost_LIBRARIES})
+target_link_libraries(hexsim ${Boost_LIBRARIES} fmt::fmt)
 
 # Assembler
 add_executable(hexasm hex.cpp hexasm.cpp)
-target_link_libraries(hexasm ${Boost_LIBRARIES})
+target_link_libraries(hexasm ${Boost_LIBRARIES} fmt::fmt)
 
 # Compiler
 add_executable(xcmp hex.cpp xcmp.cpp)
-target_link_libraries(xcmp ${Boost_LIBRARIES})
+target_link_libraries(xcmp ${Boost_LIBRARIES} fmt::fmt)
 
 # Compile and run
 add_executable(xrun hex.cpp xrun.cpp)
-target_link_libraries(xrun ${Boost_LIBRARIES})
+target_link_libraries(xrun ${Boost_LIBRARIES} fmt::fmt)
 
 install(TARGETS hexasm xcmp xrun hexsim
         DESTINATION ${CMAKE_INSTALL_BINDIR})

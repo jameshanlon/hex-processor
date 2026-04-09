@@ -1,5 +1,6 @@
 #include <ostream>
 #include <iostream>
+#include <fmt/format.h>
 #include <boost/filesystem.hpp>
 #include <boost/test/unit_test.hpp>
 #include "TestContext.hpp"
@@ -527,8 +528,8 @@ BOOST_AUTO_TEST_CASE(binary_or) {
 BOOST_AUTO_TEST_CASE(binary_add_constants) {
   for (int a : getCharValues()) {
     for (int b : getCharValues()) {
-      auto program = boost::format("proc main () is 0((%d) + (%d))") % a % b;
-      BOOST_TEST(runXProgramSrc(program.str()) == (a + b));
+      auto program = fmt::format("proc main () is 0(({}) + ({}))", a, b);
+      BOOST_TEST(runXProgramSrc(program) == (a + b));
     }
   }
 }
@@ -536,8 +537,8 @@ BOOST_AUTO_TEST_CASE(binary_add_constants) {
 BOOST_AUTO_TEST_CASE(bianry_sub_constants) {
   for (int a : getCharValues()) {
     for (int b : getCharValues()) {
-      auto program = boost::format("proc main () is 0((%d) - (%d))") % a % b;
-      BOOST_TEST(runXProgramSrc(program.str()) == (a - b));
+      auto program = fmt::format("proc main () is 0(({}) - ({}))", a, b);
+      BOOST_TEST(runXProgramSrc(program) == (a - b));
     }
   }
 }
@@ -545,8 +546,8 @@ BOOST_AUTO_TEST_CASE(bianry_sub_constants) {
 BOOST_AUTO_TEST_CASE(bianry_ls_constants) {
   for (int a : getCharValues()) {
     for (int b : getCharValues()) {
-      auto program = boost::format("proc main () is 0((%d) < (%d))") % a % b;
-      BOOST_TEST((runXProgramSrc(program.str()) != 0) == (a < b));
+      auto program = fmt::format("proc main () is 0(({}) < ({}))", a, b);
+      BOOST_TEST((runXProgramSrc(program) != 0) == (a < b));
     }
   }
 }
@@ -554,8 +555,8 @@ BOOST_AUTO_TEST_CASE(bianry_ls_constants) {
 BOOST_AUTO_TEST_CASE(bianry_le_constants) {
   for (int a : getCharValues()) {
     for (int b : getCharValues()) {
-      auto program = boost::format("proc main () is 0((%d) <= (%d))") % a % b;
-      BOOST_TEST((runXProgramSrc(program.str()) != 0) == (a <= b));
+      auto program = fmt::format("proc main () is 0(({}) <= ({}))", a, b);
+      BOOST_TEST((runXProgramSrc(program) != 0) == (a <= b));
     }
   }
 }
@@ -563,8 +564,8 @@ BOOST_AUTO_TEST_CASE(bianry_le_constants) {
 BOOST_AUTO_TEST_CASE(bianry_gt_constants) {
   for (int a : getCharValues()) {
     for (int b : getCharValues()) {
-      auto program = boost::format("proc main () is 0((%d) > (%d))") % a % b;
-      BOOST_TEST((runXProgramSrc(program.str()) != 0) == (a > b));
+      auto program = fmt::format("proc main () is 0(({}) > ({}))", a, b);
+      BOOST_TEST((runXProgramSrc(program) != 0) == (a > b));
     }
   }
 }
@@ -572,8 +573,8 @@ BOOST_AUTO_TEST_CASE(bianry_gt_constants) {
 BOOST_AUTO_TEST_CASE(bianry_ge_constants) {
   for (int a : getCharValues()) {
     for (int b : getCharValues()) {
-      auto program = boost::format("proc main () is 0((%d) >= (%d))") % a % b;
-      BOOST_TEST((runXProgramSrc(program.str()) != 0) == (a >= b));
+      auto program = fmt::format("proc main () is 0(({}) >= ({}))", a, b);
+      BOOST_TEST((runXProgramSrc(program) != 0) == (a >= b));
     }
   }
 }
@@ -581,8 +582,8 @@ BOOST_AUTO_TEST_CASE(bianry_ge_constants) {
 BOOST_AUTO_TEST_CASE(bianry_eq_constants) {
   for (int a : getCharValues()) {
     for (int b : getCharValues()) {
-      auto program = boost::format("proc main () is 0((%d) = (%d))") % a % b;
-      BOOST_TEST((runXProgramSrc(program.str()) != 0) == (a == b));
+      auto program = fmt::format("proc main () is 0(({}) = ({}))", a, b);
+      BOOST_TEST((runXProgramSrc(program) != 0) == (a == b));
     }
   }
 }
@@ -590,8 +591,8 @@ BOOST_AUTO_TEST_CASE(bianry_eq_constants) {
 BOOST_AUTO_TEST_CASE(bianry_ne_constants) {
   for (int a : getCharValues()) {
     for (int b : getCharValues()) {
-      auto program = boost::format("proc main () is 0((%d) ~= (%d))") % a % b;
-      BOOST_TEST((runXProgramSrc(program.str()) != 0) == (a != b));
+      auto program = fmt::format("proc main () is 0(({}) ~= ({}))", a, b);
+      BOOST_TEST((runXProgramSrc(program) != 0) == (a != b));
     }
   }
 }
@@ -599,8 +600,8 @@ BOOST_AUTO_TEST_CASE(bianry_ne_constants) {
 BOOST_AUTO_TEST_CASE(bianry_and_constants) {
   for (int a : getCharValues()) {
     for (int b : getCharValues()) {
-      auto program = boost::format("proc main () is 0((%d) and (%d))") % a % b;
-      BOOST_TEST((runXProgramSrc(program.str()) != 0) == (a && b));
+      auto program = fmt::format("proc main () is 0(({}) and ({}))", a, b);
+      BOOST_TEST((runXProgramSrc(program) != 0) == (a && b));
     }
   }
 }
@@ -608,8 +609,8 @@ BOOST_AUTO_TEST_CASE(bianry_and_constants) {
 BOOST_AUTO_TEST_CASE(bianry_or_constants) {
   for (int a : getCharValues()) {
     for (int b : getCharValues()) {
-      auto program = boost::format("proc main () is 0((%d) or (%d))") % a % b;
-      BOOST_TEST((runXProgramSrc(program.str()) != 0) == (a || b));
+      auto program = fmt::format("proc main () is 0(({}) or ({}))", a, b);
+      BOOST_TEST((runXProgramSrc(program) != 0) == (a || b));
     }
   }
 }

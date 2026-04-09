@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <boost/format.hpp>
+#include <fmt/format.h>
 
 #include "hex.hpp"
 #include "hexasm.hpp"
@@ -90,7 +90,7 @@ int main(int argc, const char *argv[]) {
     // Run.
     return driver.runCatchExceptions(driverAction, inputFilename, outputFilename, "a.out", reportMemoryInfo);
   } catch (const std::exception &e) {
-    std::cerr << boost::format("Error: %s\n") % e.what();
+    std::cerr << fmt::format("Error: {}\n", e.what());
     return 1;
   }
 }

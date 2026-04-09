@@ -10,7 +10,8 @@ add_executable(UnitTests
                x_programs.cpp)
 
 target_link_libraries(UnitTests
-                      ${Boost_LIBRARIES})
+                      ${Boost_LIBRARIES}
+                      fmt::fmt)
 
 target_include_directories(UnitTests PUBLIC
                            ${CMAKE_SOURCE_DIR}

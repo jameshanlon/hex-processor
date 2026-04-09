@@ -14,7 +14,7 @@
 #include <stack>
 #include <vector>
 #include <map>
-#include <boost/format.hpp>
+#include <fmt/format.h>
 
 #include "util.hpp"
 
@@ -156,37 +156,37 @@ struct TokenError : public Error {
 
 struct UnexpectedTokenError : public Error {
   UnexpectedTokenError(Location location, Token expectedToken, Token gotToken) :
-      Error(location, (boost::format("expected token %s, got %s") % tokenEnumStr(expectedToken) % tokenEnumStr(gotToken)).str()) {}
+      Error(location, fmt::format("expected token {}, got {}", tokenEnumStr(expectedToken), tokenEnumStr(gotToken))) {}
 };
 
 struct ExpectedNameError : public Error {
   ExpectedNameError(Location location, Token token) :
-    Error(location, (boost::format("expected name but got %s") % tokenEnumStr(token)).str()) {}
+    Error(location, fmt::format("expected name but got {}", tokenEnumStr(token))) {}
 };
 
 struct ParserTokenError : public Error {
   ParserTokenError(Location location, std::string message, Token token) :
-    Error(location, (boost::format("%s, got %s") % message % tokenEnumStr(token)).str()) {}
+    Error(location, fmt::format("{}, got {}", message, tokenEnumStr(token))) {}
 };
 
 struct SemanticTokenError : public Error {
   SemanticTokenError(Location location, std::string message, Token token) :
-    Error(location, (boost::format("%s, got %s") % message % tokenEnumStr(token)).str()) {}
+    Error(location, fmt::format("{}, got {}", message, tokenEnumStr(token))) {}
 };
 
 struct UnknownSymbolError : public Error {
   UnknownSymbolError(Location location, std::string name) :
-    Error(location, (boost::format("could not find symbol %s") % name).str()) {}
+    Error(location, fmt::format("could not find symbol {}", name)) {}
 };
 
 struct NonConstArrayLengthError : public Error {
   NonConstArrayLengthError(Location location, std::string name) :
-    Error(location, (boost::format("array %s length is not constant") % name).str()) {}
+    Error(location, fmt::format("array {} length is not constant", name)) {}
 };
 
 struct InvalidSyscallError : public Error {
   InvalidSyscallError(Location location, int sysCallId) :
-    Error(location, (boost::format("invalid syscall: %d") % sysCallId).str()) {}
+    Error(location, fmt::format("invalid syscall: {}", sysCallId)) {}
 };
 
 //===---------------------------------------------------------------------===//
@@ -1085,10 +1085,10 @@ class AstPrinter : public AstVisitor {
     }
   }
   std::string exprValString(const Expr &expr) {
-    return expr.isConst() ? (boost::format(" [const=%d]") % expr.getValue()).str() : "";
+    return expr.isConst() ? fmt::format(" [const={}]", expr.getValue()) : "";
   }
   std::string locString(const AstNode &node) {
-    return (boost::format(" [loc=%s]") % node.getLocation().str()).str();
+    return fmt::format(" [loc={}]", node.getLocation().str());
   }
 public:
   AstPrinter(std::ostream& outs = std::cout) :
@@ -1101,63 +1101,63 @@ public:
     indentCount--;
   }
   void visitPre(Proc &decl) override {
-    indent(); outs << boost::format("proc %s%s\n") % decl.getName() % locString(decl);
+    indent(); outs << fmt::format("proc {}{}\n", decl.getName(), locString(decl));
     indentCount++;
   };
   void visitPost(Proc &decl) override {
     indentCount--;
   }
   void visitPre(ArrayDecl &decl) override {
-    indent(); outs << boost::format("arraydecl %s%s\n") % decl.getName() % locString(decl);
+    indent(); outs << fmt::format("arraydecl {}{}\n", decl.getName(), locString(decl));
     indentCount++;
   };
   void visitPost(ArrayDecl &decl) override {
     indentCount--;
   }
   void visitPre(VarDecl &decl) override {
-    indent(); outs << boost::format("vardecl %s%s\n") % decl.getName() % locString(decl);
+    indent(); outs << fmt::format("vardecl {}{}\n", decl.getName(), locString(decl));
   };
   void visitPost(VarDecl &decl) override { }
   void visitPre(ValDecl &decl) override {
-    indent(); outs << boost::format("valdecl %s%s\n") % decl.getName() % locString(decl);
+    indent(); outs << fmt::format("valdecl {}{}\n", decl.getName(), locString(decl));
     indentCount++;
   };
   void visitPost(ValDecl &decl) override {
     indentCount--;
   }
   void visitPre(BinaryOpExpr &expr) override {
-    indent(); outs << boost::format("binaryop %s%s%s\n")
-                        % tokenEnumStr(expr.getOp()) % exprValString(expr) % locString(expr);
+    indent(); outs << fmt::format("binaryop {}{}{}\n",
+                        tokenEnumStr(expr.getOp()), exprValString(expr), locString(expr));
     indentCount++;
   };
   void visitPost(BinaryOpExpr &expr) override {
     indentCount--;
   }
   void visitPre(UnaryOpExpr &expr) override {
-    indent(); outs << boost::format("unaryop %s%s%s\n")
-                        % tokenEnumStr(expr.getOp()) % exprValString(expr) % locString(expr);
+    indent(); outs << fmt::format("unaryop {}{}{}\n",
+                        tokenEnumStr(expr.getOp()), exprValString(expr), locString(expr));
     indentCount++;
   };
   void visitPost(UnaryOpExpr &expr) override {
     indentCount--;
   }
   void visitPre(StringExpr &expr) override {
-    indent(); outs << boost::format("string %s%s\n") % expr.getValue() % locString(expr);
+    indent(); outs << fmt::format("string {}{}\n", expr.getValue(), locString(expr));
   };
   void visitPost(StringExpr &expr) override { }
   void visitPre(BooleanExpr &expr) override {
-    indent(); outs << boost::format("boolean %d%s\n") % expr.getValue() % locString(expr);
+    indent(); outs << fmt::format("boolean {}{}\n", expr.getValue(), locString(expr));
   };
   void visitPost(BooleanExpr &expr) override { }
   void visitPre(NumberExpr &expr) override {
-    indent(); outs << boost::format("number %d%s\n") % expr.getValue() % locString(expr);
+    indent(); outs << fmt::format("number {}{}\n", expr.getValue(), locString(expr));
   };
   void visitPost(NumberExpr &expr) override { }
   void visitPre(CallExpr &expr) override {
     if (expr.isSysCall()) {
-      indent(); outs << boost::format("syscall %d%s\n") % expr.getSysCallId() % locString(expr);
+      indent(); outs << fmt::format("syscall {}{}\n", expr.getSysCallId(), locString(expr));
     } else {
-      indent(); outs << boost::format("call %s%s\n") % expr.getName() % locString(expr);
+      indent(); outs << fmt::format("call {}{}\n", expr.getName(), locString(expr));
     }
     indentCount++;
   };
@@ -1165,63 +1165,63 @@ public:
     indentCount--;
   }
   void visitPre(ArraySubscriptExpr &expr) override {
-    indent(); outs << boost::format("arraysubscript %s%s\n") % expr.getName() % locString(expr);
+    indent(); outs << fmt::format("arraysubscript {}{}\n", expr.getName(), locString(expr));
     indentCount++;
   };
   void visitPost(ArraySubscriptExpr &expr) override {
     indentCount--;
   }
   void visitPre(VarRefExpr &expr) override {
-    indent(); outs << boost::format("varref %s%s\n") % expr.getName() % locString(expr);
+    indent(); outs << fmt::format("varref {}{}\n", expr.getName(), locString(expr));
   };
   void visitPost(VarRefExpr &expr) override { }
   void visitPre(ValFormal &formal) override {
-    indent(); outs << boost::format("valformal %s%s\n") % formal.getName() % locString(formal);
+    indent(); outs << fmt::format("valformal {}{}\n", formal.getName(), locString(formal));
   };
   void visitPost(ValFormal &formal) override {};
   void visitPre(ArrayFormal &formal) override {
-    indent(); outs << boost::format("arrayformal %s%s\n") % formal.getName() % locString(formal);
+    indent(); outs << fmt::format("arrayformal {}{}\n", formal.getName(), locString(formal));
   };
   void visitPost(ArrayFormal &formal) override {};
   void visitPre(ProcFormal &formal) override {
-    indent(); outs << boost::format("procformal %s%s\n") % formal.getName() % locString(formal);
+    indent(); outs << fmt::format("procformal {}{}\n", formal.getName(), locString(formal));
   };
   void visitPost(ProcFormal &formal) override {};
   void visitPre(FuncFormal &formal) override {
-    indent(); outs << boost::format("funcformal %s%s\n") % formal.getName() % locString(formal);
+    indent(); outs << fmt::format("funcformal {}{}\n", formal.getName(), locString(formal));
   };
   void visitPost(FuncFormal &formal) override {};
   void visitPre(SkipStatement &stmt) override {
-    indent(); outs << boost::format("skipstmt%s\n") % locString(stmt);
+    indent(); outs << fmt::format("skipstmt{}\n", locString(stmt));
   };
   void visitPost(SkipStatement &stmt) override {};
   void visitPre(StopStatement &stmt) override {
-    indent(); outs << boost::format("stopstmt%s\n") % locString(stmt);
+    indent(); outs << fmt::format("stopstmt{}\n", locString(stmt));
   };
   void visitPost(StopStatement &stmt) override {};
   void visitPre(ReturnStatement &stmt) override {
-    indent(); outs << boost::format("returnstmt%s\n") % locString(stmt);
+    indent(); outs << fmt::format("returnstmt{}\n", locString(stmt));
     indentCount++;
   };
   void visitPost(ReturnStatement &stmt) override {
     indentCount--;
   };
   void visitPre(IfStatement &stmt) override {
-    indent(); outs << boost::format("ifstmt%s\n") % locString(stmt);
+    indent(); outs << fmt::format("ifstmt{}\n", locString(stmt));
     indentCount++;
   };
   void visitPost(IfStatement &stmt) override {
     indentCount--;
   };
   void visitPre(WhileStatement &stmt) override {
-    indent(); outs << boost::format("whilestmt%s\n") % locString(stmt);
+    indent(); outs << fmt::format("whilestmt{}\n", locString(stmt));
     indentCount++;
   };
   void visitPost(WhileStatement &stmt) override {
     indentCount--;
   };
   void visitPre(SeqStatement &stmt) override {
-    indent(); outs << boost::format("seqstmt%s\n") % locString(stmt);
+    indent(); outs << fmt::format("seqstmt{}\n", locString(stmt));
     indentCount++;
   };
   void visitPost(SeqStatement &stmt) override {
@@ -1229,9 +1229,9 @@ public:
   };
   void visitPre(CallStatement &stmt) override {
     if (stmt.getCall()->isSysCall()) {
-      indent(); outs << boost::format("syscallstmt %d%s\n") % stmt.getCall()->getSysCallId() % locString(stmt);
+      indent(); outs << fmt::format("syscallstmt {}{}\n", stmt.getCall()->getSysCallId(), locString(stmt));
     } else {
-      indent(); outs << boost::format("callstmt %s\n") % locString(stmt);
+      indent(); outs << fmt::format("callstmt {}\n", locString(stmt));
     }
     indentCount++;
   };
@@ -1239,7 +1239,7 @@ public:
     indentCount--;
   };
   void visitPre(AssStatement &stmt) override {
-    indent(); outs << boost::format("assstmt%s\n") % locString(stmt);
+    indent(); outs << fmt::format("assstmt{}\n", locString(stmt));
     indentCount++;
   };
   void visitPost(AssStatement &stmt) override {
@@ -2006,7 +2006,7 @@ public:
   InstrStackOffset(hexasm::Token token, Frame *frame, int offset) :
       InstrImm(token, 0), frame(frame), offset(offset) {}
   std::string toString() const {
-    return (boost::format("%s %d") % hexasm::tokenEnumStr(getToken()) % offset).str();
+    return fmt::format("{} {}", hexasm::tokenEnumStr(getToken()), offset);
   }
   Frame *getFrame() { return frame; }
   int getOffset() { return offset; }
@@ -2448,7 +2448,7 @@ public:
   /// Generate a constant pool entry if required, return the label to it.
   const std::string genConstPool(int value) {
     if (constMap.count(value) == 0) {
-      auto label = (boost::format("_const%d") % constCount++).str();
+      auto label = fmt::format("_const{}", constCount++);
       constMap[value].assign(label);
       genDataLabel(label);
       genData(value);
@@ -2480,7 +2480,7 @@ public:
   void genString(Reg reg, const std::string value) {
     // Add string to pool and assign label.
     // Create the label.
-    auto label = (boost::format("_string%d") % stringCount++).str();
+    auto label = fmt::format("_string{}", stringCount++);
     genDataLabel(label);
     // Back the string bytes into 32-bit words.
     uint32_t packedWord = 0;
@@ -2628,16 +2628,16 @@ public:
           directive->getToken() == hexasm::Token::FUNC ||
           directive->getToken() == hexasm::Token::PROLOGUE) {
         // Add some new lines for these section markers.
-        out << boost::format("\n%-20s\n") % directive->toString();
+        out << fmt::format("\n{:<20}\n", directive->toString());
       } else if (directive->getToken() == hexasm::Token::SP_VALUE) {
         // SP value and data section are emitted together.
-        out << boost::format("%-20s\n") % directive->toString();
+        out << fmt::format("{:<20}\n", directive->toString());
         for (auto &directive : data) {
-          out << boost::format("%-20s\n") % directive->toString();
+          out << fmt::format("{:<20}\n", directive->toString());
         }
       } else {
         // All other directives.
-        out << boost::format("%-20s\n") % directive->toString();
+        out << fmt::format("{:<20}\n", directive->toString());
       }
     }
     out << "\n";
@@ -2999,7 +2999,7 @@ class ReportMemoryInfo : public AstVisitor {
   const std::vector<std::unique_ptr<hexasm::Directive>> &directives;
   std::ostream &outs;
   void reportFrame(Frame *frame, Proc &proc) {
-    outs << boost::format("Frame for %s\n") % proc.getName();
+    outs << fmt::format("Frame for {}\n", proc.getName());
     outs << "  Size: " << frame->getSize() << "\n";
     if (proc.getFormals().empty()) {
       outs << "  No formal parameters\n";
@@ -3009,7 +3009,7 @@ class ReportMemoryInfo : public AstVisitor {
         auto symbol = st.lookup(std::make_pair(proc.getName(), decl->getName()),
                                 decl->getLocation());
         auto index = symbol->getFrame()->getSize() - 1 + symbol->getStackOffset();
-        outs << boost::format("    %s at index %d\n") % symbol->getName() % index;
+        outs << fmt::format("    {} at index {}\n", symbol->getName(), index);
       }
     }
     if (proc.getDecls().empty()) {
@@ -3020,7 +3020,7 @@ class ReportMemoryInfo : public AstVisitor {
         auto symbol = st.lookup(std::make_pair(proc.getName(), decl->getName()),
                                 decl->getLocation());
         auto index = symbol->getFrame()->getSize() - 1 + symbol->getStackOffset();
-        outs << boost::format("    %s at index %d\n") % symbol->getName() % index;
+        outs << fmt::format("    {} at index {}\n", symbol->getName(), index);
       }
     }
     outs << "\n";
@@ -3032,9 +3032,9 @@ public:
     AstVisitor(false, false, false), st(symbolTable), directives(directives), outs(outs) {}
   void visitPre(Program &program) {
     auto stackPointer = dynamic_cast<hexasm::Data*>(directives[1].get())->getValue();
-    outs << boost::format("Memory range 0x%x - 0x%x\n") % 0 % MAX_ADDRESS;
-    outs << boost::format("Stack pointer initialised to 0x%x\n") % stackPointer;
-    outs << boost::format("Arrays allocated 0x%x - 0x%x\n") % (stackPointer+1) % MAX_ADDRESS;
+    outs << fmt::format("Memory range 0x{:x} - 0x{:x}\n", 0, MAX_ADDRESS);
+    outs << fmt::format("Stack pointer initialised to 0x{:x}\n", stackPointer);
+    outs << fmt::format("Arrays allocated 0x{:x} - 0x{:x}\n", stackPointer+1, MAX_ADDRESS);
     outs << "\n";
   }
   void visitPre(Proc &proc) {
@@ -3179,9 +3179,9 @@ public:
       return run(action, input, inputIsFilename, outputBinaryFilename, reportMemoryInfo);
     } catch (const hexutil::Error &e) {
       if (e.hasLocation()) {
-        std::cerr << boost::format("Error %s: %s\n") % e.getLocation().str() % e.what();
+        std::cerr << fmt::format("Error {}: {}\n", e.getLocation().str(), e.what());
       } else {
-        std::cerr << boost::format("Error: %s\n") % e.what();
+        std::cerr << fmt::format("Error: {}\n", e.what());
       }
       if (lexer.hasLine()) {
         std::cerr << "  " << lexer.getLine() << "\n";

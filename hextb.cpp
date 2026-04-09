@@ -4,7 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <exception>
-#include <boost/format.hpp>
+#include <fmt/format.h>
 #include <verilated.h>
 
 #include "Vhex_pkg.h"
@@ -40,8 +40,8 @@ void load(const char *filename,
   file.read(reinterpret_cast<char*>(&programSize), 4);
   programSize <<= 2;
   if (programSize != remainingFileSize) {
-    std::cerr << boost::format("Warning: mismatching program size %d != %d\n")
-                   % programSize % remainingFileSize;
+    std::cerr << fmt::format("Warning: mismatching program size {} != {}\n",
+                             programSize, remainingFileSize);
   }
 
   // Read the file contents.
@@ -63,14 +63,14 @@ void handleSyscall(hex::Syscall syscall,
     case hex::Syscall::EXIT:
       exitCode = top->hex->u_memory->memory_q[spWordIndex+2];
       if (trace) {
-        std::cout << boost::format("exit %d\n") % exitCode;
+        std::cout << fmt::format("exit {}\n", exitCode);
       }
       break;
     case hex::Syscall::WRITE: {
       char value = top->hex->u_memory->memory_q[spWordIndex+2];
       int stream = top->hex->u_memory->memory_q[spWordIndex+3];
       if (trace) {
-        std::cout << boost::format("output(%c, %d)\n") % value % stream;
+        std::cout << fmt::format("output({}, {})\n", value, stream);
       }
       io.output(value, stream);
       break;
@@ -78,7 +78,7 @@ void handleSyscall(hex::Syscall syscall,
     case hex::Syscall::READ: {
       int stream = top->hex->u_memory->memory_q[spWordIndex+2];
       if (trace) {
-        std::cout << boost::format("input(%d)\n") % stream;
+        std::cout << fmt::format("input({})\n", stream);
       }
       // Truncated inputs (ie not sign extended).
       top->hex->u_memory->memory_q[spWordIndex+1] = io.input(stream) & 0xFF;
@@ -121,11 +121,11 @@ int run(const std::unique_ptr<VerilatedContext> &contextp,
     // Trace
     if (trace && top->i_clk && contextp->time() > RESET_END) {
       auto instr = instrEnumToStr(static_cast<hex::Instr>((top->hex->u_processor->instr >> 4) & 0xF));
-      std::cout << boost::format("[%-6d] %-6d 0x%02x %-6s\n")
-                     % contextp->time()
-                     % top->hex->u_processor->pc_q
-                     % static_cast<unsigned>(top->hex->u_processor->instr)
-                     % instr;
+      std::cout << fmt::format("[{:6}] {:6} {:#04x} {:6}\n",
+                               contextp->time(),
+                               top->hex->u_processor->pc_q,
+                               static_cast<unsigned>(top->hex->u_processor->instr),
+                               instr);
     }
     // Handle syscalls
     if (top->i_clk && top->o_syscall_valid) {

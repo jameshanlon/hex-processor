@@ -1,6 +1,7 @@
 #ifndef HEX_ASM_HPP
 #define HEX_ASM_HPP
 
+#include <cassert>
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
@@ -13,7 +14,7 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <boost/format.hpp>
+#include <fmt/format.h>
 
 #include "hex.hpp"
 #include "util.hpp"
@@ -180,24 +181,24 @@ static int tokenToOprInstrOpc(Token token) {
 
 struct UnrecognisedTokenError : public Error {
   UnrecognisedTokenError(Location location, Token token) :
-      Error(location, (boost::format("unrecognised token %s") % tokenEnumStr(token)).str()) {}
+      Error(location, fmt::format("unrecognised token {}", tokenEnumStr(token))) {}
 };
 
 struct UnexpectedTokenError : public Error {
   UnexpectedTokenError(Location location, Token token) :
-      Error(location, (boost::format("unexpected token %s") % tokenEnumStr(token)).str()) {}
+      Error(location, fmt::format("unexpected token {}", tokenEnumStr(token))) {}
 };
 
 struct InvalidOprError : public Error {
   InvalidOprError(Token token) :
-      Error((boost::format("unexpected operand to OPR %s") % tokenEnumStr(token)).str()) {}
+      Error(fmt::format("unexpected operand to OPR {}", tokenEnumStr(token))) {}
   InvalidOprError(Location location, Token token) :
-      Error(location, (boost::format("unexpected operand to OPR %s") % tokenEnumStr(token)).str()) {}
+      Error(location, fmt::format("unexpected operand to OPR {}", tokenEnumStr(token))) {}
 };
 
 struct UnknownLabelError : public Error {
   UnknownLabelError(Location location, std::string label) :
-      Error(location, (boost::format("unknown label %s") % label).str()) {}
+      Error(location, fmt::format("unknown label {}", label)) {}
 };
 
 //===---------------------------------------------------------------------===//
@@ -811,12 +812,12 @@ public:
     size_t programSize = 0;
     for (auto &directive : program) {
       programSize += directive->getSize();
-      out << boost::format("%#08x %-20s (%d bytes)\n")
-               % directive->getByteOffset()
-               % directive->toString()
-               % directive->getSize();
+      out << fmt::format("{:#010x} {:<20} ({} bytes)\n",
+                         directive->getByteOffset(),
+                         directive->toString(),
+                         directive->getSize());
     }
-    out << boost::format("%d bytes\n") % programSize;
+    out << fmt::format("{} bytes\n", programSize);
   }
 
   /// Emit each directive of the program as binary.

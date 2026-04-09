@@ -10,7 +10,7 @@
 #include <map>
 #include <fstream>
 #include <iostream>
-#include <boost/format.hpp>
+#include <fmt/format.h>
 
 #include "hex.hpp"
 #include "hexsimio.hpp"
@@ -141,7 +141,7 @@ public:
     if (dumpContents) {
       out << "Read " << std::to_string(programSize) << " bytes\n";
       for (size_t i=0; i<(programSize / 4) + 1; i++) {
-        out << boost::format("%08d %08x\n") % i % memory[i];
+        out << fmt::format("{:08d} {:08x}\n", i, memory[i]);
       }
     }
   }
@@ -150,13 +150,13 @@ public:
     unsigned spWordIndex = memory[1];
     switch (static_cast<hex::Syscall>(areg)) {
       case hex::Syscall::EXIT:
-        out << boost::format("exit %d\n") % memory[spWordIndex+2];
+        out << fmt::format("exit {}\n", memory[spWordIndex+2]);
         break;
       case hex::Syscall::WRITE:
-        out << boost::format("write %d to simout(%d)\n") % memory[spWordIndex+2] % memory[spWordIndex+3];
+        out << fmt::format("write {} to simout({})\n", memory[spWordIndex+2], memory[spWordIndex+3]);
         break;
       case hex::Syscall::READ:
-        out << boost::format("read %d to mem[%08x]\n") % memory[spWordIndex+1] % (spWordIndex+1);
+        out << fmt::format("read {} to mem[{:08x}]\n", memory[spWordIndex+1], (spWordIndex+1));
         break;
       default: break;
     }
@@ -168,67 +168,65 @@ public:
       std::string symbolInfo;
       if (symbolName) {
         auto symbolOffset = lastPC - debugInfoMap[symbolName];
-        symbolInfo = (boost::format("%s+%d") % symbolName % symbolOffset).str();
+        symbolInfo = fmt::format("{}+{}", symbolName, symbolOffset);
       }
-      out << boost::format("%-6d %-6d %-12s %-4s %-2d ")
-               % cycles % lastPC % symbolInfo % instrEnumToStr(instrEnum) % (instr & 0xF);
+      out << fmt::format("{:<6d} {:<6d} {:<12} {:<4} {:<2d} ", cycles, lastPC, symbolInfo, instrEnumToStr(instrEnum), (instr & 0xF));
     } else {
-      out << boost::format("%-6d %-6d %-4s %-2d ")
-               % cycles % lastPC % instrEnumToStr(instrEnum) % (instr & 0xF);
+      out << fmt::format("{:<6d} {:<6d} {:<4} {:<2d} ", cycles, lastPC, instrEnumToStr(instrEnum), (instr & 0xF));
     }
     switch (instrEnum) {
       case hex::Instr::LDAM:
-        out << boost::format("areg = mem[oreg (%#08x)] (%d)\n") % oreg % memory[oreg];
+        out << fmt::format("areg = mem[oreg ({:#08x})] ({})\n", oreg, memory[oreg]);
         break;
       case hex::Instr::LDBM:
-        out << boost::format("breg = mem[oreg (%#08x)] (%d)\n") % oreg % memory[oreg];
+        out << fmt::format("breg = mem[oreg ({:#08x})] ({})\n", oreg, memory[oreg]);
         break;
       case hex::Instr::STAM:
-        out << boost::format("mem[oreg (%#08x)] = areg %d\n") % oreg % areg;
+        out << fmt::format("mem[oreg ({:#08x})] = areg {}\n", oreg, areg);
         break;
       case hex::Instr::LDAC:
-        out << boost::format("areg = oreg %d\n") % oreg;
+        out << fmt::format("areg = oreg {}\n", oreg);
         break;
       case hex::Instr::LDBC:
-        out << boost::format("breg = oreg %d\n") % oreg;
+        out << fmt::format("breg = oreg {}\n", oreg);
         break;
       case hex::Instr::LDAP:
-        out << boost::format("areg = pc (%d) + oreg (%d) %d\n") % pc % oreg % (pc + oreg);
+        out << fmt::format("areg = pc ({}) + oreg ({}) {}\n", pc, oreg, (pc + oreg));
         break;
       case hex::Instr::LDAI:
-        out << boost::format("areg = mem[areg (%d) + oreg (%d) = %#08x] (%d)\n") % areg % oreg % (areg+oreg) % memory[areg+oreg];
+        out << fmt::format("areg = mem[areg ({}) + oreg ({}) = {:#08x}] ({})\n", areg, oreg, (areg+oreg), memory[areg+oreg]);
         break;
       case hex::Instr::LDBI:
-        out << boost::format("breg = mem[breg (%d) + oreg (%d) = %#08x] (%d)\n") % breg % oreg % (breg+oreg) % memory[breg+oreg];
+        out << fmt::format("breg = mem[breg ({}) + oreg ({}) = {:#08x}] ({})\n", breg, oreg, (breg+oreg), memory[breg+oreg]);
         break;
       case hex::Instr::STAI:
-        out << boost::format("mem[breg (%d) + oreg (%d) = %#08x] = areg (%d)\n") % breg % oreg % (breg+oreg) % areg;
+        out << fmt::format("mem[breg ({}) + oreg ({}) = {:#08x}] = areg ({})\n", breg, oreg, (breg+oreg), areg);
         break;
       case hex::Instr::BR:
-        out << boost::format("pc = pc + oreg (%d) (%#08x)\n") % oreg % (pc + oreg);
+        out << fmt::format("pc = pc + oreg ({}) ({:#08x})\n", oreg, (pc + oreg));
         break;
       case hex::Instr::BRZ:
-        out << boost::format("pc = areg == zero ? pc + oreg (%d) (%#08x) : pc\n") % oreg % (pc + oreg);
+        out << fmt::format("pc = areg == zero ? pc + oreg ({}) ({:#08x}) : pc\n", oreg, (pc + oreg));
         break;
       case hex::Instr::BRN:
-        out << boost::format("pc = areg < zero ? pc + oreg (%d) (%#08x) : pc\n") % oreg % (pc + oreg);
+        out << fmt::format("pc = areg < zero ? pc + oreg ({}) ({:#08x}) : pc\n", oreg, (pc + oreg));
         break;
       case hex::Instr::PFIX:
-        out << boost::format("oreg = oreg (%d) << 4 (%#08x)\n") % oreg % (oreg << 4);
+        out << fmt::format("oreg = oreg ({}) << 4 ({:#08x})\n", oreg, (oreg << 4));
         break;
       case hex::Instr::NFIX:
-        out << boost::format("oreg = 0xFFFFFF00 | oreg (%d) << 4 (%#08x)\n") % oreg % (0xFFFFFF00 | (oreg << 4));
+        out << fmt::format("oreg = 0xFFFFFF00 | oreg ({}) << 4 ({:#08x})\n", oreg, (0xFFFFFF00 | (oreg << 4)));
         break;
       case hex::Instr::OPR:
         switch (static_cast<hex::OprInstr>(oreg)) {
           case hex::OprInstr::BRB:
-            out << boost::format("BRB pc = breg (%#08x)\n") % breg;
+            out << fmt::format("BRB pc = breg ({:#08x})\n", breg);
             break;
           case hex::OprInstr::ADD:
-           out << boost::format("ADD areg = areg (%d) + breg (%d) (%d)\n") % areg % breg % (areg + breg);
+           out << fmt::format("ADD areg = areg ({}) + breg ({}) ({})\n", areg, breg, (areg + breg));
             break;
           case hex::OprInstr::SUB:
-           out << boost::format("SUB areg = areg (%d) - breg (%d) (%d)\n") % areg % breg % (areg - breg);
+           out << fmt::format("SUB areg = areg ({}) - breg ({}) ({})\n", areg, breg, (areg - breg));
             break;
           case hex::OprInstr::SVC:
             break;

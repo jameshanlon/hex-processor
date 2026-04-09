@@ -1,4 +1,5 @@
 #include "hexasm.hpp"
+#include <fmt/format.h>
 
 //===---------------------------------------------------------------------===//
 // Driver
@@ -82,9 +83,9 @@ int main(int argc, const char *argv[]) {
 
   } catch (const hexutil::Error &e) {
     if (e.hasLocation()) {
-      std::cerr << boost::format("Error %s: %s\n") % e.getLocation().str() % e.what();
+      std::cerr << fmt::format("Error {}: {}\n", e.getLocation().str(), e.what());
     } else {
-      std::cerr << boost::format("Error: %s\n") % e.what();
+      std::cerr << fmt::format("Error: {}\n", e.what());
     }
     if (lexer.hasLine()) {
       std::cerr << "  " << lexer.getLine() << "\n";
