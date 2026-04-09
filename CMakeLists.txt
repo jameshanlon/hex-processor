@@ -10,6 +10,13 @@ FetchContent_Declare(fmt
 )
 FetchContent_MakeAvailable(fmt)
 
+# FetchContent for Catch2
+FetchContent_Declare(Catch2
+  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+  GIT_TAG v3.4.0
+)
+FetchContent_MakeAvailable(Catch2)
+
 # Boost
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.68.0 REQUIRED COMPONENTS

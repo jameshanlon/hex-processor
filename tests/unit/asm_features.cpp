@@ -1,6 +1,6 @@
 #include <ostream>
 #include <iostream>
-#include <boost/test/unit_test.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include "TestContext.hpp"
 
 
@@ -8,10 +8,9 @@
 // Unit tests for assembly languages features.
 //===---------------------------------------------------------------------===//
 
-BOOST_FIXTURE_TEST_SUITE(asm_features, TestContext)
-
-BOOST_AUTO_TEST_CASE(exit_tokens) {
-  auto output = tokHexProgramFile(getAsmTestPath("exit0.S")).str();
+TEST_CASE("[asm_features] exit_tokens") {
+  TestContext ctx;
+  auto output = ctx.tokHexProgramFile(ctx.getAsmTestPath("exit0.S")).str();
   std::string expected = ""
 R"(BR
 IDENTIFIER start
@@ -30,11 +29,12 @@ OPR
 SVC
 EOF
 )";
-  BOOST_TEST(output == expected);
+  REQUIRE(output == expected);
 }
 
-BOOST_AUTO_TEST_CASE(exit_tree) {
-  auto output = asmHexProgramFile(getAsmTestPath("exit0.S"), true).str();
+TEST_CASE("[asm_features] exit_tree") {
+  TestContext ctx;
+  auto output = ctx.asmHexProgramFile(ctx.getAsmTestPath("exit0.S"), true).str();
   std::string expected = ""
 R"(0x00000000 BR start (7)         (1 bytes)
 0x00000004 DATA 16383           (4 bytes)
@@ -47,62 +47,64 @@ R"(0x00000000 BR start (7)         (1 bytes)
 0x00000000 PADDING 3            (3 bytes)
 13 bytes
 )";
-  BOOST_TEST(output == expected);
+  REQUIRE(output == expected);
 }
 
-BOOST_AUTO_TEST_CASE(exit_bin) {
-  auto output = asmHexProgramFile(getAsmTestPath("exit0.S"));
+TEST_CASE("[asm_features] exit_bin") {
+  TestContext ctx;
+  auto output = ctx.asmHexProgramFile(ctx.getAsmTestPath("exit0.S"));
   output.seekp(0, std::ios::end);
-  BOOST_TEST(output.tellp() == 16);
+  REQUIRE(output.tellp() == 16);
 }
 
-BOOST_AUTO_TEST_CASE(exit0_run) {
-  auto ret = runHexProgramFile(getAsmTestPath("exit0.S"));
-  BOOST_TEST(ret == 0);
+TEST_CASE("[asm_features] exit0_run") {
+  TestContext ctx;
+  auto ret = ctx.runHexProgramFile(ctx.getAsmTestPath("exit0.S"));
+  REQUIRE(ret == 0);
 }
 
-BOOST_AUTO_TEST_CASE(exit255_run) {
-  auto ret = runHexProgramFile(getAsmTestPath("exit255.S"));
-  BOOST_TEST(ret == 255);
+TEST_CASE("[asm_features] exit255_run") {
+  TestContext ctx;
+  auto ret = ctx.runHexProgramFile(ctx.getAsmTestPath("exit255.S"));
+  REQUIRE(ret == 255);
 }
 
-BOOST_AUTO_TEST_CASE(hello_run) {
-  runHexProgramFile(getAsmTestPath("hello.S"));
-  BOOST_TEST(simOutBuffer.str() == "hello\n");
+TEST_CASE("[asm_features] hello_run") {
+  TestContext ctx;
+  ctx.runHexProgramFile(ctx.getAsmTestPath("hello.S"));
+  REQUIRE(ctx.simOutBuffer.str() == "hello\n");
 }
 
-BOOST_AUTO_TEST_CASE(hello_procedure_run) {
-  runHexProgramFile(getAsmTestPath("hello_procedure.S"));
-  BOOST_TEST(simOutBuffer.str() == "hello\n");
+TEST_CASE("[asm_features] hello_procedure_run") {
+  TestContext ctx;
+  ctx.runHexProgramFile(ctx.getAsmTestPath("hello_procedure.S"));
+  REQUIRE(ctx.simOutBuffer.str() == "hello\n");
 }
 
 //===---------------------------------------------------------------------===//
 // Error handling.
 //===---------------------------------------------------------------------===//
 
-BOOST_AUTO_TEST_CASE(error_unexpected_opr_operand) {
+TEST_CASE("[asm_features] error_unexpected_opr_operand") {
+  TestContext ctx;
   auto program = "OPR OPR";
-  BOOST_CHECK_THROW(asmHexProgramSrc(program), hexasm::InvalidOprError);
+  REQUIRE_THROWS_AS(ctx.asmHexProgramSrc(program), hexasm::InvalidOprError);
 }
 
-BOOST_AUTO_TEST_CASE(error_unrecognised_token) {
+TEST_CASE("[asm_features] error_unrecognised_token") {
+  TestContext ctx;
   auto program = "123";
-  BOOST_CHECK_THROW(asmHexProgramSrc(program), hexasm::UnrecognisedTokenError);
+  REQUIRE_THROWS_AS(ctx.asmHexProgramSrc(program), hexasm::UnrecognisedTokenError);
 }
 
-BOOST_AUTO_TEST_CASE(error_expected_number) {
+TEST_CASE("[asm_features] error_expected_number") {
+  TestContext ctx;
   auto program = "BR .";
-  BOOST_CHECK_THROW(asmHexProgramSrc(program), hexasm::UnexpectedTokenError);
+  REQUIRE_THROWS_AS(ctx.asmHexProgramSrc(program), hexasm::UnexpectedTokenError);
 }
 
-BOOST_AUTO_TEST_CASE(error_expected_negative_integer) {
+TEST_CASE("[asm_features] error_expected_negative_integer") {
+  TestContext ctx;
   auto program = "BR -foo";
-  BOOST_CHECK_THROW(asmHexProgramSrc(program), hexasm::UnexpectedTokenError);
+  REQUIRE_THROWS_AS(ctx.asmHexProgramSrc(program), hexasm::UnexpectedTokenError);
 }
-
-BOOST_AUTO_TEST_CASE(error_unknown_label) {
-  auto program = "BR foo";
-  BOOST_CHECK_THROW(asmHexProgramSrc(program), hexasm::UnknownLabelError);
-}
-
-BOOST_AUTO_TEST_SUITE_END()

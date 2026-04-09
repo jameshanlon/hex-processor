@@ -10,7 +10,8 @@ add_executable(UnitTests
                x_programs.cpp)
 
 target_link_libraries(UnitTests
-                      ${Boost_LIBRARIES}
+                      PRIVATE
+                      Catch2::Catch2WithMain
                       fmt::fmt)
 
 target_include_directories(UnitTests PUBLIC
