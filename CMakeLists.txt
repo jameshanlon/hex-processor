@@ -17,10 +17,6 @@ FetchContent_Declare(
   GIT_TAG v3.4.0)
 FetchContent_MakeAvailable(Catch2)
 
-# Boost
-set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.68.0 REQUIRED COMPONENTS unit_test_framework)
-
 # Python
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
@@ -45,23 +41,21 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 add_compile_options(-Wall -pedantic)
 
-include_directories(${Boost_INCLUDE_DIRS})
-
 # Simulator
 add_executable(hexsim hex.cpp hexsim.cpp)
-target_link_libraries(hexsim ${Boost_LIBRARIES} fmt::fmt)
+target_link_libraries(hexsim fmt::fmt)
 
 # Assembler
 add_executable(hexasm hex.cpp hexasm.cpp)
-target_link_libraries(hexasm ${Boost_LIBRARIES} fmt::fmt)
+target_link_libraries(hexasm fmt::fmt)
 
 # Compiler
 add_executable(xcmp hex.cpp xcmp.cpp)
-target_link_libraries(xcmp ${Boost_LIBRARIES} fmt::fmt)
+target_link_libraries(xcmp fmt::fmt)
 
 # Compile and run
 add_executable(xrun hex.cpp xrun.cpp)
-target_link_libraries(xrun ${Boost_LIBRARIES} fmt::fmt)
+target_link_libraries(xrun fmt::fmt)
 
 install(TARGETS hexasm xcmp xrun hexsim DESTINATION ${CMAKE_INSTALL_BINDIR})
 
