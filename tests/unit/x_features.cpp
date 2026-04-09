@@ -1,7 +1,6 @@
 #include <ostream>
 #include <iostream>
 #include <fmt/format.h>
-#include <boost/filesystem.hpp>
 #include <boost/test/unit_test.hpp>
 #include "TestContext.hpp"
 

@@ -22,14 +22,14 @@ struct TestContext {
 
   /// Return the path to a test filename.
   std::string getAsmTestPath(std::string filename) {
-    boost::filesystem::path testPath(ASM_TEST_SRC_PREFIX);
+    fs::path testPath(ASM_TEST_SRC_PREFIX);
     testPath /= filename;
     return testPath.string();
   }
 
   /// Return the path to a test filename.
   std::string getXTestPath(std::string filename) {
-    boost::filesystem::path testPath(X_TEST_SRC_PREFIX);
+    fs::path testPath(X_TEST_SRC_PREFIX);
     testPath /= filename;
     return testPath.string();
   }

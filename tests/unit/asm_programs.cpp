@@ -1,6 +1,5 @@
 #include <ostream>
 #include <iostream>
-#include <boost/filesystem.hpp>
 #include <boost/test/unit_test.hpp>
 #include "TestContext.hpp"
 
