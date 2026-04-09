@@ -17,9 +17,9 @@ class HexSimIO {
   std::array<bool, 8> connected;
 
 public:
-
-  HexSimIO(std::istream &in, std::ostream &out) :
-      in(in), out(out), connected({false, false, false, false, false, false, false, false}) {}
+  HexSimIO(std::istream &in, std::ostream &out)
+      : in(in), out(out),
+        connected({false, false, false, false, false, false, false, false}) {}
 
   /// Output a character to ostream or a file.
   void output(char value, int stream) {
@@ -28,7 +28,7 @@ public:
     } else {
       size_t index = (stream >> 8) & 7;
       if (!connected[index]) {
-        fileIO[index].open(std::string("simout")+std::to_string(index),
+        fileIO[index].open(std::string("simout") + std::to_string(index),
                            std::fstream::out);
         connected[index] = true;
       }
@@ -43,7 +43,7 @@ public:
     } else {
       size_t index = (stream >> 8) & 7;
       if (!connected[index]) {
-        fileIO[index].open(std::string("simin")+std::to_string(index),
+        fileIO[index].open(std::string("simin") + std::to_string(index),
                            std::fstream::in);
         connected[index] = true;
       }

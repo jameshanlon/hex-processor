@@ -7,10 +7,10 @@
 #include <cstdio>
 #include <cstring>
 #include <exception>
-#include <map>
+#include <fmt/format.h>
 #include <fstream>
 #include <iostream>
-#include <fmt/format.h>
+#include <map>
 
 #include "hex.hpp"
 #include "hexsimio.hpp"
@@ -60,11 +60,11 @@ class Processor {
     if (lastPC < debugInfo[0].second) {
       return nullptr;
     }
-    for (size_t i=0; i<debugInfo.size(); i++) {
+    for (size_t i = 0; i < debugInfo.size(); i++) {
       if (i == debugInfo.size() - 1 && lastPC >= debugInfo[i].second) {
         return debugInfo[i].first.c_str();
       }
-      if (lastPC >= debugInfo[i].second && lastPC < debugInfo[i+1].second) {
+      if (lastPC >= debugInfo[i].second && lastPC < debugInfo[i + 1].second) {
         return debugInfo[i].first.c_str();
       }
     }
@@ -72,17 +72,15 @@ class Processor {
   }
 
 public:
-
-  Processor(std::istream &in, std::ostream &out, size_t maxCycles=0) :
-    pc(0), areg(0), breg(0), oreg(0),
-    io(in, out), truncateInputs(true), out(out),
-    running(true), tracing(false), lastPC(0), cycles(0),
-    maxCycles(maxCycles) {}
+  Processor(std::istream &in, std::ostream &out, size_t maxCycles = 0)
+      : pc(0), areg(0), breg(0), oreg(0), io(in, out), truncateInputs(true),
+        out(out), running(true), tracing(false), lastPC(0), cycles(0),
+        maxCycles(maxCycles) {}
 
   void setTracing(bool value) { tracing = value; }
   void setTruncateInputs(bool value) { truncateInputs = value; }
 
-  void load(const char *filename, bool dumpContents=false) {
+  void load(const char *filename, bool dumpContents = false) {
     // Load the binary file.
     std::streampos fileSize;
     std::ifstream file(filename, std::ios::binary);
@@ -94,22 +92,23 @@ public:
 
     // Check the file length matches.
     unsigned remainingFileSize = static_cast<unsigned>(fileSize) - 4;
-    remainingFileSize = (remainingFileSize + 3U) & ~3U; // Round up to multiple of 4.
+    remainingFileSize =
+        (remainingFileSize + 3U) & ~3U; // Round up to multiple of 4.
     unsigned programSize;
-    file.read(reinterpret_cast<char*>(&programSize), 4);
+    file.read(reinterpret_cast<char *>(&programSize), 4);
     programSize <<= 2;
 
     // Read the instructions into memory.
-    file.read(reinterpret_cast<char*>(memory.data()), programSize);
+    file.read(reinterpret_cast<char *>(memory.data()), programSize);
 
     // Read debug data (if present).
     if (remainingFileSize > programSize) {
       // Strings.
       uint32_t numStrings;
-      file.read(reinterpret_cast<char*>(&numStrings), sizeof(uint32_t));
-      //std::cout << std::to_string(numStrings) << " strings\n";
+      file.read(reinterpret_cast<char *>(&numStrings), sizeof(uint32_t));
+      // std::cout << std::to_string(numStrings) << " strings\n";
       std::vector<std::string> strings;
-      for (size_t i=0; i<numStrings; i++) {
+      for (size_t i = 0; i < numStrings; i++) {
         char c = file.get();
         std::string s;
         while (c != '\0') {
@@ -120,14 +119,15 @@ public:
       }
       // Symbols
       uint32_t numSymbols;
-      file.read(reinterpret_cast<char*>(&numSymbols), sizeof(uint32_t));
-      //std::cout << std::to_string(numSymbols) << " symbols\n";
-      for (size_t i=0; i<numSymbols; i++) {
+      file.read(reinterpret_cast<char *>(&numSymbols), sizeof(uint32_t));
+      // std::cout << std::to_string(numSymbols) << " symbols\n";
+      for (size_t i = 0; i < numSymbols; i++) {
         uint32_t strIndex;
         uint32_t byteOffset;
-        file.read(reinterpret_cast<char*>(&strIndex), sizeof(uint32_t));
-        file.read(reinterpret_cast<char*>(&byteOffset), sizeof(uint32_t));
-        //std::cout << "symbol " << strings[strIndex] << " " << std::to_string(byteOffset) << "\n";
+        file.read(reinterpret_cast<char *>(&strIndex), sizeof(uint32_t));
+        file.read(reinterpret_cast<char *>(&byteOffset), sizeof(uint32_t));
+        // std::cout << "symbol " << strings[strIndex] << " " <<
+        // std::to_string(byteOffset) << "\n";
         debugInfo.push_back(std::make_pair(strings[strIndex], byteOffset));
         debugInfoMap[strings[strIndex]] = byteOffset;
       }
@@ -136,7 +136,7 @@ public:
     // Print the contents of the binary.
     if (dumpContents) {
       out << "Read " << std::to_string(programSize) << " bytes\n";
-      for (size_t i=0; i<(programSize / 4) + 1; i++) {
+      for (size_t i = 0; i < (programSize / 4) + 1; i++) {
         out << fmt::format("{:08d} {:08x}\n", i, memory[i]);
       }
     }
@@ -145,16 +145,19 @@ public:
   void traceSyscall() {
     unsigned spWordIndex = memory[1];
     switch (static_cast<hex::Syscall>(areg)) {
-      case hex::Syscall::EXIT:
-        out << fmt::format("exit {}\n", memory[spWordIndex+2]);
-        break;
-      case hex::Syscall::WRITE:
-        out << fmt::format("write {} to simout({})\n", memory[spWordIndex+2], memory[spWordIndex+3]);
-        break;
-      case hex::Syscall::READ:
-        out << fmt::format("read {} to mem[{:08x}]\n", memory[spWordIndex+1], (spWordIndex+1));
-        break;
-      default: break;
+    case hex::Syscall::EXIT:
+      out << fmt::format("exit {}\n", memory[spWordIndex + 2]);
+      break;
+    case hex::Syscall::WRITE:
+      out << fmt::format("write {} to simout({})\n", memory[spWordIndex + 2],
+                         memory[spWordIndex + 3]);
+      break;
+    case hex::Syscall::READ:
+      out << fmt::format("read {} to mem[{:08x}]\n", memory[spWordIndex + 1],
+                         (spWordIndex + 1));
+      break;
+    default:
+      break;
     }
   }
 
@@ -166,94 +169,107 @@ public:
         auto symbolOffset = lastPC - debugInfoMap[symbolName];
         symbolInfo = fmt::format("{}+{}", symbolName, symbolOffset);
       }
-      out << fmt::format("{:<6d} {:<6d} {:<12} {:<4} {:<2d} ", cycles, lastPC, symbolInfo, instrEnumToStr(instrEnum), (instr & 0xF));
+      out << fmt::format("{:<6d} {:<6d} {:<12} {:<4} {:<2d} ", cycles, lastPC,
+                         symbolInfo, instrEnumToStr(instrEnum), (instr & 0xF));
     } else {
-      out << fmt::format("{:<6d} {:<6d} {:<4} {:<2d} ", cycles, lastPC, instrEnumToStr(instrEnum), (instr & 0xF));
+      out << fmt::format("{:<6d} {:<6d} {:<4} {:<2d} ", cycles, lastPC,
+                         instrEnumToStr(instrEnum), (instr & 0xF));
     }
     switch (instrEnum) {
-      case hex::Instr::LDAM:
-        out << fmt::format("areg = mem[oreg ({:#08x})] ({})\n", oreg, memory[oreg]);
+    case hex::Instr::LDAM:
+      out << fmt::format("areg = mem[oreg ({:#08x})] ({})\n", oreg,
+                         memory[oreg]);
+      break;
+    case hex::Instr::LDBM:
+      out << fmt::format("breg = mem[oreg ({:#08x})] ({})\n", oreg,
+                         memory[oreg]);
+      break;
+    case hex::Instr::STAM:
+      out << fmt::format("mem[oreg ({:#08x})] = areg {}\n", oreg, areg);
+      break;
+    case hex::Instr::LDAC:
+      out << fmt::format("areg = oreg {}\n", oreg);
+      break;
+    case hex::Instr::LDBC:
+      out << fmt::format("breg = oreg {}\n", oreg);
+      break;
+    case hex::Instr::LDAP:
+      out << fmt::format("areg = pc ({}) + oreg ({}) {}\n", pc, oreg,
+                         (pc + oreg));
+      break;
+    case hex::Instr::LDAI:
+      out << fmt::format("areg = mem[areg ({}) + oreg ({}) = {:#08x}] ({})\n",
+                         areg, oreg, (areg + oreg), memory[areg + oreg]);
+      break;
+    case hex::Instr::LDBI:
+      out << fmt::format("breg = mem[breg ({}) + oreg ({}) = {:#08x}] ({})\n",
+                         breg, oreg, (breg + oreg), memory[breg + oreg]);
+      break;
+    case hex::Instr::STAI:
+      out << fmt::format("mem[breg ({}) + oreg ({}) = {:#08x}] = areg ({})\n",
+                         breg, oreg, (breg + oreg), areg);
+      break;
+    case hex::Instr::BR:
+      out << fmt::format("pc = pc + oreg ({}) ({:#08x})\n", oreg, (pc + oreg));
+      break;
+    case hex::Instr::BRZ:
+      out << fmt::format("pc = areg == zero ? pc + oreg ({}) ({:#08x}) : pc\n",
+                         oreg, (pc + oreg));
+      break;
+    case hex::Instr::BRN:
+      out << fmt::format("pc = areg < zero ? pc + oreg ({}) ({:#08x}) : pc\n",
+                         oreg, (pc + oreg));
+      break;
+    case hex::Instr::PFIX:
+      out << fmt::format("oreg = oreg ({}) << 4 ({:#08x})\n", oreg,
+                         (oreg << 4));
+      break;
+    case hex::Instr::NFIX:
+      out << fmt::format("oreg = 0xFFFFFF00 | oreg ({}) << 4 ({:#08x})\n", oreg,
+                         (0xFFFFFF00 | (oreg << 4)));
+      break;
+    case hex::Instr::OPR:
+      switch (static_cast<hex::OprInstr>(oreg)) {
+      case hex::OprInstr::BRB:
+        out << fmt::format("BRB pc = breg ({:#08x})\n", breg);
         break;
-      case hex::Instr::LDBM:
-        out << fmt::format("breg = mem[oreg ({:#08x})] ({})\n", oreg, memory[oreg]);
+      case hex::OprInstr::ADD:
+        out << fmt::format("ADD areg = areg ({}) + breg ({}) ({})\n", areg,
+                           breg, (areg + breg));
         break;
-      case hex::Instr::STAM:
-        out << fmt::format("mem[oreg ({:#08x})] = areg {}\n", oreg, areg);
+      case hex::OprInstr::SUB:
+        out << fmt::format("SUB areg = areg ({}) - breg ({}) ({})\n", areg,
+                           breg, (areg - breg));
         break;
-      case hex::Instr::LDAC:
-        out << fmt::format("areg = oreg {}\n", oreg);
+      case hex::OprInstr::SVC:
         break;
-      case hex::Instr::LDBC:
-        out << fmt::format("breg = oreg {}\n", oreg);
-        break;
-      case hex::Instr::LDAP:
-        out << fmt::format("areg = pc ({}) + oreg ({}) {}\n", pc, oreg, (pc + oreg));
-        break;
-      case hex::Instr::LDAI:
-        out << fmt::format("areg = mem[areg ({}) + oreg ({}) = {:#08x}] ({})\n", areg, oreg, (areg+oreg), memory[areg+oreg]);
-        break;
-      case hex::Instr::LDBI:
-        out << fmt::format("breg = mem[breg ({}) + oreg ({}) = {:#08x}] ({})\n", breg, oreg, (breg+oreg), memory[breg+oreg]);
-        break;
-      case hex::Instr::STAI:
-        out << fmt::format("mem[breg ({}) + oreg ({}) = {:#08x}] = areg ({})\n", breg, oreg, (breg+oreg), areg);
-        break;
-      case hex::Instr::BR:
-        out << fmt::format("pc = pc + oreg ({}) ({:#08x})\n", oreg, (pc + oreg));
-        break;
-      case hex::Instr::BRZ:
-        out << fmt::format("pc = areg == zero ? pc + oreg ({}) ({:#08x}) : pc\n", oreg, (pc + oreg));
-        break;
-      case hex::Instr::BRN:
-        out << fmt::format("pc = areg < zero ? pc + oreg ({}) ({:#08x}) : pc\n", oreg, (pc + oreg));
-        break;
-      case hex::Instr::PFIX:
-        out << fmt::format("oreg = oreg ({}) << 4 ({:#08x})\n", oreg, (oreg << 4));
-        break;
-      case hex::Instr::NFIX:
-        out << fmt::format("oreg = 0xFFFFFF00 | oreg ({}) << 4 ({:#08x})\n", oreg, (0xFFFFFF00 | (oreg << 4)));
-        break;
-      case hex::Instr::OPR:
-        switch (static_cast<hex::OprInstr>(oreg)) {
-          case hex::OprInstr::BRB:
-            out << fmt::format("BRB pc = breg ({:#08x})\n", breg);
-            break;
-          case hex::OprInstr::ADD:
-           out << fmt::format("ADD areg = areg ({}) + breg ({}) ({})\n", areg, breg, (areg + breg));
-            break;
-          case hex::OprInstr::SUB:
-           out << fmt::format("SUB areg = areg ({}) - breg ({}) ({})\n", areg, breg, (areg - breg));
-            break;
-          case hex::OprInstr::SVC:
-            break;
-        };
-        break;
-   }
+      };
+      break;
+    }
   }
 
   void syscall() {
     unsigned spWordIndex = memory[1];
     switch (static_cast<hex::Syscall>(areg)) {
-      case hex::Syscall::EXIT:
-        exitCode = memory[spWordIndex+2];
-        running = false;
-        break;
-      case hex::Syscall::WRITE:
-        io.output(memory[spWordIndex+2], memory[spWordIndex+3]);
-        break;
-      case hex::Syscall::READ: {
-        auto value = io.input(memory[spWordIndex+2]);
-        memory[spWordIndex+1] = truncateInputs ? value & 0xFF : value;
-        break;
-      }
-      default:
-        throw std::runtime_error("invalid syscall: " + std::to_string(areg));
+    case hex::Syscall::EXIT:
+      exitCode = memory[spWordIndex + 2];
+      running = false;
+      break;
+    case hex::Syscall::WRITE:
+      io.output(memory[spWordIndex + 2], memory[spWordIndex + 3]);
+      break;
+    case hex::Syscall::READ: {
+      auto value = io.input(memory[spWordIndex + 2]);
+      memory[spWordIndex + 1] = truncateInputs ? value & 0xFF : value;
+      break;
+    }
+    default:
+      throw std::runtime_error("invalid syscall: " + std::to_string(areg));
     }
   }
 
   int run() {
-    while (running &&
-           (maxCycles > 0 ? cycles <= maxCycles : true)) {
+    while (running && (maxCycles > 0 ? cycles <= maxCycles : true)) {
       instr = (memory[pc >> 2] >> ((pc & 0x3) << 3)) & 0xFF;
       lastPC = pc;
       pc = pc + 1;
@@ -263,91 +279,91 @@ public:
         trace(instr, instrEnum);
       }
       switch (instrEnum) {
-        case hex::Instr::LDAM:
-          areg = memory[oreg];
-          oreg = 0;
-          break;
-        case hex::Instr::LDBM:
-          breg = memory[oreg];
-          oreg = 0;
-          break;
-        case hex::Instr::STAM:
-          memory[oreg] = areg;
-          oreg = 0;
-          break;
-        case hex::Instr::LDAC:
-          areg = oreg;
-          oreg = 0;
-          break;
-        case hex::Instr::LDBC:
-          breg = oreg;
-          oreg = 0;
-          break;
-        case hex::Instr::LDAP:
-          areg = pc + oreg;
-          oreg = 0;
-          break;
-        case hex::Instr::LDAI:
-          areg = memory[areg + oreg];
-          oreg = 0;
-          break;
-        case hex::Instr::LDBI:
-          breg = memory[breg + oreg];
-          oreg = 0;
-          break;
-        case hex::Instr::STAI:
-          memory[breg + oreg] = areg;
-          oreg = 0;
-          break;
-        case hex::Instr::BR:
+      case hex::Instr::LDAM:
+        areg = memory[oreg];
+        oreg = 0;
+        break;
+      case hex::Instr::LDBM:
+        breg = memory[oreg];
+        oreg = 0;
+        break;
+      case hex::Instr::STAM:
+        memory[oreg] = areg;
+        oreg = 0;
+        break;
+      case hex::Instr::LDAC:
+        areg = oreg;
+        oreg = 0;
+        break;
+      case hex::Instr::LDBC:
+        breg = oreg;
+        oreg = 0;
+        break;
+      case hex::Instr::LDAP:
+        areg = pc + oreg;
+        oreg = 0;
+        break;
+      case hex::Instr::LDAI:
+        areg = memory[areg + oreg];
+        oreg = 0;
+        break;
+      case hex::Instr::LDBI:
+        breg = memory[breg + oreg];
+        oreg = 0;
+        break;
+      case hex::Instr::STAI:
+        memory[breg + oreg] = areg;
+        oreg = 0;
+        break;
+      case hex::Instr::BR:
+        pc = pc + oreg;
+        oreg = 0;
+        break;
+      case hex::Instr::BRZ:
+        if (areg == 0) {
           pc = pc + oreg;
+        }
+        oreg = 0;
+        break;
+      case hex::Instr::BRN:
+        if ((int)areg < 0) {
+          pc = pc + oreg;
+        }
+        oreg = 0;
+        break;
+      case hex::Instr::PFIX:
+        oreg = oreg << 4;
+        break;
+      case hex::Instr::NFIX:
+        oreg = 0xFFFFFF00 | (oreg << 4);
+        break;
+      case hex::Instr::OPR:
+        switch (static_cast<hex::OprInstr>(oreg)) {
+        case hex::OprInstr::BRB:
+          pc = breg;
           oreg = 0;
           break;
-        case hex::Instr::BRZ:
-          if (areg == 0) {
-            pc = pc + oreg;
+        case hex::OprInstr::ADD:
+          areg = areg + breg;
+          oreg = 0;
+          break;
+        case hex::OprInstr::SUB:
+          areg = areg - breg;
+          oreg = 0;
+          break;
+        case hex::OprInstr::SVC:
+          syscall();
+          if (tracing) {
+            traceSyscall();
           }
-          oreg = 0;
-          break;
-        case hex::Instr::BRN:
-          if ((int)areg < 0) {
-            pc = pc + oreg;
-          }
-          oreg = 0;
-          break;
-        case hex::Instr::PFIX:
-          oreg = oreg << 4;
-          break;
-        case hex::Instr::NFIX:
-          oreg = 0xFFFFFF00 | (oreg << 4);
-          break;
-        case hex::Instr::OPR:
-          switch (static_cast<hex::OprInstr>(oreg)) {
-            case hex::OprInstr::BRB:
-              pc = breg;
-              oreg = 0;
-              break;
-            case hex::OprInstr::ADD:
-              areg = areg + breg;
-              oreg = 0;
-              break;
-            case hex::OprInstr::SUB:
-              areg = areg - breg;
-              oreg = 0;
-              break;
-            case hex::OprInstr::SVC:
-              syscall();
-              if (tracing) {
-                traceSyscall();
-              }
-              break;
-            default:
-              throw std::runtime_error("invalid OPR: " + std::to_string(oreg));
-          };
-          oreg = 0;
           break;
         default:
-          throw std::runtime_error("invalid instruction");
+          throw std::runtime_error("invalid OPR: " + std::to_string(oreg));
+        };
+        oreg = 0;
+        break;
+      default:
+        throw std::runtime_error("invalid instruction");
       }
       cycles++;
     }

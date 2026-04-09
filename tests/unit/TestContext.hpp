@@ -39,9 +39,9 @@ struct TestContext {
     // Read program to be compiled into the input buffer.
     std::ifstream file(filename);
     // Get file size.
-    file.seekg(0,std::ios::end);
+    file.seekg(0, std::ios::end);
     auto length = file.tellg();
-    file.seekg(0,std::ios::beg);
+    file.seekg(0, std::ios::beg);
     // Read the whole file into the buffer.
     std::vector<char> buffer(length);
     file.read(&buffer[0], length);
@@ -51,9 +51,8 @@ struct TestContext {
   }
 
   /// Simulate a hex program binary.
-  int simXBinary(const char *filename,
-                 const std::string input={},
-                 bool trace=false) {
+  int simXBinary(const char *filename, const std::string input = {},
+                 bool trace = false) {
     // Initialise in/out buffers.
     std::istringstream simInBuffer(input);
     simOutBuffer.str("");
@@ -80,9 +79,10 @@ struct TestContext {
     return tokHexProgramSrc(readFile(filename));
   }
 
-  /// Parse and emit the tree of an assembly program from string into an output buffer.
+  /// Parse and emit the tree of an assembly program from string into an output
+  /// buffer.
   std::ostringstream asmHexProgramSrc(const std::string program,
-                                      bool emitText=false) {
+                                      bool emitText = false) {
     hexasm::Lexer lexer;
     hexasm::Parser parser(lexer);
     lexer.loadBuffer(program);
@@ -97,16 +97,16 @@ struct TestContext {
     return outBuffer;
   }
 
-  /// Parse and emit the tree of an assembly program from file into an output buffer.
+  /// Parse and emit the tree of an assembly program from file into an output
+  /// buffer.
   std::ostringstream asmHexProgramFile(const std::string filename,
-                                       bool emitText=false) {
+                                       bool emitText = false) {
     return asmHexProgramSrc(readFile(filename), emitText);
   }
 
   /// Run an assembly program.
-  int runHexProgramSrc(const std::string program,
-                       const std::string input={},
-                       bool trace=false) {
+  int runHexProgramSrc(const std::string program, const std::string input = {},
+                       bool trace = false) {
     // Assemble the program.
     hexasm::Lexer lexer;
     hexasm::Parser parser(lexer);
@@ -122,8 +122,7 @@ struct TestContext {
 
   /// Run an assembly program.
   int runHexProgramFile(const std::string filename,
-                        const std::string input={},
-                        bool trace=false) {
+                        const std::string input = {}, bool trace = false) {
     return runHexProgramSrc(readFile(filename), input, trace);
   }
 
@@ -155,7 +154,7 @@ struct TestContext {
 
   /// Parse and emit the assembly of an X program into an output buffer.
   std::ostringstream asmXProgramSrc(const std::string program,
-                                    bool text=false) {
+                                    bool text = false) {
     std::ostringstream outBuffer;
     xcmp::Driver driver(outBuffer);
     if (text) {
@@ -168,14 +167,13 @@ struct TestContext {
 
   /// Parse and emit the assembly of an X program into an output buffer.
   std::ostringstream asmXProgramFile(const std::string &filename,
-                                     bool text=false) {
+                                     bool text = false) {
     return asmXProgramSrc(readFile(filename), text);
   }
 
   /// Run an X program from a string.
-  int runXProgramSrc(const std::string program,
-                     const std::string input={},
-                     bool trace=false) {
+  int runXProgramSrc(const std::string program, const std::string input = {},
+                     bool trace = false) {
     // Compile and assemble the program.
     xcmp::Driver driver(std::cout);
     fs::path path(CURRENT_BINARY_DIRECTORY);
@@ -194,9 +192,8 @@ struct TestContext {
   }
 
   /// Run an X program from a file.
-  int runXProgramFile(const std::string filename,
-                      const std::string input="",
-                      bool trace=false) {
+  int runXProgramFile(const std::string filename, const std::string input = "",
+                      bool trace = false) {
     return runXProgramSrc(readFile(filename), input, trace);
   }
 };

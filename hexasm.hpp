@@ -6,15 +6,15 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <istream>
+#include <fmt/format.h>
 #include <fstream>
-#include <sstream>
 #include <iostream>
+#include <istream>
+#include <map>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <map>
-#include <fmt/format.h>
 
 #include "hex.hpp"
 #include "util.hpp"
@@ -96,76 +96,126 @@ enum class Token {
 
 static const char *tokenEnumStr(Token token) {
   switch (token) {
-  case Token::NUMBER:      return "NUMBER";
-  case Token::MINUS:       return "MINUS";
-  case Token::DATA:        return "DATA";
-  case Token::PROC:        return "PROC";
-  case Token::FUNC:        return "FUNC";
-  case Token::LDAM:        return "LDAM";
-  case Token::LDBM:        return "LDBM";
-  case Token::STAM:        return "STAM";
-  case Token::LDAC:        return "LDAC";
-  case Token::LDBC:        return "LDBC";
-  case Token::LDAP:        return "LDAP";
-  case Token::LDAI:        return "LDAI";
-  case Token::LDBI:        return "LDBI";
-  case Token::STAI:        return "STAI";
-  case Token::BR:          return "BR";
-  case Token::BRZ:         return "BRZ";
-  case Token::BRN:         return "BRN";
-  case Token::BRB:         return "BRB";
-  case Token::SVC:         return "SVC";
-  case Token::ADD:         return "ADD";
-  case Token::SUB:         return "SUB";
-  case Token::OPR:         return "OPR";
-  case Token::IDENTIFIER:  return "IDENTIFIER";
-  case Token::END_OF_FILE: return "END_OF_FILE";
-  case Token::PADDING:     return "PADDING";
-  case Token::PROLOGUE:    return "PROLOGUE";
-  case Token::EPILOGUE:    return "EPILOGUE";
-  case Token::LDAI_FB:     return "LDAI_FB";
-  case Token::LDBI_FB:     return "LDBI_FB";
-  case Token::STAI_FB:     return "STAI_FB";
-  case Token::NONE:        return "NONE";
+  case Token::NUMBER:
+    return "NUMBER";
+  case Token::MINUS:
+    return "MINUS";
+  case Token::DATA:
+    return "DATA";
+  case Token::PROC:
+    return "PROC";
+  case Token::FUNC:
+    return "FUNC";
+  case Token::LDAM:
+    return "LDAM";
+  case Token::LDBM:
+    return "LDBM";
+  case Token::STAM:
+    return "STAM";
+  case Token::LDAC:
+    return "LDAC";
+  case Token::LDBC:
+    return "LDBC";
+  case Token::LDAP:
+    return "LDAP";
+  case Token::LDAI:
+    return "LDAI";
+  case Token::LDBI:
+    return "LDBI";
+  case Token::STAI:
+    return "STAI";
+  case Token::BR:
+    return "BR";
+  case Token::BRZ:
+    return "BRZ";
+  case Token::BRN:
+    return "BRN";
+  case Token::BRB:
+    return "BRB";
+  case Token::SVC:
+    return "SVC";
+  case Token::ADD:
+    return "ADD";
+  case Token::SUB:
+    return "SUB";
+  case Token::OPR:
+    return "OPR";
+  case Token::IDENTIFIER:
+    return "IDENTIFIER";
+  case Token::END_OF_FILE:
+    return "END_OF_FILE";
+  case Token::PADDING:
+    return "PADDING";
+  case Token::PROLOGUE:
+    return "PROLOGUE";
+  case Token::EPILOGUE:
+    return "EPILOGUE";
+  case Token::LDAI_FB:
+    return "LDAI_FB";
+  case Token::LDBI_FB:
+    return "LDBI_FB";
+  case Token::STAI_FB:
+    return "STAI_FB";
+  case Token::NONE:
+    return "NONE";
   default:
-    throw std::runtime_error(std::string("unexpected token: ")+std::to_string(static_cast<int>(token)));
+    throw std::runtime_error(std::string("unexpected token: ") +
+                             std::to_string(static_cast<int>(token)));
   }
 }
 
 static hex::Instr tokenToInstr(Token token) {
   switch (token) {
-  case Token::LDAM: return hex::Instr::LDAM;
-  case Token::LDBM: return hex::Instr::LDBM;
-  case Token::STAM: return hex::Instr::STAM;
-  case Token::LDAC: return hex::Instr::LDAC;
-  case Token::LDBC: return hex::Instr::LDBC;
-  case Token::LDAP: return hex::Instr::LDAP;
-  case Token::LDAI: return hex::Instr::LDAI;
-  case Token::LDBI: return hex::Instr::LDBI;
-  case Token::STAI: return hex::Instr::STAI;
-  case Token::BR:   return hex::Instr::BR;
-  case Token::BRZ:  return hex::Instr::BRZ;
-  case Token::BRN:  return hex::Instr::BRN;
-  case Token::OPR:  return hex::Instr::OPR;
+  case Token::LDAM:
+    return hex::Instr::LDAM;
+  case Token::LDBM:
+    return hex::Instr::LDBM;
+  case Token::STAM:
+    return hex::Instr::STAM;
+  case Token::LDAC:
+    return hex::Instr::LDAC;
+  case Token::LDBC:
+    return hex::Instr::LDBC;
+  case Token::LDAP:
+    return hex::Instr::LDAP;
+  case Token::LDAI:
+    return hex::Instr::LDAI;
+  case Token::LDBI:
+    return hex::Instr::LDBI;
+  case Token::STAI:
+    return hex::Instr::STAI;
+  case Token::BR:
+    return hex::Instr::BR;
+  case Token::BRZ:
+    return hex::Instr::BRZ;
+  case Token::BRN:
+    return hex::Instr::BRN;
+  case Token::OPR:
+    return hex::Instr::OPR;
   default:
-    throw std::runtime_error(std::string("unexpected instruction token: ")+tokenEnumStr(token));
+    throw std::runtime_error(std::string("unexpected instruction token: ") +
+                             tokenEnumStr(token));
   }
 }
 
 static hex::OprInstr tokenToOprInstr(Token token) {
   switch (token) {
-  case Token::BRB: return hex::OprInstr::BRB;
-  case Token::SVC: return hex::OprInstr::SVC;
-  case Token::ADD: return hex::OprInstr::ADD;
-  case Token::SUB: return hex::OprInstr::SUB;
+  case Token::BRB:
+    return hex::OprInstr::BRB;
+  case Token::SVC:
+    return hex::OprInstr::SVC;
+  case Token::ADD:
+    return hex::OprInstr::ADD;
+  case Token::SUB:
+    return hex::OprInstr::SUB;
   default:
-    throw std::runtime_error(std::string("unexpected operand instrucion token: ")+tokenEnumStr(token));
+    throw std::runtime_error(
+        std::string("unexpected operand instrucion token: ") +
+        tokenEnumStr(token));
   }
 }
 
-static int instrToInstrOpc(hex::Instr instr) {
-  return static_cast<int>(instr);
-}
+static int instrToInstrOpc(hex::Instr instr) { return static_cast<int>(instr); }
 
 static int tokenToInstrOpc(Token token) {
   return static_cast<int>(tokenToInstr(token));
@@ -180,25 +230,29 @@ static int tokenToOprInstrOpc(Token token) {
 //===---------------------------------------------------------------------===//
 
 struct UnrecognisedTokenError : public Error {
-  UnrecognisedTokenError(Location location, Token token) :
-      Error(location, fmt::format("unrecognised token {}", tokenEnumStr(token))) {}
+  UnrecognisedTokenError(Location location, Token token)
+      : Error(location,
+              fmt::format("unrecognised token {}", tokenEnumStr(token))) {}
 };
 
 struct UnexpectedTokenError : public Error {
-  UnexpectedTokenError(Location location, Token token) :
-      Error(location, fmt::format("unexpected token {}", tokenEnumStr(token))) {}
+  UnexpectedTokenError(Location location, Token token)
+      : Error(location,
+              fmt::format("unexpected token {}", tokenEnumStr(token))) {}
 };
 
 struct InvalidOprError : public Error {
-  InvalidOprError(Token token) :
-      Error(fmt::format("unexpected operand to OPR {}", tokenEnumStr(token))) {}
-  InvalidOprError(Location location, Token token) :
-      Error(location, fmt::format("unexpected operand to OPR {}", tokenEnumStr(token))) {}
+  InvalidOprError(Token token)
+      : Error(
+            fmt::format("unexpected operand to OPR {}", tokenEnumStr(token))) {}
+  InvalidOprError(Location location, Token token)
+      : Error(location, fmt::format("unexpected operand to OPR {}",
+                                    tokenEnumStr(token))) {}
 };
 
 struct UnknownLabelError : public Error {
-  UnknownLabelError(Location location, std::string label) :
-      Error(location, fmt::format("unknown label {}", label)) {}
+  UnknownLabelError(Location location, std::string label)
+      : Error(location, fmt::format("unknown label {}", label)) {}
 };
 
 //===---------------------------------------------------------------------===//
@@ -252,15 +306,18 @@ class Directive {
   Token token;
   int byteOffset;
   bool assembled;
+
 public:
-  Directive(Token token) :
-      token(token), byteOffset(0), assembled(false) {}
-  Directive(Location location, Token token) :
-      location(location), token(token), byteOffset(0), assembled(false) {}
+  Directive(Token token) : token(token), byteOffset(0), assembled(false) {}
+  Directive(Location location, Token token)
+      : location(location), token(token), byteOffset(0), assembled(false) {}
   virtual ~Directive() = default;
   const Location &getLocation() const { return location; }
   Token getToken() const { return token; }
-  void setByteOffset(unsigned value) { assembled = true; byteOffset = value; }
+  void setByteOffset(unsigned value) {
+    assembled = true;
+    byteOffset = value;
+  }
   unsigned getByteOffset() const { return byteOffset; }
   bool isAssembled() const { return assembled; }
   virtual bool operandIsLabel() const = 0;
@@ -271,27 +328,26 @@ public:
 
 class Data : public Directive {
   int value;
+
 public:
-  Data(Token token, int value) :
-      Directive(token), value(value) {}
-  Data(Location location, Token token, int value) :
-      Directive(location, token), value(value) {}
+  Data(Token token, int value) : Directive(token), value(value) {}
+  Data(Location location, Token token, int value)
+      : Directive(location, token), value(value) {}
   bool operandIsLabel() const { return false; }
   size_t getSize() const { return 4; } // Data entries are always one word.
   int getValue() const { return value; }
-  std::string toString() const {
-    return "DATA " + std::to_string(value);
-  }
+  std::string toString() const { return "DATA " + std::to_string(value); }
 };
 
 class Label : public Directive {
   std::string label;
   int labelValue;
+
 public:
-  Label(Token token, std::string label) :
-      Directive(token), label(label), labelValue(0) {}
-  Label(Location location, Token token, std::string label) :
-      Directive(location, token), label(label), labelValue(0) {}
+  Label(Token token, std::string label)
+      : Directive(token), label(label), labelValue(0) {}
+  Label(Location location, Token token, std::string label)
+      : Directive(location, token), label(label), labelValue(0) {}
   bool operandIsLabel() const { return false; }
   size_t getSize() const { return 0; }
   /// Update the label value and return true if it was changed.
@@ -307,44 +363,42 @@ public:
 
 class Func : public Label {
   std::string identifier;
+
 public:
-  Func(Token token, std::string identifier) :
-      Label(token, identifier) {}
-  Func(Location location, Token token, std::string identifier) :
-      Label(location, token, identifier) {}
+  Func(Token token, std::string identifier) : Label(token, identifier) {}
+  Func(Location location, Token token, std::string identifier)
+      : Label(location, token, identifier) {}
   const std::string &getName() const { return getLabel(); }
-  std::string toString() const {
-    return "FUNC " + getLabel();
-  }
+  std::string toString() const { return "FUNC " + getLabel(); }
 };
 
 class Proc : public Label {
   std::string identifier;
+
 public:
-  Proc(Token token, std::string identifier) :
-      Label(token, identifier) {}
-  Proc(Location location, Token token, std::string identifier) :
-      Label(location, token, identifier) {}
+  Proc(Token token, std::string identifier) : Label(token, identifier) {}
+  Proc(Location location, Token token, std::string identifier)
+      : Label(location, token, identifier) {}
   const std::string &getName() const { return getLabel(); }
-  std::string toString() const {
-    return "PROC " + getLabel();
-  }
+  std::string toString() const { return "PROC " + getLabel(); }
 };
 
 class InstrImm : public Directive {
   int immValue;
+
 public:
-  InstrImm(Token token, int immValue) :
-      Directive(token), immValue(immValue) {}
-  InstrImm(Location location, Token token, int immValue) :
-      Directive(location, token), immValue(immValue) {}
+  InstrImm(Token token, int immValue) : Directive(token), immValue(immValue) {}
+  InstrImm(Location location, Token token, int immValue)
+      : Directive(location, token), immValue(immValue) {}
   bool operandIsLabel() const { return false; }
   size_t getSize() const {
-    return (immValue < 0 && numNibbles(immValue) == 1) ? 2 : numNibbles(immValue);
+    return (immValue < 0 && numNibbles(immValue) == 1) ? 2
+                                                       : numNibbles(immValue);
   }
   int getValue() const { return immValue; }
   std::string toString() const {
-    return std::string(tokenEnumStr(getToken())) + " " + std::to_string(immValue);
+    return std::string(tokenEnumStr(getToken())) + " " +
+           std::to_string(immValue);
   }
 };
 
@@ -352,16 +406,19 @@ class InstrLabel : public Directive {
   std::string label;
   int labelValue;
   bool relative;
+
 public:
-  InstrLabel(Token token, std::string label, bool relative) :
-      Directive(token), label(label), relative(relative) {}
-  InstrLabel(Location location, Token token, std::string label, bool relative) :
-      Directive(location, token), label(label), relative(relative) {}
+  InstrLabel(Token token, std::string label, bool relative)
+      : Directive(token), label(label), relative(relative) {}
+  InstrLabel(Location location, Token token, std::string label, bool relative)
+      : Directive(location, token), label(label), relative(relative) {}
   void setLabelValue(int newValue) { labelValue = newValue; }
   bool operandIsLabel() const { return true; }
   bool isRelative() const { return relative; }
   size_t getSize() const {
-    return (labelValue < 0 && numNibbles(labelValue) == 1) ? 2 : numNibbles(labelValue);
+    return (labelValue < 0 && numNibbles(labelValue) == 1)
+               ? 2
+               : numNibbles(labelValue);
   }
   int getValue() const { return labelValue; }
   std::string getLabel() const { return label; }
@@ -376,21 +433,17 @@ public:
 
 class InstrOp : public Directive {
   Token opcode;
+
 public:
-  InstrOp(Token token, Token opcode) :
-      Directive(token), opcode(opcode) {
-    if (opcode != Token::BRB &&
-        opcode != Token::ADD &&
-        opcode != Token::SUB &&
+  InstrOp(Token token, Token opcode) : Directive(token), opcode(opcode) {
+    if (opcode != Token::BRB && opcode != Token::ADD && opcode != Token::SUB &&
         opcode != Token::SVC) {
       throw InvalidOprError(opcode);
     }
   }
-  InstrOp(Location location, Token token, Token opcode) :
-      Directive(location, token), opcode(opcode) {
-    if (opcode != Token::BRB &&
-        opcode != Token::ADD &&
-        opcode != Token::SUB &&
+  InstrOp(Location location, Token token, Token opcode)
+      : Directive(location, token), opcode(opcode) {
+    if (opcode != Token::BRB && opcode != Token::ADD && opcode != Token::SUB &&
         opcode != Token::SVC) {
       throw InvalidOprError(location, opcode);
     }
@@ -405,6 +458,7 @@ public:
 
 class Padding : public Directive {
   size_t numBytes;
+
 public:
   Padding(size_t numBytes) : Directive(Token::PADDING), numBytes(numBytes) {}
   bool operandIsLabel() const { return false; }
@@ -430,7 +484,7 @@ public:
   /// Lookup a token type by identifier.
   Token lookup(const std::string &name) {
     auto it = table.find(name);
-    if(it != table.end()) {
+    if (it != table.end()) {
       return it->second;
     }
     table.insert(std::make_pair(name, Token::IDENTIFIER));
@@ -440,22 +494,22 @@ public:
 
 class Lexer {
 
-  Table                         table;
+  Table table;
   std::unique_ptr<std::istream> file;
-  char                          lastChar;
-  std::string                   identifier;
-  unsigned                      value;
-  Token                         lastToken;
-  size_t                        currentLineNumber;
-  size_t                        currentCharNumber;
-  std::string                   currentLine;
+  char lastChar;
+  std::string identifier;
+  unsigned value;
+  Token lastToken;
+  size_t currentLineNumber;
+  size_t currentCharNumber;
+  std::string currentLine;
 
   void declareKeywords() {
-    table.insert("ADD",  Token::ADD);
-    table.insert("BRN",  Token::BRN);
-    table.insert("BR",   Token::BR);
-    table.insert("BRB",  Token::BRB);
-    table.insert("BRZ",  Token::BRZ);
+    table.insert("ADD", Token::ADD);
+    table.insert("BRN", Token::BRN);
+    table.insert("BR", Token::BR);
+    table.insert("BRB", Token::BRB);
+    table.insert("BRZ", Token::BRZ);
     table.insert("DATA", Token::DATA);
     table.insert("FUNC", Token::FUNC);
     table.insert("LDAC", Token::LDAC);
@@ -465,12 +519,12 @@ class Lexer {
     table.insert("LDBC", Token::LDBC);
     table.insert("LDBI", Token::LDBI);
     table.insert("LDBM", Token::LDBM);
-    table.insert("OPR",  Token::OPR);
+    table.insert("OPR", Token::OPR);
     table.insert("PROC", Token::PROC);
     table.insert("STAI", Token::STAI);
     table.insert("STAM", Token::STAM);
-    table.insert("SUB",  Token::SUB);
-    table.insert("SVC",  Token::SVC);
+    table.insert("SUB", Token::SUB);
+    table.insert("SVC", Token::SVC);
   }
 
   int readChar() {
@@ -530,7 +584,7 @@ class Lexer {
     }
     // End of file.
     if (lastChar == EOF) {
-      if (auto ifstream = dynamic_cast<std::ifstream*>(file.get())) {
+      if (auto ifstream = dynamic_cast<std::ifstream *>(file.get())) {
         ifstream->close();
       }
       currentLine.clear();
@@ -541,14 +595,9 @@ class Lexer {
   }
 
 public:
+  Lexer() : currentLineNumber(0), currentCharNumber(0) { declareKeywords(); }
 
-  Lexer() : currentLineNumber(0), currentCharNumber(0) {
-    declareKeywords();
-  }
-
-  Token getNextToken() {
-    return lastToken = readToken();
-  }
+  Token getNextToken() { return lastToken = readToken(); }
 
   /// Open a file using ifstream.
   void openFile(const char *filename) {
@@ -561,9 +610,7 @@ public:
     readChar();
   }
 
-  void openFile(const std::string &filename) {
-    openFile(filename.c_str());
-  }
+  void openFile(const std::string &filename) { openFile(filename.c_str()); }
 
   /// Load a string using istringstream.
   void loadBuffer(const std::string &buffer) {
@@ -575,18 +622,18 @@ public:
   void emitTokens(std::ostream &out) {
     while (true) {
       switch (getNextToken()) {
-        case Token::IDENTIFIER:
-          out << "IDENTIFIER " << getIdentifier() << "\n";
-          break;
-        case Token::NUMBER:
-          out << "NUMBER " << getNumber() << "\n";
-          break;
-        case Token::END_OF_FILE:
-          out << "EOF\n";
-          return;
-        default:
-          out << tokenEnumStr(getLastToken()) << "\n";
-          break;
+      case Token::IDENTIFIER:
+        out << "IDENTIFIER " << getIdentifier() << "\n";
+        break;
+      case Token::NUMBER:
+        out << "NUMBER " << getNumber() << "\n";
+        break;
+      case Token::END_OF_FILE:
+        out << "EOF\n";
+        return;
+      default:
+        out << tokenEnumStr(getLastToken()) << "\n";
+        break;
       }
     }
   }
@@ -597,8 +644,9 @@ public:
   size_t getLineNumber() const { return currentLineNumber; }
   bool hasLine() const { return !currentLine.empty(); }
   const std::string &getLine() const { return currentLine; }
-  const Location getLocation() const { return Location(currentLineNumber,
-                                                       currentCharNumber); }
+  const Location getLocation() const {
+    return Location(currentLineNumber, currentCharNumber);
+  }
 };
 
 //===---------------------------------------------------------------------===//
@@ -621,8 +669,8 @@ class Parser {
 
   int parseInteger() {
     if (lexer.getLastToken() == Token::MINUS) {
-       expectNext(Token::NUMBER);
-       return -lexer.getNumber();
+      expectNext(Token::NUMBER);
+      return -lexer.getNumber();
     }
     expectLast(Token::NUMBER);
     return lexer.getNumber();
@@ -636,50 +684,54 @@ class Parser {
   std::unique_ptr<Directive> parseDirective() {
     auto location = lexer.getLocation();
     switch (lexer.getLastToken()) {
-      case Token::DATA:
-        lexer.getNextToken();
-        return std::make_unique<Data>(location, Token::DATA, parseInteger());
-      case Token::FUNC:
-        return std::make_unique<Func>(location, Token::FUNC, parseIdentifier());
-      case Token::PROC:
-        return std::make_unique<Proc>(location, Token::PROC, parseIdentifier());
-      case Token::IDENTIFIER:
-        return std::make_unique<Label>(location, Token::IDENTIFIER, lexer.getIdentifier());
-      case Token::OPR:
-        return std::make_unique<InstrOp>(location, Token::OPR, lexer.getNextToken());
-      case Token::LDAM:
-      case Token::LDBM:
-      case Token::STAM:
-      case Token::LDAC:
-      case Token::LDBC: {
-        auto opcode = lexer.getLastToken();
-        if (lexer.getNextToken() == Token::IDENTIFIER) {
-          return std::make_unique<InstrLabel>(location, opcode, lexer.getIdentifier(), false);
-        } else {
-          return std::make_unique<InstrImm>(location, opcode, parseInteger());
-        }
+    case Token::DATA:
+      lexer.getNextToken();
+      return std::make_unique<Data>(location, Token::DATA, parseInteger());
+    case Token::FUNC:
+      return std::make_unique<Func>(location, Token::FUNC, parseIdentifier());
+    case Token::PROC:
+      return std::make_unique<Proc>(location, Token::PROC, parseIdentifier());
+    case Token::IDENTIFIER:
+      return std::make_unique<Label>(location, Token::IDENTIFIER,
+                                     lexer.getIdentifier());
+    case Token::OPR:
+      return std::make_unique<InstrOp>(location, Token::OPR,
+                                       lexer.getNextToken());
+    case Token::LDAM:
+    case Token::LDBM:
+    case Token::STAM:
+    case Token::LDAC:
+    case Token::LDBC: {
+      auto opcode = lexer.getLastToken();
+      if (lexer.getNextToken() == Token::IDENTIFIER) {
+        return std::make_unique<InstrLabel>(location, opcode,
+                                            lexer.getIdentifier(), false);
+      } else {
+        return std::make_unique<InstrImm>(location, opcode, parseInteger());
       }
-      case Token::LDAP:
-      case Token::LDAI:
-      case Token::LDBI:
-      case Token::STAI:
-      case Token::BR:
-      case Token::BRN:
-      case Token::BRZ: {
-        auto opcode = lexer.getLastToken();
-        if (lexer.getNextToken() == Token::IDENTIFIER) {
-          return std::make_unique<InstrLabel>(location, opcode, lexer.getIdentifier(), true);
-        } else {
-          return std::make_unique<InstrImm>(location, opcode, parseInteger());
-        }
+    }
+    case Token::LDAP:
+    case Token::LDAI:
+    case Token::LDBI:
+    case Token::STAI:
+    case Token::BR:
+    case Token::BRN:
+    case Token::BRZ: {
+      auto opcode = lexer.getLastToken();
+      if (lexer.getNextToken() == Token::IDENTIFIER) {
+        return std::make_unique<InstrLabel>(location, opcode,
+                                            lexer.getIdentifier(), true);
+      } else {
+        return std::make_unique<InstrImm>(location, opcode, parseInteger());
       }
-      case Token::PROLOGUE:
-      case Token::EPILOGUE:
-      case Token::LDAI_FB:
-      case Token::LDBI_FB:
-      case Token::STAI_FB:
-      default:
-        throw UnrecognisedTokenError(location, lexer.getLastToken());
+    }
+    case Token::PROLOGUE:
+    case Token::EPILOGUE:
+    case Token::LDAI_FB:
+    case Token::LDBI_FB:
+    case Token::STAI_FB:
+    default:
+      throw UnrecognisedTokenError(location, lexer.getLastToken());
     }
   }
 
@@ -702,7 +754,7 @@ public:
 class CodeGen {
 
   std::vector<std::unique_ptr<Directive>> &program;
-  std::map<std::string, Label*> labelMap;
+  std::map<std::string, Label *> labelMap;
   std::vector<std::pair<std::string, unsigned>> debugInfo;
   size_t programSizeBytes;
 
@@ -711,21 +763,22 @@ class CodeGen {
     for (auto &directive : program) {
       switch (directive->getToken()) {
       case Token::FUNC: {
-        auto func = dynamic_cast<Func*>(directive.get());
+        auto func = dynamic_cast<Func *>(directive.get());
         labelMap[func->getName()] = func;
         break;
       }
       case Token::PROC: {
-        auto proc = dynamic_cast<Proc*>(directive.get());
+        auto proc = dynamic_cast<Proc *>(directive.get());
         labelMap[proc->getName()] = proc;
         break;
       }
       case Token::IDENTIFIER: {
-        auto label = dynamic_cast<Label*>(directive.get());
+        auto label = dynamic_cast<Label *>(directive.get());
         labelMap[label->getLabel()] = label;
         break;
       }
-      default: break;
+      default:
+        break;
       }
     }
   }
@@ -735,9 +788,9 @@ class CodeGen {
   void resolveLabels() {
     int lastSize = -1;
     int byteOffset = 0;
-    //int count = 0;
+    // int count = 0;
     while (lastSize != byteOffset) {
-      //std::cout << "Resolving labels iteration " << count++ << "\n";
+      // std::cout << "Resolving labels iteration " << count++ << "\n";
       lastSize = byteOffset;
       byteOffset = 0;
       for (auto &directive : program) {
@@ -751,29 +804,34 @@ class CodeGen {
         if (directive->getToken() == Token::IDENTIFIER ||
             directive->getToken() == Token::FUNC ||
             directive->getToken() == Token::PROC) {
-          dynamic_cast<Label*>(directive.get())->setLabelValue(byteOffset);
+          dynamic_cast<Label *>(directive.get())->setLabelValue(byteOffset);
         }
         // Update the label operand value of an instruction, accounting for
         // relative and absolute references.
         if (directive->operandIsLabel()) {
-          auto instrLabel = dynamic_cast<InstrLabel*>(directive.get());
+          auto instrLabel = dynamic_cast<InstrLabel *>(directive.get());
           if (labelMap.count(instrLabel->getLabel()) == 0) {
-            throw UnknownLabelError(directive->getLocation(), instrLabel->getLabel());
+            throw UnknownLabelError(directive->getLocation(),
+                                    instrLabel->getLabel());
           }
           int labelValue = labelMap[instrLabel->getLabel()]->getValue();
           if (instrLabel->isRelative()) {
             int offset = labelValue - byteOffset;
-            //std::cout << "label value " << labelValue
-            //          << " byteOffset " << byteOffset
-            //          << " offset " << offset
-            //          << " instrlen " << instrLen(labelValue, byteOffset) << "\n";
+            // std::cout << "label value " << labelValue
+            //           << " byteOffset " << byteOffset
+            //           << " offset " << offset
+            //           << " instrlen " << instrLen(labelValue, byteOffset) <<
+            //           "\n";
             if (offset >= 0) {
-              instrLabel->setLabelValue(offset - instrLen(labelValue, byteOffset));
+              instrLabel->setLabelValue(offset -
+                                        instrLen(labelValue, byteOffset));
             } else {
-              instrLabel->setLabelValue(offset - instrLen(labelValue, byteOffset));
+              instrLabel->setLabelValue(offset -
+                                        instrLen(labelValue, byteOffset));
             }
           } else {
-            assert((labelValue & 0x3) == 0 && "absolute label value is not word aligned");
+            assert((labelValue & 0x3) == 0 &&
+                   "absolute label value is not word aligned");
             instrLabel->setLabelValue(labelValue >> 2);
           }
         }
@@ -784,10 +842,9 @@ class CodeGen {
   }
 
 public:
-
   /// Constructor.
-  CodeGen(std::vector<std::unique_ptr<Directive>> &program) :
-      program(program), programSizeBytes(0) {
+  CodeGen(std::vector<std::unique_ptr<Directive>> &program)
+      : program(program), programSizeBytes(0) {
 
     // Iteratively resolve label values.
     createLabelMap();
@@ -813,8 +870,7 @@ public:
     for (auto &directive : program) {
       programSize += directive->getSize();
       out << fmt::format("{:#010x} {:<20} ({} bytes)\n",
-                         directive->getByteOffset(),
-                         directive->toString(),
+                         directive->getByteOffset(), directive->toString(),
                          directive->getSize());
     }
     out << fmt::format("{} bytes\n", programSize);
@@ -827,42 +883,46 @@ public:
       size_t size = directive->getSize();
       // Func
       if (directive->getToken() == Token::FUNC) {
-        auto funcDirective = dynamic_cast<Func*>(directive.get());
-        debugInfo.push_back(std::make_pair(funcDirective->getLabel(), byteOffset));
-      // Proc
+        auto funcDirective = dynamic_cast<Func *>(directive.get());
+        debugInfo.push_back(
+            std::make_pair(funcDirective->getLabel(), byteOffset));
+        // Proc
       } else if (directive->getToken() == Token::PROC) {
-        auto procDirective = dynamic_cast<Proc*>(directive.get());
-        debugInfo.push_back(std::make_pair(procDirective->getLabel(), byteOffset));
-      // Padding
+        auto procDirective = dynamic_cast<Proc *>(directive.get());
+        debugInfo.push_back(
+            std::make_pair(procDirective->getLabel(), byteOffset));
+        // Padding
       } else if (directive->getToken() == Token::PADDING) {
-        for (size_t i=0; i<directive->getSize(); i++) {
+        for (size_t i = 0; i < directive->getSize(); i++) {
           outputFile.put(0);
         }
-      // Data
+        // Data
       } else if (directive->getToken() == Token::DATA) {
         // Add padding for 4-byte data alignment.
         if (byteOffset & 0x3) {
           int paddingBytes = 4 - (byteOffset & 0x3);
           int paddingValue = 0;
-          outputFile.write(reinterpret_cast<const char*>(&paddingValue), paddingBytes);
+          outputFile.write(reinterpret_cast<const char *>(&paddingValue),
+                           paddingBytes);
           byteOffset += paddingBytes;
         }
-        auto dataDirective = dynamic_cast<Data*>(directive.get());
+        auto dataDirective = dynamic_cast<Data *>(directive.get());
         auto value = dataDirective->getValue();
-        outputFile.write(reinterpret_cast<const char*>(&value), size);
+        outputFile.write(reinterpret_cast<const char *>(&value), size);
         byteOffset += size;
-      // Instruction
+        // Instruction
       } else if (size > 0) {
         if (size > 1) {
           // Output PFIX/NFIX to extend the immediate value.
-          hex::Instr instr = (directive->getValue() < 0) ? hex::Instr::NFIX : hex::Instr::PFIX;
+          hex::Instr instr =
+              (directive->getValue() < 0) ? hex::Instr::NFIX : hex::Instr::PFIX;
           char instrValue = instrToInstrOpc(instr) << 4 |
                             ((directive->getValue() >> ((size - 1) * 4)) & 0xF);
           outputFile.put(instrValue);
           byteOffset++;
         }
         if (size > 2) {
-          for (size_t i=size-2; i>0; i--) {
+          for (size_t i = size - 2; i > 0; i--) {
             char instrValue = instrToInstrOpc(hex::Instr::PFIX) << 4 |
                               ((directive->getValue() >> (i * 4)) & 0xF);
             outputFile.put(instrValue);
@@ -882,18 +942,22 @@ public:
   void emitDebugInfo(std::ostream &outputFile) {
     uint32_t tableSize = debugInfo.size();
     // Symbol string table (concatenate null-terminated strings).
-    outputFile.write(reinterpret_cast<const char*>(&tableSize), sizeof(uint32_t));
+    outputFile.write(reinterpret_cast<const char *>(&tableSize),
+                     sizeof(uint32_t));
     for (const auto &pair : debugInfo) {
       auto name = pair.first;
-      outputFile.write(name.c_str(), name.length()+1);
+      outputFile.write(name.c_str(), name.length() + 1);
     }
     // Symbols -> address map (index, byte offset) in ascending offsets.
-    outputFile.write(reinterpret_cast<const char*>(&tableSize), sizeof(uint32_t));
+    outputFile.write(reinterpret_cast<const char *>(&tableSize),
+                     sizeof(uint32_t));
     uint32_t tableIndex = 0;
     for (const auto &pair : debugInfo) {
       uint32_t byteOffset = pair.second;
-      outputFile.write(reinterpret_cast<const char*>(&tableIndex), sizeof(uint32_t));
-      outputFile.write(reinterpret_cast<const char*>(&byteOffset), sizeof(uint32_t));
+      outputFile.write(reinterpret_cast<const char *>(&tableIndex),
+                       sizeof(uint32_t));
+      outputFile.write(reinterpret_cast<const char *>(&byteOffset),
+                       sizeof(uint32_t));
       tableIndex++;
     }
   }
@@ -903,7 +967,8 @@ public:
     std::fstream outputFile(outputFilename, std::ios::out | std::ios::binary);
     // The first four bytes are the remaining binary size.
     uint32_t programSizeWords = programSizeBytes >> 2;
-    outputFile.write(reinterpret_cast<const char*>(&programSizeWords), sizeof(uint32_t));
+    outputFile.write(reinterpret_cast<const char *>(&programSizeWords),
+                     sizeof(uint32_t));
     // Emit the program.
     emitProgramBin(outputFile);
     emitDebugInfo(outputFile);

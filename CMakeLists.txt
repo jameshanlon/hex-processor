@@ -4,38 +4,36 @@ include(GNUInstallDirs)
 
 # FetchContent for fmt
 include(FetchContent)
-FetchContent_Declare(fmt
+FetchContent_Declare(
+  fmt
   GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-  GIT_TAG 11.0.2
-)
+  GIT_TAG 11.0.2)
 FetchContent_MakeAvailable(fmt)
 
 # FetchContent for Catch2
-FetchContent_Declare(Catch2
+FetchContent_Declare(
+  Catch2
   GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG v3.4.0
-)
+  GIT_TAG v3.4.0)
 FetchContent_MakeAvailable(Catch2)
 
 # Boost
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.68.0 REQUIRED COMPONENTS
-             unit_test_framework)
+find_package(Boost 1.68.0 REQUIRED COMPONENTS unit_test_framework)
 
 # Python
-find_package(Python3 REQUIRED COMPONENTS
-             Interpreter)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 # Use local find scripts
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 option(USE_VERILATOR "Use Verilator for simulation" ON)
-option(BUILD_DOCS    "Create and install HTML documentation" OFF)
+option(BUILD_DOCS "Create and install HTML documentation" OFF)
 
 # Verilator
-if (USE_VERILATOR)
+if(USE_VERILATOR)
   find_package(verilator HINTS $ENV{VERILATOR_ROOT} ${VERILATOR_ROOT})
-  if (NOT verilator_FOUND)
+  if(NOT verilator_FOUND)
     message(FATAL_ERROR "Verilator was not found.")
   endif()
   message(STATUS "Found Verilator binary = ${VERILATOR_BIN}")
@@ -65,27 +63,30 @@ target_link_libraries(xcmp ${Boost_LIBRARIES} fmt::fmt)
 add_executable(xrun hex.cpp xrun.cpp)
 target_link_libraries(xrun ${Boost_LIBRARIES} fmt::fmt)
 
-install(TARGETS hexasm xcmp xrun hexsim
-        DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS hexasm xcmp xrun hexsim DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # Verilator
-if (USE_VERILATOR)
+if(USE_VERILATOR)
   add_executable(hextb hex.cpp hextb.cpp)
 
-  verilate(hextb TRACE
-           VERILATOR_ARGS --top-module hex
-           SOURCES verilog/hex_pkg.sv
-                   verilog/hex.sv
-                   verilog/processor.sv
-                   verilog/memory.sv)
+  verilate(
+    hextb
+    TRACE
+    VERILATOR_ARGS
+    --top-module
+    hex
+    SOURCES
+    verilog/hex_pkg.sv
+    verilog/hex.sv
+    verilog/processor.sv
+    verilog/memory.sv)
 
-  install(TARGETS hextb
-          DESTINATION ${CMAKE_INSTALL_BINDIR})
+  install(TARGETS hextb DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 enable_testing()
 add_subdirectory(tests)
 
-if (BUILD_DOCS)
+if(BUILD_DOCS)
   add_subdirectory(docs)
 endif()

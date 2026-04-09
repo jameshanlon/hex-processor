@@ -1,8 +1,7 @@
-#include <ostream>
-#include <iostream>
-#include <catch2/catch_test_macros.hpp>
 #include "TestContext.hpp"
-
+#include <catch2/catch_test_macros.hpp>
+#include <iostream>
+#include <ostream>
 
 //===---------------------------------------------------------------------===//
 // Unit tests for assembly languages features.
@@ -12,7 +11,7 @@ TEST_CASE("[asm_features] exit_tokens") {
   TestContext ctx;
   auto output = ctx.tokHexProgramFile(ctx.getAsmTestPath("exit0.S")).str();
   std::string expected = ""
-R"(BR
+                         R"(BR
 IDENTIFIER start
 DATA
 NUMBER 16383
@@ -34,9 +33,10 @@ EOF
 
 TEST_CASE("[asm_features] exit_tree") {
   TestContext ctx;
-  auto output = ctx.asmHexProgramFile(ctx.getAsmTestPath("exit0.S"), true).str();
+  auto output =
+      ctx.asmHexProgramFile(ctx.getAsmTestPath("exit0.S"), true).str();
   std::string expected = ""
-R"(0x00000000 BR start (7)         (1 bytes)
+                         R"(0x00000000 BR start (7)         (1 bytes)
 0x00000004 DATA 16383           (4 bytes)
 0x00000008 start                (0 bytes)
 0x00000008 LDAC 0               (1 bytes)
@@ -94,17 +94,20 @@ TEST_CASE("[asm_features] error_unexpected_opr_operand") {
 TEST_CASE("[asm_features] error_unrecognised_token") {
   TestContext ctx;
   auto program = "123";
-  REQUIRE_THROWS_AS(ctx.asmHexProgramSrc(program), hexasm::UnrecognisedTokenError);
+  REQUIRE_THROWS_AS(ctx.asmHexProgramSrc(program),
+                    hexasm::UnrecognisedTokenError);
 }
 
 TEST_CASE("[asm_features] error_expected_number") {
   TestContext ctx;
   auto program = "BR .";
-  REQUIRE_THROWS_AS(ctx.asmHexProgramSrc(program), hexasm::UnexpectedTokenError);
+  REQUIRE_THROWS_AS(ctx.asmHexProgramSrc(program),
+                    hexasm::UnexpectedTokenError);
 }
 
 TEST_CASE("[asm_features] error_expected_negative_integer") {
   TestContext ctx;
   auto program = "BR -foo";
-  REQUIRE_THROWS_AS(ctx.asmHexProgramSrc(program), hexasm::UnexpectedTokenError);
+  REQUIRE_THROWS_AS(ctx.asmHexProgramSrc(program),
+                    hexasm::UnexpectedTokenError);
 }

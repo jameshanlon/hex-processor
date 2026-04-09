@@ -1,14 +1,12 @@
-#include <ostream>
-#include <iostream>
-#include <fmt/format.h>
-#include <catch2/catch_test_macros.hpp>
 #include "TestContext.hpp"
-
+#include <catch2/catch_test_macros.hpp>
+#include <fmt/format.h>
+#include <iostream>
+#include <ostream>
 
 //===---------------------------------------------------------------------===//
 // Unit tests for X language features.
 //===---------------------------------------------------------------------===//
-
 
 //===---------------------------------------------------------------------===//
 // Null programs
@@ -212,7 +210,8 @@ TEST_CASE("constants_min_positive_pool") {
   TestContext ctx;
 
   auto program = "val x = 65536; proc main () is 0(x)";
-  REQUIRE(ctx.asmXProgramSrc(program, true).str().find("_const0") != std::string::npos);
+  REQUIRE(ctx.asmXProgramSrc(program, true).str().find("_const0") !=
+          std::string::npos);
   REQUIRE(ctx.runXProgramSrc(program) == 65536);
 }
 
@@ -220,7 +219,8 @@ TEST_CASE("constants_max_positive_pool") {
   TestContext ctx;
 
   auto program = "val x = 2147483647; proc main () is 0(x)";
-  REQUIRE(ctx.asmXProgramSrc(program, true).str().find("_const0") != std::string::npos);
+  REQUIRE(ctx.asmXProgramSrc(program, true).str().find("_const0") !=
+          std::string::npos);
   REQUIRE(ctx.runXProgramSrc(program) == 2147483647);
 }
 
@@ -228,7 +228,8 @@ TEST_CASE("constants_min_negative_pool") {
   TestContext ctx;
 
   auto program = "val x = -65536; proc main () is 0(x)";
-  REQUIRE(ctx.asmXProgramSrc(program, true).str().find("_const0") != std::string::npos);
+  REQUIRE(ctx.asmXProgramSrc(program, true).str().find("_const0") !=
+          std::string::npos);
   REQUIRE(ctx.runXProgramSrc(program) == -65536);
 }
 
@@ -236,7 +237,8 @@ TEST_CASE("constants_max_negative_pool") {
   TestContext ctx;
 
   auto program = "val x = -2147483648; proc main () is 0(x)";
-  REQUIRE(ctx.asmXProgramSrc(program, true).str().find("_const0") != std::string::npos);
+  REQUIRE(ctx.asmXProgramSrc(program, true).str().find("_const0") !=
+          std::string::npos);
   REQUIRE(ctx.runXProgramSrc(program) == -2147483648);
 }
 
@@ -250,7 +252,8 @@ TEST_CASE("constants_hex") {
 TEST_CASE("constants_propagation_binop") {
   TestContext ctx;
 
-  auto program = "val x = 1; val y = 2; val z = 3; val r = (x + y) - z; proc main () is 0(r)";
+  auto program = "val x = 1; val y = 2; val z = 3; val r = (x + y) - z; proc "
+                 "main () is 0(r)";
   REQUIRE(ctx.runXProgramSrc(program) == 0);
 }
 
@@ -280,7 +283,8 @@ proc main() is {
 TEST_CASE("putval_multiple_indirect") {
   TestContext ctx;
 
-  // Demonstrate multiple indirection of the character values through a function.
+  // Demonstrate multiple indirection of the character values through a
+  // function.
   auto program = R"(
 val put = 1;
 func foo(val c) is return c
@@ -318,7 +322,8 @@ TEST_CASE("binop_func_plus_const") {
   TestContext ctx;
 
   // Binop addition with a function call on LHS and RHS.
-  // The '1 + foo()' causes the RHS function call result to be written to the stack.
+  // The '1 + foo()' causes the RHS function call result to be written to the
+  // stack.
   auto program = R"(
 val put = 1;
 func foo(val x) is return x
@@ -743,7 +748,7 @@ TEST_CASE("binary_associative_plus4") {
   auto program = R"(func add4(val a, val b, val c, val d) is
                       return a + b + c + d
                     proc main () is 0(add4(2(0), 2(0), 2(0), 2(0))))";
-  REQUIRE(ctx.runXProgramSrc(program, {1, 2, 3, 4}) == 1+2+3+4);
+  REQUIRE(ctx.runXProgramSrc(program, {1, 2, 3, 4}) == 1 + 2 + 3 + 4);
 }
 
 TEST_CASE("binary_associative_and4") {
@@ -903,8 +908,6 @@ proc main () is
 // Global variables
 //===---------------------------------------------------------------------===//
 
-
-
 //===---------------------------------------------------------------------===//
 // Global arrays
 //===---------------------------------------------------------------------===//
@@ -987,7 +990,8 @@ TEST_CASE("scope_local_global_matching") {
 TEST_CASE("scope_matching_formals") {
   TestContext ctx;
 
-  // Matching formal variables in two local scopes, but with different stack offsets.
+  // Matching formal variables in two local scopes, but with different stack
+  // offsets.
   auto program = R"(
     proc foo(val a, val b, val c, val d) is 1(((a - b) - c) - d, 0)
     proc bar(val d, val c, val b, val a) is 1(((a - b) - c) - d, 0)
@@ -1000,7 +1004,8 @@ TEST_CASE("scope_matching_formals") {
 TEST_CASE("scope_matching_locals") {
   TestContext ctx;
 
-  // Matching local variables in two local scopes, but with different stack offsets.
+  // Matching local variables in two local scopes, but with different stack
+  // offsets.
   auto program = R"(
     proc foo(val a, val b, val c, val d) is
       var w; var x; var y; var z;
@@ -1197,6 +1202,6 @@ TEST_CASE("semantics_non_const_array_length_error") {
   TestContext ctx;
 
   auto program = "var x; array foo[x]; proc main () is skip";
-  REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::NonConstArrayLengthError);
+  REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program),
+                    xcmp::NonConstArrayLengthError);
 }
-

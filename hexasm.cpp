@@ -14,7 +14,8 @@ static void help(const char *argv[]) {
   std::cout << "  -h,--help         Display this message\n";
   std::cout << "  --tokens          Tokenise the input only\n";
   std::cout << "  --instrs          Display the instruction sequence only\n";
-  std::cout << "  -o,--output file  Specify a file for binary output (default a.out)\n";
+  std::cout << "  -o,--output file  Specify a file for binary output (default "
+               "a.out)\n";
 }
 
 int main(int argc, const char *argv[]) {
@@ -41,7 +42,8 @@ int main(int argc, const char *argv[]) {
                  std::strcmp(argv[i], "-o") == 0) {
         outputFilename = argv[++i];
       } else if (argv[i][0] == '-') {
-          throw std::runtime_error(std::string("unrecognised argument: ")+argv[i]);
+        throw std::runtime_error(std::string("unrecognised argument: ") +
+                                 argv[i]);
       } else {
         if (!filename) {
           filename = argv[i];
@@ -83,7 +85,8 @@ int main(int argc, const char *argv[]) {
 
   } catch (const hexutil::Error &e) {
     if (e.hasLocation()) {
-      std::cerr << fmt::format("Error {}: {}\n", e.getLocation().str(), e.what());
+      std::cerr << fmt::format("Error {}: {}\n", e.getLocation().str(),
+                               e.what());
     } else {
       std::cerr << fmt::format("Error: {}\n", e.what());
     }

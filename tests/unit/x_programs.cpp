@@ -1,15 +1,13 @@
-#include <ostream>
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <catch2/catch_test_macros.hpp>
 #include "TestContext.hpp"
-
+#include <catch2/catch_test_macros.hpp>
+#include <fstream>
+#include <iostream>
+#include <ostream>
+#include <sstream>
 
 //===---------------------------------------------------------------------===//
 // Unit tests for X programs.
 //===---------------------------------------------------------------------===//
-
 
 TEST_CASE("mul") {
   TestContext ctx;
@@ -156,14 +154,16 @@ TEST_CASE("xhexb_xhexb_hello_prints") {
   auto helloContents = ctx.readFile(ctx.getXTestPath("hello_prints.x"));
   // Compile xhexb, compile program.
   ctx.runXProgramFile(ctx.getXTestPath("xhexb.x"), xhexbContents);
-  // Simulate the compiled program (compile xhexb using xcmp.cpp:xhexb.x binary).
+  // Simulate the compiled program (compile xhexb using xcmp.cpp:xhexb.x
+  // binary).
   ctx.simXBinary("simout2", xhexbContents);
   REQUIRE(ctx.simOutBuffer.str() == R"(error near line 3054: illegal character
 tree size: 18631
 program size: 17093
 size: 177097
 )");
-  // Simulate the compiled program (compile hello_prints using xhexb.x:xhexb.x binary).
+  // Simulate the compiled program (compile hello_prints using xhexb.x:xhexb.x
+  // binary).
   ctx.simXBinary("simout2", helloContents);
   REQUIRE(ctx.simOutBuffer.str() == R"(error near line 74: illegal character
 tree size: 602
@@ -174,4 +174,3 @@ size: 414
   ctx.simXBinary("simout2");
   REQUIRE(ctx.simOutBuffer.str() == "hello world\n");
 }
-

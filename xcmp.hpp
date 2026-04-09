@@ -5,16 +5,16 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fmt/format.h>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <optional>
 #include <ostream>
-#include <string>
 #include <stack>
+#include <string>
 #include <vector>
-#include <map>
-#include <fmt/format.h>
 
 #include "util.hpp"
 
@@ -78,49 +78,91 @@ enum class Token {
 
 static const char *tokenEnumStr(Token token) {
   switch (token) {
-  case Token::NONE:        return "NONE";
-  case Token::IDENTIFIER:  return "IDENTIFIER";
-  case Token::NUMBER:      return "NUMBER";
-  case Token::LBRACKET:    return "[";
-  case Token::RBRACKET:    return "]";
-  case Token::LPAREN:      return "(";
-  case Token::RPAREN:      return ")";
-  case Token::IF:          return "if";
-  case Token::THEN:        return "then";
-  case Token::ELSE:        return "else";
-  case Token::WHILE:       return "while";
-  case Token::DO:          return "do";
-  case Token::ASS:         return ":=";
-  case Token::SKIP:        return "skip";
-  case Token::BEGIN:       return "{";
-  case Token::END:         return "}";
-  case Token::SEMICOLON:   return ";";
-  case Token::COMMA:       return ",";
-  case Token::VAR:         return "var";
-  case Token::ARRAY:       return "array";
-  case Token::PROC:        return "proc";
-  case Token::FUNC:        return "func";
-  case Token::IS:          return "is";
-  case Token::STOP:        return "stop";
-  case Token::NOT:         return "~";
-  case Token::VAL:         return "val";
-  case Token::STRING:      return "string";
-  case Token::TRUE:        return "true";
-  case Token::FALSE:       return "false";
-  case Token::RETURN:      return "return";
-  case Token::PLUS:        return "+";
-  case Token::MINUS:       return "-";
-  case Token::OR:          return "or";
-  case Token::AND:         return "and";
-  case Token::EQ:          return "=";
-  case Token::NE:          return "~=";
-  case Token::LS:          return "<";
-  case Token::LE:          return "<=";
-  case Token::GR:          return ">";
-  case Token::GE:          return ">=";
-  case Token::END_OF_FILE: return "END_OF_FILE";
+  case Token::NONE:
+    return "NONE";
+  case Token::IDENTIFIER:
+    return "IDENTIFIER";
+  case Token::NUMBER:
+    return "NUMBER";
+  case Token::LBRACKET:
+    return "[";
+  case Token::RBRACKET:
+    return "]";
+  case Token::LPAREN:
+    return "(";
+  case Token::RPAREN:
+    return ")";
+  case Token::IF:
+    return "if";
+  case Token::THEN:
+    return "then";
+  case Token::ELSE:
+    return "else";
+  case Token::WHILE:
+    return "while";
+  case Token::DO:
+    return "do";
+  case Token::ASS:
+    return ":=";
+  case Token::SKIP:
+    return "skip";
+  case Token::BEGIN:
+    return "{";
+  case Token::END:
+    return "}";
+  case Token::SEMICOLON:
+    return ";";
+  case Token::COMMA:
+    return ",";
+  case Token::VAR:
+    return "var";
+  case Token::ARRAY:
+    return "array";
+  case Token::PROC:
+    return "proc";
+  case Token::FUNC:
+    return "func";
+  case Token::IS:
+    return "is";
+  case Token::STOP:
+    return "stop";
+  case Token::NOT:
+    return "~";
+  case Token::VAL:
+    return "val";
+  case Token::STRING:
+    return "string";
+  case Token::TRUE:
+    return "true";
+  case Token::FALSE:
+    return "false";
+  case Token::RETURN:
+    return "return";
+  case Token::PLUS:
+    return "+";
+  case Token::MINUS:
+    return "-";
+  case Token::OR:
+    return "or";
+  case Token::AND:
+    return "and";
+  case Token::EQ:
+    return "=";
+  case Token::NE:
+    return "~=";
+  case Token::LS:
+    return "<";
+  case Token::LE:
+    return "<=";
+  case Token::GR:
+    return ">";
+  case Token::GE:
+    return ">=";
+  case Token::END_OF_FILE:
+    return "END_OF_FILE";
   default:
-    throw std::runtime_error(std::string("unexpected token: ")+std::to_string(static_cast<int>(token)));
+    throw std::runtime_error(std::string("unexpected token: ") +
+                             std::to_string(static_cast<int>(token)));
   }
 }
 
@@ -147,46 +189,53 @@ static bool isBinaryOp(Token token) {
 //===---------------------------------------------------------------------===//
 
 struct CharConstError : public Error {
-  CharConstError(Location location) : Error(location, "bad character constant") {}
+  CharConstError(Location location)
+      : Error(location, "bad character constant") {}
 };
 
 struct TokenError : public Error {
-  TokenError(Location location, std::string message) : Error(location, message) {}
+  TokenError(Location location, std::string message)
+      : Error(location, message) {}
 };
 
 struct UnexpectedTokenError : public Error {
-  UnexpectedTokenError(Location location, Token expectedToken, Token gotToken) :
-      Error(location, fmt::format("expected token {}, got {}", tokenEnumStr(expectedToken), tokenEnumStr(gotToken))) {}
+  UnexpectedTokenError(Location location, Token expectedToken, Token gotToken)
+      : Error(location, fmt::format("expected token {}, got {}",
+                                    tokenEnumStr(expectedToken),
+                                    tokenEnumStr(gotToken))) {}
 };
 
 struct ExpectedNameError : public Error {
-  ExpectedNameError(Location location, Token token) :
-    Error(location, fmt::format("expected name but got {}", tokenEnumStr(token))) {}
+  ExpectedNameError(Location location, Token token)
+      : Error(location,
+              fmt::format("expected name but got {}", tokenEnumStr(token))) {}
 };
 
 struct ParserTokenError : public Error {
-  ParserTokenError(Location location, std::string message, Token token) :
-    Error(location, fmt::format("{}, got {}", message, tokenEnumStr(token))) {}
+  ParserTokenError(Location location, std::string message, Token token)
+      : Error(location,
+              fmt::format("{}, got {}", message, tokenEnumStr(token))) {}
 };
 
 struct SemanticTokenError : public Error {
-  SemanticTokenError(Location location, std::string message, Token token) :
-    Error(location, fmt::format("{}, got {}", message, tokenEnumStr(token))) {}
+  SemanticTokenError(Location location, std::string message, Token token)
+      : Error(location,
+              fmt::format("{}, got {}", message, tokenEnumStr(token))) {}
 };
 
 struct UnknownSymbolError : public Error {
-  UnknownSymbolError(Location location, std::string name) :
-    Error(location, fmt::format("could not find symbol {}", name)) {}
+  UnknownSymbolError(Location location, std::string name)
+      : Error(location, fmt::format("could not find symbol {}", name)) {}
 };
 
 struct NonConstArrayLengthError : public Error {
-  NonConstArrayLengthError(Location location, std::string name) :
-    Error(location, fmt::format("array {} length is not constant", name)) {}
+  NonConstArrayLengthError(Location location, std::string name)
+      : Error(location, fmt::format("array {} length is not constant", name)) {}
 };
 
 struct InvalidSyscallError : public Error {
-  InvalidSyscallError(Location location, int sysCallId) :
-    Error(location, fmt::format("invalid syscall: {}", sysCallId)) {}
+  InvalidSyscallError(Location location, int sysCallId)
+      : Error(location, fmt::format("invalid syscall: {}", sysCallId)) {}
 };
 
 //===---------------------------------------------------------------------===//
@@ -214,36 +263,36 @@ public:
 
 class Lexer {
 
-  TokenTable                    table;
+  TokenTable table;
   std::unique_ptr<std::istream> file;
-  char                          lastChar;
-  std::string                   identifier;
-  std::string                   string;
-  unsigned                      value;
-  Token                         lastToken;
-  size_t                        currentLineNumber;
-  size_t                        currentCharNumber;
-  std::string                   currentLine;
+  char lastChar;
+  std::string identifier;
+  std::string string;
+  unsigned value;
+  Token lastToken;
+  size_t currentLineNumber;
+  size_t currentCharNumber;
+  std::string currentLine;
 
   void declareKeywords() {
-    table.insert("and",    Token::AND);
-    table.insert("array",  Token::ARRAY);
-    table.insert("do",     Token::DO);
-    table.insert("else",   Token::ELSE);
-    table.insert("false",  Token::FALSE);
-    table.insert("func",   Token::FUNC);
-    table.insert("if",     Token::IF);
-    table.insert("is",     Token::IS);
-    table.insert("or",     Token::OR);
-    table.insert("proc",   Token::PROC);
+    table.insert("and", Token::AND);
+    table.insert("array", Token::ARRAY);
+    table.insert("do", Token::DO);
+    table.insert("else", Token::ELSE);
+    table.insert("false", Token::FALSE);
+    table.insert("func", Token::FUNC);
+    table.insert("if", Token::IF);
+    table.insert("is", Token::IS);
+    table.insert("or", Token::OR);
+    table.insert("proc", Token::PROC);
     table.insert("return", Token::RETURN);
-    table.insert("skip",   Token::SKIP);
-    table.insert("stop",   Token::STOP);
-    table.insert("then",   Token::THEN);
-    table.insert("true",   Token::TRUE);
-    table.insert("val",    Token::VAL);
-    table.insert("var",    Token::VAR);
-    table.insert("while",  Token::WHILE);
+    table.insert("skip", Token::SKIP);
+    table.insert("stop", Token::STOP);
+    table.insert("then", Token::THEN);
+    table.insert("true", Token::TRUE);
+    table.insert("val", Token::VAL);
+    table.insert("var", Token::VAR);
+    table.insert("while", Token::WHILE);
   }
 
   int readChar() {
@@ -256,17 +305,16 @@ class Lexer {
     return lastChar;
   }
 
-   void readDecInt() {
-      std::string number(1, lastChar);
-      while (std::isdigit(readChar())) {
-        number += lastChar;
-      }
-      value = std::strtoul(number.c_str(), nullptr, 10);
-   }
+  void readDecInt() {
+    std::string number(1, lastChar);
+    while (std::isdigit(readChar())) {
+      number += lastChar;
+    }
+    value = std::strtoul(number.c_str(), nullptr, 10);
+  }
 
   bool isHexDigit(char c) {
-    return ('0' <= c && c <= '9') ||
-           ('a' <= c && c <= 'z') ||
+    return ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') ||
            ('A' <= c && c <= 'Z');
   }
 
@@ -284,12 +332,24 @@ class Lexer {
       // Handle escape characters.
       readChar();
       switch (lastChar) {
-      case '\\': ch = '\\'; break;
-      case '\'': ch = '\''; break;
-      case '"':  ch = '"';  break;
-      case 't':  ch = '\t'; break;
-      case 'r':  ch = '\r'; break;
-      case 'n':  ch = '\n'; break;
+      case '\\':
+        ch = '\\';
+        break;
+      case '\'':
+        ch = '\'';
+        break;
+      case '"':
+        ch = '"';
+        break;
+      case 't':
+        ch = '\t';
+        break;
+      case 'r':
+        ch = '\r';
+        break;
+      case 'n':
+        ch = '\n';
+        break;
       default:
         throw CharConstError(getLocation());
       }
@@ -349,18 +409,51 @@ class Lexer {
       return Token::NUMBER;
     }
     Token token;
-    switch(lastChar) {
-    case '[': readChar(); token = Token::LBRACKET;  break;
-    case ']': readChar(); token = Token::RBRACKET;  break;
-    case '(': readChar(); token = Token::LPAREN;    break;
-    case ')': readChar(); token = Token::RPAREN;    break;
-    case '{': readChar(); token = Token::BEGIN;     break;
-    case '}': readChar(); token = Token::END;       break;
-    case ';': readChar(); token = Token::SEMICOLON; break;
-    case ',': readChar(); token = Token::COMMA;     break;
-    case '+': readChar(); token = Token::PLUS;      break;
-    case '-': readChar(); token = Token::MINUS;     break;
-    case '=': readChar(); token = Token::EQ;        break;
+    switch (lastChar) {
+    case '[':
+      readChar();
+      token = Token::LBRACKET;
+      break;
+    case ']':
+      readChar();
+      token = Token::RBRACKET;
+      break;
+    case '(':
+      readChar();
+      token = Token::LPAREN;
+      break;
+    case ')':
+      readChar();
+      token = Token::RPAREN;
+      break;
+    case '{':
+      readChar();
+      token = Token::BEGIN;
+      break;
+    case '}':
+      readChar();
+      token = Token::END;
+      break;
+    case ';':
+      readChar();
+      token = Token::SEMICOLON;
+      break;
+    case ',':
+      readChar();
+      token = Token::COMMA;
+      break;
+    case '+':
+      readChar();
+      token = Token::PLUS;
+      break;
+    case '-':
+      readChar();
+      token = Token::MINUS;
+      break;
+    case '=':
+      readChar();
+      token = Token::EQ;
+      break;
     case '<':
       if (readChar() == '=') {
         readChar();
@@ -412,7 +505,7 @@ class Lexer {
       readChar();
       break;
     case EOF:
-      if (auto ifstream = dynamic_cast<std::ifstream*>(file.get())) {
+      if (auto ifstream = dynamic_cast<std::ifstream *>(file.get())) {
         ifstream->close();
       }
       token = Token::END_OF_FILE;
@@ -420,20 +513,16 @@ class Lexer {
       currentLine.clear();
       break;
     default:
-      throw TokenError(getLocation(), std::string("unexpected character ")+lastChar);
+      throw TokenError(getLocation(),
+                       std::string("unexpected character ") + lastChar);
     }
     return token;
   }
 
 public:
+  Lexer() : currentLineNumber(0), currentCharNumber(0) { declareKeywords(); }
 
-  Lexer() : currentLineNumber(0), currentCharNumber(0) {
-    declareKeywords();
-  }
-
-  Token getNextToken() {
-    return lastToken = readToken();
-  }
+  Token getNextToken() { return lastToken = readToken(); }
 
   /// Open a file using ifstream.
   void openFile(const char *filename) {
@@ -446,9 +535,7 @@ public:
     readChar();
   }
 
-  void openFile(const std::string &filename) {
-    openFile(filename.c_str());
-  }
+  void openFile(const std::string &filename) { openFile(filename.c_str()); }
 
   /// Load a string using istringstream.
   void loadBuffer(const std::string &buffer) {
@@ -460,21 +547,21 @@ public:
   void emitTokens(std::ostream &out) {
     while (true) {
       switch (getNextToken()) {
-        case Token::IDENTIFIER:
-          out << "IDENTIFIER " << getIdentifier() << "\n";
-          break;
-        case Token::NUMBER:
-          out << "NUMBER " << getNumber() << "\n";
-          break;
-        case Token::STRING:
-          out << "STRING " << getString() << "\n";
-          break;
-        case Token::END_OF_FILE:
-          out << "EOF\n";
-          return;
-        default:
-          out << tokenEnumStr(getLastToken()) << "\n";
-          break;
+      case Token::IDENTIFIER:
+        out << "IDENTIFIER " << getIdentifier() << "\n";
+        break;
+      case Token::NUMBER:
+        out << "NUMBER " << getNumber() << "\n";
+        break;
+      case Token::STRING:
+        out << "STRING " << getString() << "\n";
+        break;
+      case Token::END_OF_FILE:
+        out << "EOF\n";
+        return;
+      default:
+        out << tokenEnumStr(getLastToken()) << "\n";
+        break;
       }
     }
   }
@@ -487,8 +574,9 @@ public:
   size_t getCharNumber() const { return currentCharNumber; }
   bool hasLine() const { return !currentLine.empty(); }
   const std::string &getLine() const { return currentLine; }
-  const Location getLocation() const { return Location(currentLineNumber,
-                                                       currentCharNumber); }
+  const Location getLocation() const {
+    return Location(currentLineNumber, currentCharNumber);
+  }
 };
 
 //===---------------------------------------------------------------------===//
@@ -525,7 +613,7 @@ class AssStatement;
 
 /// A visitor base class for the AST.
 class AstVisitor {
-  bool recurseOp; // Expr
+  bool recurseOp;    // Expr
   bool recurseCalls; // Expr
   bool recurseStmts; // Stmts
   // Track the current scope.
@@ -535,14 +623,17 @@ class AstVisitor {
   std::unique_ptr<Expr> exprReplacement;
 
 public:
-  AstVisitor(bool recurseOp=true, bool recurseCalls=true, bool recurseStmts=true) :
-    recurseOp(recurseOp), recurseCalls(recurseCalls), recurseStmts(recurseStmts),
-    exprReplacement(nullptr) {}
+  AstVisitor(bool recurseOp = true, bool recurseCalls = true,
+             bool recurseStmts = true)
+      : recurseOp(recurseOp), recurseCalls(recurseCalls),
+        recurseStmts(recurseStmts), exprReplacement(nullptr) {}
   bool shouldRecurseOp() const { return recurseOp; }
   bool shouldRecurseCalls() const { return recurseCalls; }
   bool shouldRecurseStmts() const { return recurseStmts; }
   bool hasExprReplacement() const { return exprReplacement != nullptr; }
-  void setExprReplacement(std::unique_ptr<Expr> expr) { exprReplacement = std::move(expr); }
+  void setExprReplacement(std::unique_ptr<Expr> expr) {
+    exprReplacement = std::move(expr);
+  }
   std::unique_ptr<Expr> &getExprReplacement() { return exprReplacement; }
   // Scoping
   void enterProgram() { scope.push(""); }
@@ -554,66 +645,67 @@ public:
     return scope.top();
   }
   // Vist methods.
-  virtual void visitPre(Program&) {}
-  virtual void visitPost(Program&) {}
-  virtual void visitPre(Proc&) {}
-  virtual void visitPost(Proc&) {}
-  virtual void visitPre(ArrayDecl&) {}
-  virtual void visitPost(ArrayDecl&) {}
-  virtual void visitPre(VarDecl&) {}
-  virtual void visitPost(VarDecl&) {}
-  virtual void visitPre(ValDecl&) {}
-  virtual void visitPost(ValDecl&) {}
-  virtual void visitPre(BinaryOpExpr&) {}
-  virtual void visitPost(BinaryOpExpr&) {}
-  virtual void visitPre(UnaryOpExpr&) {}
-  virtual void visitPost(UnaryOpExpr&) {}
-  virtual void visitPre(StringExpr&) {}
-  virtual void visitPost(StringExpr&) {}
-  virtual void visitPre(BooleanExpr&) {}
-  virtual void visitPost(BooleanExpr&) {}
-  virtual void visitPre(NumberExpr&) {}
-  virtual void visitPost(NumberExpr&) {}
-  virtual void visitPre(CallExpr&) {}
-  virtual void visitPost(CallExpr&) {}
-  virtual void visitPre(ArraySubscriptExpr&) {}
-  virtual void visitPost(ArraySubscriptExpr&) {}
-  virtual void visitPre(VarRefExpr&) {}
-  virtual void visitPost(VarRefExpr&) {}
-  virtual void visitPre(ValFormal&) {}
-  virtual void visitPost(ValFormal&) {}
-  virtual void visitPre(ArrayFormal&) {}
-  virtual void visitPost(ArrayFormal&) {}
-  virtual void visitPre(ProcFormal&) {}
-  virtual void visitPost(ProcFormal&) {}
-  virtual void visitPre(FuncFormal&) {}
-  virtual void visitPost(FuncFormal&) {}
-  virtual void visitPre(SkipStatement&) {}
-  virtual void visitPost(SkipStatement&) {}
-  virtual void visitPre(StopStatement&) {}
-  virtual void visitPost(StopStatement&) {}
-  virtual void visitPre(ReturnStatement&) {}
-  virtual void visitPost(ReturnStatement&) {}
-  virtual void visitPre(IfStatement&) {}
-  virtual void visitPost(IfStatement&) {}
-  virtual void visitPre(WhileStatement&) {}
-  virtual void visitPost(WhileStatement&) {}
-  virtual void visitPre(SeqStatement&) {}
-  virtual void visitPost(SeqStatement&) {}
-  virtual void visitPre(CallStatement&) {}
-  virtual void visitPost(CallStatement&) {}
-  virtual void visitPre(AssStatement&) {}
-  virtual void visitPost(AssStatement&) {}
+  virtual void visitPre(Program &) {}
+  virtual void visitPost(Program &) {}
+  virtual void visitPre(Proc &) {}
+  virtual void visitPost(Proc &) {}
+  virtual void visitPre(ArrayDecl &) {}
+  virtual void visitPost(ArrayDecl &) {}
+  virtual void visitPre(VarDecl &) {}
+  virtual void visitPost(VarDecl &) {}
+  virtual void visitPre(ValDecl &) {}
+  virtual void visitPost(ValDecl &) {}
+  virtual void visitPre(BinaryOpExpr &) {}
+  virtual void visitPost(BinaryOpExpr &) {}
+  virtual void visitPre(UnaryOpExpr &) {}
+  virtual void visitPost(UnaryOpExpr &) {}
+  virtual void visitPre(StringExpr &) {}
+  virtual void visitPost(StringExpr &) {}
+  virtual void visitPre(BooleanExpr &) {}
+  virtual void visitPost(BooleanExpr &) {}
+  virtual void visitPre(NumberExpr &) {}
+  virtual void visitPost(NumberExpr &) {}
+  virtual void visitPre(CallExpr &) {}
+  virtual void visitPost(CallExpr &) {}
+  virtual void visitPre(ArraySubscriptExpr &) {}
+  virtual void visitPost(ArraySubscriptExpr &) {}
+  virtual void visitPre(VarRefExpr &) {}
+  virtual void visitPost(VarRefExpr &) {}
+  virtual void visitPre(ValFormal &) {}
+  virtual void visitPost(ValFormal &) {}
+  virtual void visitPre(ArrayFormal &) {}
+  virtual void visitPost(ArrayFormal &) {}
+  virtual void visitPre(ProcFormal &) {}
+  virtual void visitPost(ProcFormal &) {}
+  virtual void visitPre(FuncFormal &) {}
+  virtual void visitPost(FuncFormal &) {}
+  virtual void visitPre(SkipStatement &) {}
+  virtual void visitPost(SkipStatement &) {}
+  virtual void visitPre(StopStatement &) {}
+  virtual void visitPost(StopStatement &) {}
+  virtual void visitPre(ReturnStatement &) {}
+  virtual void visitPost(ReturnStatement &) {}
+  virtual void visitPre(IfStatement &) {}
+  virtual void visitPost(IfStatement &) {}
+  virtual void visitPre(WhileStatement &) {}
+  virtual void visitPost(WhileStatement &) {}
+  virtual void visitPre(SeqStatement &) {}
+  virtual void visitPost(SeqStatement &) {}
+  virtual void visitPre(CallStatement &) {}
+  virtual void visitPost(CallStatement &) {}
+  virtual void visitPre(AssStatement &) {}
+  virtual void visitPost(AssStatement &) {}
 };
 
 /// AST node base class.
 class AstNode {
   Location location;
+
 public:
   AstNode() : location(Location(0, 0)) {}
   AstNode(Location location) : location(location) {}
   virtual ~AstNode() = default;
-  virtual void accept(AstVisitor* visitor) = 0;
+  virtual void accept(AstVisitor *visitor) = 0;
   const Location &getLocation() const { return location; }
   void replaceExpr(std::unique_ptr<Expr> &expr, AstVisitor *visitor) {
     // If the visitor wishes to replcae the expression, it will have created a
@@ -628,10 +720,13 @@ public:
 
 class Expr : public AstNode {
   std::optional<int> constValue;
+
 public:
   Expr(Location location) : AstNode(location), constValue(std::nullopt) {}
   bool isConst() const { return constValue.has_value(); }
-  bool isConstZero() const { return constValue.has_value() && constValue.value() == 0; }
+  bool isConstZero() const {
+    return constValue.has_value() && constValue.value() == 0;
+  }
   int getValue() const { return constValue.value(); }
   void setValue(int newConstValue) { constValue.emplace(newConstValue); }
 };
@@ -639,12 +734,14 @@ public:
 class VarRefExpr : public Expr {
   std::string name;
   std::unique_ptr<Expr> expr;
+
 public:
-  VarRefExpr(Location location, std::string name) : Expr(location), name(name) {}
+  VarRefExpr(Location location, std::string name)
+      : Expr(location), name(name) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    //expr->accept(visitor);
-    //replaceExpr(expr, visitor);
+    // expr->accept(visitor);
+    // replaceExpr(expr, visitor);
     visitor->visitPost(*this);
   }
   const std::string &getName() const { return name; }
@@ -653,9 +750,11 @@ public:
 class ArraySubscriptExpr : public Expr {
   std::string name;
   std::unique_ptr<Expr> expr;
+
 public:
-  ArraySubscriptExpr(Location location, std::string name, std::unique_ptr<Expr> expr) :
-      Expr(location), name(name), expr(std::move(expr)) {}
+  ArraySubscriptExpr(Location location, std::string name,
+                     std::unique_ptr<Expr> expr)
+      : Expr(location), name(name), expr(std::move(expr)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     expr->accept(visitor);
@@ -670,15 +769,18 @@ class CallExpr : public Expr {
   int sysCallId;
   std::string name;
   std::vector<std::unique_ptr<Expr>> args;
+
 public:
-  CallExpr(Location location, int sysCallId) :
-      Expr(location), sysCallId(sysCallId) {}
-  CallExpr(Location location, int sysCallId, std::vector<std::unique_ptr<Expr>> args) :
-      Expr(location), sysCallId(sysCallId), args(std::move(args)) {}
-  CallExpr(Location location, std::string name) :
-      Expr(location), sysCallId(-1), name(name) {}
-  CallExpr(Location location, std::string name, std::vector<std::unique_ptr<Expr>> args) :
-      Expr(location), sysCallId(-1), name(name), args(std::move(args)) {}
+  CallExpr(Location location, int sysCallId)
+      : Expr(location), sysCallId(sysCallId) {}
+  CallExpr(Location location, int sysCallId,
+           std::vector<std::unique_ptr<Expr>> args)
+      : Expr(location), sysCallId(sysCallId), args(std::move(args)) {}
+  CallExpr(Location location, std::string name)
+      : Expr(location), sysCallId(-1), name(name) {}
+  CallExpr(Location location, std::string name,
+           std::vector<std::unique_ptr<Expr>> args)
+      : Expr(location), sysCallId(-1), name(name), args(std::move(args)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     if (visitor->shouldRecurseCalls()) {
@@ -698,9 +800,10 @@ public:
 
 class NumberExpr : public Expr {
   unsigned value;
+
 public:
-  NumberExpr(Location location, unsigned value) :
-      Expr(location), value(value) {}
+  NumberExpr(Location location, unsigned value)
+      : Expr(location), value(value) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -710,9 +813,9 @@ public:
 
 class BooleanExpr : public Expr {
   bool value;
+
 public:
-  BooleanExpr(Location location, bool value) :
-      Expr(location), value(value) {}
+  BooleanExpr(Location location, bool value) : Expr(location), value(value) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -722,9 +825,10 @@ public:
 
 class StringExpr : public Expr {
   std::string value;
+
 public:
-  StringExpr(Location location, std::string value) :
-      Expr(location), value(value) {}
+  StringExpr(Location location, std::string value)
+      : Expr(location), value(value) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -735,9 +839,10 @@ public:
 class UnaryOpExpr : public Expr {
   Token op;
   std::unique_ptr<Expr> element;
+
 public:
-  UnaryOpExpr(Location location, Token op, std::unique_ptr<Expr> element) :
-      Expr(location), op(op), element(std::move(element)) {}
+  UnaryOpExpr(Location location, Token op, std::unique_ptr<Expr> element)
+      : Expr(location), op(op), element(std::move(element)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     if (!isConst() && visitor->shouldRecurseOp()) {
@@ -753,9 +858,11 @@ public:
 class BinaryOpExpr : public Expr {
   Token op;
   std::unique_ptr<Expr> LHS, RHS;
+
 public:
-  BinaryOpExpr(Location location, Token op, std::unique_ptr<Expr> LHS, std::unique_ptr<Expr> RHS) :
-      Expr(location), op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+  BinaryOpExpr(Location location, Token op, std::unique_ptr<Expr> LHS,
+               std::unique_ptr<Expr> RHS)
+      : Expr(location), op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     if (!isConst() && visitor->shouldRecurseOp()) {
@@ -777,6 +884,7 @@ public:
 
 class Decl : public AstNode {
   std::string name;
+
 public:
   Decl(Location location, std::string name) : AstNode(location), name(name) {}
   std::string getName() const { return name; }
@@ -785,9 +893,10 @@ public:
 class ValDecl : public Decl {
   std::unique_ptr<Expr> expr;
   int exprValue;
+
 public:
-  ValDecl(Location location, std::string name, std::unique_ptr<Expr> expr) :
-      Decl(location, name), expr(std::move(expr)) {}
+  ValDecl(Location location, std::string name, std::unique_ptr<Expr> expr)
+      : Decl(location, name), expr(std::move(expr)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     expr->accept(visitor);
@@ -810,9 +919,10 @@ public:
 
 class ArrayDecl : public Decl {
   std::unique_ptr<Expr> expr;
+
 public:
-  ArrayDecl(Location location, std::string name, std::unique_ptr<Expr> expr) :
-      Decl(location, name), expr(std::move(expr)) {}
+  ArrayDecl(Location location, std::string name, std::unique_ptr<Expr> expr)
+      : Decl(location, name), expr(std::move(expr)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     expr->accept(visitor);
@@ -831,6 +941,7 @@ public:
 
 class Formal : public AstNode {
   std::string name;
+
 public:
   Formal(Location location, std::string name) : AstNode(location), name(name) {}
   std::string getName() const { return name; }
@@ -898,9 +1009,10 @@ public:
 
 class ReturnStatement : public Statement {
   std::unique_ptr<Expr> expr;
+
 public:
-  ReturnStatement(Location location, std::unique_ptr<Expr> expr) :
-      Statement(location), expr(std::move(expr)) {}
+  ReturnStatement(Location location, std::unique_ptr<Expr> expr)
+      : Statement(location), expr(std::move(expr)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     if (visitor->shouldRecurseStmts()) {
@@ -912,20 +1024,17 @@ public:
   Expr *getExpr() { return expr.get(); }
 };
 
-
 class IfStatement : public Statement {
   std::unique_ptr<Expr> condition;
   std::unique_ptr<Statement> thenStmt;
   std::unique_ptr<Statement> elseStmt;
+
 public:
-  IfStatement(Location location,
-              std::unique_ptr<Expr> condition,
+  IfStatement(Location location, std::unique_ptr<Expr> condition,
               std::unique_ptr<Statement> thenStmt,
-              std::unique_ptr<Statement> elseStmt) :
-      Statement(location),
-      condition(std::move(condition)),
-      thenStmt(std::move(thenStmt)),
-      elseStmt(std::move(elseStmt)) {}
+              std::unique_ptr<Statement> elseStmt)
+      : Statement(location), condition(std::move(condition)),
+        thenStmt(std::move(thenStmt)), elseStmt(std::move(elseStmt)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     if (visitor->shouldRecurseStmts()) {
@@ -944,13 +1053,12 @@ public:
 class WhileStatement : public Statement {
   std::unique_ptr<Expr> condition;
   std::unique_ptr<Statement> stmt;
+
 public:
-  WhileStatement(Location location, 
-                 std::unique_ptr<Expr> condition,
-                 std::unique_ptr<Statement> stmt) :
-      Statement(location),
-      condition(std::move(condition)),
-      stmt(std::move(stmt)) {}
+  WhileStatement(Location location, std::unique_ptr<Expr> condition,
+                 std::unique_ptr<Statement> stmt)
+      : Statement(location), condition(std::move(condition)),
+        stmt(std::move(stmt)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     if (visitor->shouldRecurseStmts()) {
@@ -966,9 +1074,10 @@ public:
 
 class SeqStatement : public Statement {
   std::vector<std::unique_ptr<Statement>> stmts;
+
 public:
-  SeqStatement(Location location, std::vector<std::unique_ptr<Statement>> stmts) :
-      Statement(location), stmts(std::move(stmts)) {}
+  SeqStatement(Location location, std::vector<std::unique_ptr<Statement>> stmts)
+      : Statement(location), stmts(std::move(stmts)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     for (auto &stmt : stmts) {
@@ -980,9 +1089,10 @@ public:
 
 class CallStatement : public Statement {
   std::unique_ptr<CallExpr> call;
+
 public:
-  CallStatement(Location location, std::unique_ptr<CallExpr> call) :
-      Statement(location), call(std::move(call)) {}
+  CallStatement(Location location, std::unique_ptr<CallExpr> call)
+      : Statement(location), call(std::move(call)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     if (visitor->shouldRecurseStmts()) {
@@ -996,11 +1106,11 @@ public:
 
 class AssStatement : public Statement {
   std::unique_ptr<Expr> LHS, RHS;
+
 public:
-  AssStatement(Location location,
-               std::unique_ptr<Expr> LHS,
-               std::unique_ptr<Expr> RHS) :
-      Statement(location), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+  AssStatement(Location location, std::unique_ptr<Expr> LHS,
+               std::unique_ptr<Expr> RHS)
+      : Statement(location), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     if (visitor->shouldRecurseStmts()) {
@@ -1023,16 +1133,15 @@ class Proc : public AstNode {
   std::vector<std::unique_ptr<Formal>> formals;
   std::vector<std::unique_ptr<Decl>> decls;
   std::unique_ptr<Statement> statement;
+
 public:
-  Proc(Location location,
-       bool isFunction,
-       std::string name,
+  Proc(Location location, bool isFunction, std::string name,
        std::vector<std::unique_ptr<Formal>> formals,
        std::vector<std::unique_ptr<Decl>> decls,
-       std::unique_ptr<Statement> statement) :
-      AstNode(location), function(isFunction), name(name),
-      formals(std::move(formals)), decls(std::move(decls)),
-      statement(std::move(statement)) {}
+       std::unique_ptr<Statement> statement)
+      : AstNode(location), function(isFunction), name(name),
+        formals(std::move(formals)), decls(std::move(decls)),
+        statement(std::move(statement)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->enterProc(name);
@@ -1056,10 +1165,11 @@ public:
 class Program : public AstNode {
   std::vector<std::unique_ptr<Decl>> globalDecls;
   std::vector<std::unique_ptr<Proc>> procDecls;
+
 public:
   Program(std::vector<std::unique_ptr<Decl>> globals,
-          std::vector<std::unique_ptr<Proc>> procs) :
-      globalDecls(std::move(globals)), procDecls(std::move(procs)) {}
+          std::vector<std::unique_ptr<Proc>> procs)
+      : globalDecls(std::move(globals)), procDecls(std::move(procs)) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->enterProgram();
@@ -1080,7 +1190,7 @@ class AstPrinter : public AstVisitor {
   std::ostream outs;
   unsigned indentCount;
   void indent() {
-    for (size_t i=0; i<indentCount; i++) {
+    for (size_t i = 0; i < indentCount; i++) {
       outs << "  ";
     }
   }
@@ -1090,161 +1200,168 @@ class AstPrinter : public AstVisitor {
   std::string locString(const AstNode &node) {
     return fmt::format(" [loc={}]", node.getLocation().str());
   }
+
 public:
-  AstPrinter(std::ostream& outs = std::cout) :
-      outs(outs.rdbuf()), indentCount(0) {}
+  AstPrinter(std::ostream &outs = std::cout)
+      : outs(outs.rdbuf()), indentCount(0) {}
   void visitPre(Program &decl) override {
-    indent(); outs << "program\n";
+    indent();
+    outs << "program\n";
     indentCount++;
   };
-  void visitPost(Program &decl) override {
-    indentCount--;
-  }
+  void visitPost(Program &decl) override { indentCount--; }
   void visitPre(Proc &decl) override {
-    indent(); outs << fmt::format("proc {}{}\n", decl.getName(), locString(decl));
+    indent();
+    outs << fmt::format("proc {}{}\n", decl.getName(), locString(decl));
     indentCount++;
   };
-  void visitPost(Proc &decl) override {
-    indentCount--;
-  }
+  void visitPost(Proc &decl) override { indentCount--; }
   void visitPre(ArrayDecl &decl) override {
-    indent(); outs << fmt::format("arraydecl {}{}\n", decl.getName(), locString(decl));
+    indent();
+    outs << fmt::format("arraydecl {}{}\n", decl.getName(), locString(decl));
     indentCount++;
   };
-  void visitPost(ArrayDecl &decl) override {
-    indentCount--;
-  }
+  void visitPost(ArrayDecl &decl) override { indentCount--; }
   void visitPre(VarDecl &decl) override {
-    indent(); outs << fmt::format("vardecl {}{}\n", decl.getName(), locString(decl));
+    indent();
+    outs << fmt::format("vardecl {}{}\n", decl.getName(), locString(decl));
   };
-  void visitPost(VarDecl &decl) override { }
+  void visitPost(VarDecl &decl) override {}
   void visitPre(ValDecl &decl) override {
-    indent(); outs << fmt::format("valdecl {}{}\n", decl.getName(), locString(decl));
+    indent();
+    outs << fmt::format("valdecl {}{}\n", decl.getName(), locString(decl));
     indentCount++;
   };
-  void visitPost(ValDecl &decl) override {
-    indentCount--;
-  }
+  void visitPost(ValDecl &decl) override { indentCount--; }
   void visitPre(BinaryOpExpr &expr) override {
-    indent(); outs << fmt::format("binaryop {}{}{}\n",
-                        tokenEnumStr(expr.getOp()), exprValString(expr), locString(expr));
+    indent();
+    outs << fmt::format("binaryop {}{}{}\n", tokenEnumStr(expr.getOp()),
+                        exprValString(expr), locString(expr));
     indentCount++;
   };
-  void visitPost(BinaryOpExpr &expr) override {
-    indentCount--;
-  }
+  void visitPost(BinaryOpExpr &expr) override { indentCount--; }
   void visitPre(UnaryOpExpr &expr) override {
-    indent(); outs << fmt::format("unaryop {}{}{}\n",
-                        tokenEnumStr(expr.getOp()), exprValString(expr), locString(expr));
+    indent();
+    outs << fmt::format("unaryop {}{}{}\n", tokenEnumStr(expr.getOp()),
+                        exprValString(expr), locString(expr));
     indentCount++;
   };
-  void visitPost(UnaryOpExpr &expr) override {
-    indentCount--;
-  }
+  void visitPost(UnaryOpExpr &expr) override { indentCount--; }
   void visitPre(StringExpr &expr) override {
-    indent(); outs << fmt::format("string {}{}\n", expr.getValue(), locString(expr));
+    indent();
+    outs << fmt::format("string {}{}\n", expr.getValue(), locString(expr));
   };
-  void visitPost(StringExpr &expr) override { }
+  void visitPost(StringExpr &expr) override {}
   void visitPre(BooleanExpr &expr) override {
-    indent(); outs << fmt::format("boolean {}{}\n", expr.getValue(), locString(expr));
+    indent();
+    outs << fmt::format("boolean {}{}\n", expr.getValue(), locString(expr));
   };
-  void visitPost(BooleanExpr &expr) override { }
+  void visitPost(BooleanExpr &expr) override {}
   void visitPre(NumberExpr &expr) override {
-    indent(); outs << fmt::format("number {}{}\n", expr.getValue(), locString(expr));
+    indent();
+    outs << fmt::format("number {}{}\n", expr.getValue(), locString(expr));
   };
-  void visitPost(NumberExpr &expr) override { }
+  void visitPost(NumberExpr &expr) override {}
   void visitPre(CallExpr &expr) override {
     if (expr.isSysCall()) {
-      indent(); outs << fmt::format("syscall {}{}\n", expr.getSysCallId(), locString(expr));
+      indent();
+      outs << fmt::format("syscall {}{}\n", expr.getSysCallId(),
+                          locString(expr));
     } else {
-      indent(); outs << fmt::format("call {}{}\n", expr.getName(), locString(expr));
+      indent();
+      outs << fmt::format("call {}{}\n", expr.getName(), locString(expr));
     }
     indentCount++;
   };
-  void visitPost(CallExpr &expr) override {
-    indentCount--;
-  }
+  void visitPost(CallExpr &expr) override { indentCount--; }
   void visitPre(ArraySubscriptExpr &expr) override {
-    indent(); outs << fmt::format("arraysubscript {}{}\n", expr.getName(), locString(expr));
+    indent();
+    outs << fmt::format("arraysubscript {}{}\n", expr.getName(),
+                        locString(expr));
     indentCount++;
   };
-  void visitPost(ArraySubscriptExpr &expr) override {
-    indentCount--;
-  }
+  void visitPost(ArraySubscriptExpr &expr) override { indentCount--; }
   void visitPre(VarRefExpr &expr) override {
-    indent(); outs << fmt::format("varref {}{}\n", expr.getName(), locString(expr));
+    indent();
+    outs << fmt::format("varref {}{}\n", expr.getName(), locString(expr));
   };
-  void visitPost(VarRefExpr &expr) override { }
+  void visitPost(VarRefExpr &expr) override {}
   void visitPre(ValFormal &formal) override {
-    indent(); outs << fmt::format("valformal {}{}\n", formal.getName(), locString(formal));
+    indent();
+    outs << fmt::format("valformal {}{}\n", formal.getName(),
+                        locString(formal));
   };
   void visitPost(ValFormal &formal) override {};
   void visitPre(ArrayFormal &formal) override {
-    indent(); outs << fmt::format("arrayformal {}{}\n", formal.getName(), locString(formal));
+    indent();
+    outs << fmt::format("arrayformal {}{}\n", formal.getName(),
+                        locString(formal));
   };
   void visitPost(ArrayFormal &formal) override {};
   void visitPre(ProcFormal &formal) override {
-    indent(); outs << fmt::format("procformal {}{}\n", formal.getName(), locString(formal));
+    indent();
+    outs << fmt::format("procformal {}{}\n", formal.getName(),
+                        locString(formal));
   };
   void visitPost(ProcFormal &formal) override {};
   void visitPre(FuncFormal &formal) override {
-    indent(); outs << fmt::format("funcformal {}{}\n", formal.getName(), locString(formal));
+    indent();
+    outs << fmt::format("funcformal {}{}\n", formal.getName(),
+                        locString(formal));
   };
   void visitPost(FuncFormal &formal) override {};
   void visitPre(SkipStatement &stmt) override {
-    indent(); outs << fmt::format("skipstmt{}\n", locString(stmt));
+    indent();
+    outs << fmt::format("skipstmt{}\n", locString(stmt));
   };
   void visitPost(SkipStatement &stmt) override {};
   void visitPre(StopStatement &stmt) override {
-    indent(); outs << fmt::format("stopstmt{}\n", locString(stmt));
+    indent();
+    outs << fmt::format("stopstmt{}\n", locString(stmt));
   };
   void visitPost(StopStatement &stmt) override {};
   void visitPre(ReturnStatement &stmt) override {
-    indent(); outs << fmt::format("returnstmt{}\n", locString(stmt));
+    indent();
+    outs << fmt::format("returnstmt{}\n", locString(stmt));
     indentCount++;
   };
-  void visitPost(ReturnStatement &stmt) override {
-    indentCount--;
-  };
+  void visitPost(ReturnStatement &stmt) override { indentCount--; };
   void visitPre(IfStatement &stmt) override {
-    indent(); outs << fmt::format("ifstmt{}\n", locString(stmt));
+    indent();
+    outs << fmt::format("ifstmt{}\n", locString(stmt));
     indentCount++;
   };
-  void visitPost(IfStatement &stmt) override {
-    indentCount--;
-  };
+  void visitPost(IfStatement &stmt) override { indentCount--; };
   void visitPre(WhileStatement &stmt) override {
-    indent(); outs << fmt::format("whilestmt{}\n", locString(stmt));
+    indent();
+    outs << fmt::format("whilestmt{}\n", locString(stmt));
     indentCount++;
   };
-  void visitPost(WhileStatement &stmt) override {
-    indentCount--;
-  };
+  void visitPost(WhileStatement &stmt) override { indentCount--; };
   void visitPre(SeqStatement &stmt) override {
-    indent(); outs << fmt::format("seqstmt{}\n", locString(stmt));
+    indent();
+    outs << fmt::format("seqstmt{}\n", locString(stmt));
     indentCount++;
   };
-  void visitPost(SeqStatement &stmt) override {
-    indentCount--;
-  };
+  void visitPost(SeqStatement &stmt) override { indentCount--; };
   void visitPre(CallStatement &stmt) override {
     if (stmt.getCall()->isSysCall()) {
-      indent(); outs << fmt::format("syscallstmt {}{}\n", stmt.getCall()->getSysCallId(), locString(stmt));
+      indent();
+      outs << fmt::format("syscallstmt {}{}\n", stmt.getCall()->getSysCallId(),
+                          locString(stmt));
     } else {
-      indent(); outs << fmt::format("callstmt {}\n", locString(stmt));
+      indent();
+      outs << fmt::format("callstmt {}\n", locString(stmt));
     }
     indentCount++;
   };
-  void visitPost(CallStatement &stmt) override {
-    indentCount--;
-  };
+  void visitPost(CallStatement &stmt) override { indentCount--; };
   void visitPre(AssStatement &stmt) override {
-    indent(); outs << fmt::format("assstmt{}\n", locString(stmt));
+    indent();
+    outs << fmt::format("assstmt{}\n", locString(stmt));
     indentCount++;
   };
-  void visitPost(AssStatement &stmt) override {
-    indentCount--;
-  };
+  void visitPost(AssStatement &stmt) override { indentCount--; };
 };
 
 //===---------------------------------------------------------------------===//
@@ -1257,7 +1374,8 @@ class Parser {
   /// Expect the given last token, otherwise raise an error.
   void expect(Token token) const {
     if (token != lexer.getLastToken()) {
-      throw UnexpectedTokenError(lexer.getLocation(), token, lexer.getLastToken());
+      throw UnexpectedTokenError(lexer.getLocation(), token,
+                                 lexer.getLastToken());
     }
     lexer.getNextToken();
   }
@@ -1275,9 +1393,7 @@ class Parser {
 
   /// Associative operators can be chained (eg a + b + c + d).
   bool isAssociative(Token op) const {
-    return op == Token::AND ||
-           op == Token::OR ||
-           op == Token::PLUS;
+    return op == Token::AND || op == Token::OR || op == Token::PLUS;
   }
 
   /// There is no operator associativity, so chains of associative operators
@@ -1291,7 +1407,8 @@ class Parser {
     if (isAssociative(op) && op == lexer.getLastToken()) {
       lexer.getNextToken();
       auto RHS = parseBinOpRHS(op);
-      return std::make_unique<BinaryOpExpr>(location, op, std::move(element), std::move(RHS));
+      return std::make_unique<BinaryOpExpr>(location, op, std::move(element),
+                                            std::move(RHS));
     } else {
       return element;
     }
@@ -1309,12 +1426,14 @@ class Parser {
       auto location = lexer.getLocation();
       lexer.getNextToken();
       auto element = parseElement();
-      return std::make_unique<UnaryOpExpr>(location, Token::MINUS, std::move(element));
+      return std::make_unique<UnaryOpExpr>(location, Token::MINUS,
+                                           std::move(element));
     }
     if (lexer.getLastToken() == Token::NOT) {
       lexer.getNextToken();
       auto element = parseElement();
-      return std::make_unique<UnaryOpExpr>(location, Token::NOT, std::move(element));
+      return std::make_unique<UnaryOpExpr>(location, Token::NOT,
+                                           std::move(element));
     }
     auto element = parseElement();
     auto op = lexer.getLastToken();
@@ -1322,7 +1441,8 @@ class Parser {
       // Binary operation.
       lexer.getNextToken();
       auto RHS = parseBinOpRHS(op);
-      return std::make_unique<BinaryOpExpr>(location, op, std::move(element), std::move(RHS));
+      return std::make_unique<BinaryOpExpr>(location, op, std::move(element),
+                                            std::move(RHS));
     }
     // Otherwise just return an element.
     return element;
@@ -1361,8 +1481,9 @@ class Parser {
         lexer.getNextToken();
         auto expr = parseExpr();
         expect(Token::RBRACKET);
-        return std::make_unique<ArraySubscriptExpr>(location, name, std::move(expr));
-      // Procedure call.
+        return std::make_unique<ArraySubscriptExpr>(location, name,
+                                                    std::move(expr));
+        // Procedure call.
       } else if (lexer.getLastToken() == Token::LPAREN) {
         if (lexer.getNextToken() == Token::RPAREN) {
           lexer.getNextToken();
@@ -1370,9 +1491,10 @@ class Parser {
         } else {
           auto exprList = parseExprList();
           expect(Token::RPAREN);
-          return std::make_unique<CallExpr>(location, name, std::move(exprList));
+          return std::make_unique<CallExpr>(location, name,
+                                            std::move(exprList));
         }
-      // Variable reference.
+        // Variable reference.
       } else {
         return std::make_unique<VarRefExpr>(location, name);
       }
@@ -1388,7 +1510,8 @@ class Parser {
         } else {
           auto exprList = parseExprList();
           expect(Token::RPAREN);
-          return std::make_unique<CallExpr>(location, value, std::move(exprList));
+          return std::make_unique<CallExpr>(location, value,
+                                            std::move(exprList));
         }
       } else {
         // Number.
@@ -1411,7 +1534,8 @@ class Parser {
       return expr;
     }
     default:
-      throw ParserTokenError(location, "in expression element", lexer.getLastToken());
+      throw ParserTokenError(location, "in expression element",
+                             lexer.getLastToken());
     }
   }
 
@@ -1446,7 +1570,8 @@ class Parser {
       return std::make_unique<ArrayDecl>(location, name, std::move(expr));
     }
     default:
-      throw ParserTokenError(location, "invalid declaration", lexer.getLastToken());
+      throw ParserTokenError(location, "invalid declaration",
+                             lexer.getLastToken());
     }
   }
 
@@ -1484,7 +1609,7 @@ class Parser {
   ///   [0 <formal> "," ]
   std::vector<std::unique_ptr<Formal>> parseFormals() {
     std::vector<std::unique_ptr<Formal>> formals;
-      while (true) {
+    while (true) {
       formals.push_back(parseFormal());
       if (lexer.getLastToken() == Token::COMMA) {
         lexer.getNextToken();
@@ -1561,8 +1686,7 @@ class Parser {
       auto thenStmt = parseStatement();
       expect(Token::ELSE);
       auto elseStmt = parseStatement();
-      return std::make_unique<IfStatement>(location,
-                                           std::move(condition),
+      return std::make_unique<IfStatement>(location, std::move(condition),
                                            std::move(thenStmt),
                                            std::move(elseStmt));
     }
@@ -1571,8 +1695,7 @@ class Parser {
       auto condition = parseExpr();
       expect(Token::DO);
       auto stmt = parseStatement();
-      return std::make_unique<WhileStatement>(location,
-                                              std::move(condition),
+      return std::make_unique<WhileStatement>(location, std::move(condition),
                                               std::move(stmt));
     }
     case Token::BEGIN: {
@@ -1584,26 +1707,32 @@ class Parser {
     case Token::IDENTIFIER: {
       auto element = parseElement();
       // Procedure call
-      if (dynamic_cast<CallExpr*>(element.get())) {
-        auto callExpr = std::unique_ptr<CallExpr>(static_cast<CallExpr*>(element.release()));
+      if (dynamic_cast<CallExpr *>(element.get())) {
+        auto callExpr = std::unique_ptr<CallExpr>(
+            static_cast<CallExpr *>(element.release()));
         return std::make_unique<CallStatement>(location, std::move(callExpr));
       }
       // Assignment
       expect(Token::ASS);
-      return std::make_unique<AssStatement>(location, std::move(element), parseExpr());
+      return std::make_unique<AssStatement>(location, std::move(element),
+                                            parseExpr());
     }
     case Token::NUMBER: {
       auto element = parseElement();
       // System call
-      if (dynamic_cast<CallExpr*>(element.get())) {
-        auto callExpr = std::unique_ptr<CallExpr>(static_cast<CallExpr*>(element.release()));
+      if (dynamic_cast<CallExpr *>(element.get())) {
+        auto callExpr = std::unique_ptr<CallExpr>(
+            static_cast<CallExpr *>(element.release()));
         return std::make_unique<CallStatement>(location, std::move(callExpr));
       } else {
-        throw ParserTokenError(location, "invalid statement beginning with number", lexer.getLastToken());
+        throw ParserTokenError(location,
+                               "invalid statement beginning with number",
+                               lexer.getLastToken());
       }
     }
     default:
-      throw ParserTokenError(location, "invalid statement", lexer.getLastToken());
+      throw ParserTokenError(location, "invalid statement",
+                             lexer.getLastToken());
     }
   }
 
@@ -1633,8 +1762,9 @@ class Parser {
       decls = parseLocalDecls();
     }
     auto statement = parseStatement();
-    return std::make_unique<Proc>(location, isFunction, name, std::move(formals),
-                                  std::move(decls), std::move(statement));
+    return std::make_unique<Proc>(location, isFunction, name,
+                                  std::move(formals), std::move(decls),
+                                  std::move(statement));
   }
 
   /// proc-decls :=
@@ -1666,13 +1796,7 @@ public:
 // Symbol table.
 //===---------------------------------------------------------------------===//
 
-enum class SymbolType {
-  VAL,
-  VAR,
-  ARRAY,
-  FUNC,
-  PROC
-};
+enum class SymbolType { VAL, VAR, ARRAY, FUNC, PROC };
 
 class Symbol;
 
@@ -1694,9 +1818,7 @@ public:
     offset += amount;
     size = std::max(size, offset); // +1 since it's an offset?
   }
-  void decOffset(int amount) {
-    offset -= amount;
-  }
+  void decOffset(int amount) { offset -= amount; }
   void setOffset(int value) { offset = value; }
   size_t getOffset() { return offset; }
   const std::string &getExitLabel() const { return exitLabel; }
@@ -1714,8 +1836,9 @@ class Symbol {
   std::string globalLabel;
 
 public:
-  Symbol(SymbolType type, AstNode *node, const std::string &scope, const std::string &name) :
-      type(type), node(node), scope(scope), name(name) {}
+  Symbol(SymbolType type, AstNode *node, const std::string &scope,
+         const std::string &name)
+      : type(type), node(node), scope(scope), name(name) {}
   SymbolType getType() const { return type; }
   const std::string &getScope() const { return scope; }
   AstNode *getNode() const { return node; }
@@ -1729,20 +1852,22 @@ public:
 };
 
 using SymbolID = std::pair<const std::string, const std::string>;
-using SymbolIDRef = std::pair<const std::string&, const std::string&>;
+using SymbolIDRef = std::pair<const std::string &, const std::string &>;
 
 class SymbolTable {
   std::map<SymbolID, std::unique_ptr<Symbol>> symbolMap;
 
 public:
   void insert(SymbolIDRef identifier, std::unique_ptr<Symbol> symbol) {
-    //std::cout << "insert " << identifier.first << ", " << identifier.second <<"\n";
+    // std::cout << "insert " << identifier.first << ", " << identifier.second
+    // <<"\n";
     symbolMap[identifier] = std::move(symbol);
   }
 
   /// Lookup a symbol, and throw an exception if not found.
-  Symbol* lookup(SymbolIDRef identifier, const Location &location) {
-    //std::cout << "lookup " << identifier.first << ", " << identifier.second <<"\n";
+  Symbol *lookup(SymbolIDRef identifier, const Location &location) {
+    // std::cout << "lookup " << identifier.first << ", " << identifier.second
+    // <<"\n";
     auto it = symbolMap.find(identifier);
     if (it != symbolMap.end()) {
       return it->second.get();
@@ -1764,41 +1889,58 @@ public:
 
 class CreateSymbols : public AstVisitor {
   SymbolTable &symbolTable;
+
 public:
-  CreateSymbols(SymbolTable &symbolTable) :
-    AstVisitor(false, false, false), symbolTable(symbolTable) {}
+  CreateSymbols(SymbolTable &symbolTable)
+      : AstVisitor(false, false, false), symbolTable(symbolTable) {}
   void visitPre(Proc &proc) {
     auto symbolType = proc.isFunction() ? SymbolType::FUNC : SymbolType::PROC;
     symbolTable.insert(std::make_pair(getCurrentScope(), proc.getName()),
-                       std::make_unique<Symbol>(symbolType, &proc, getCurrentScope(), proc.getName()));
+                       std::make_unique<Symbol>(symbolType, &proc,
+                                                getCurrentScope(),
+                                                proc.getName()));
   }
   void visitPre(ArrayDecl &decl) {
     symbolTable.insert(std::make_pair(getCurrentScope(), decl.getName()),
-                       std::make_unique<Symbol>(SymbolType::ARRAY, &decl, getCurrentScope(), decl.getName()));
+                       std::make_unique<Symbol>(SymbolType::ARRAY, &decl,
+                                                getCurrentScope(),
+                                                decl.getName()));
   }
   void visitPre(VarDecl &decl) {
     symbolTable.insert(std::make_pair(getCurrentScope(), decl.getName()),
-                       std::make_unique<Symbol>(SymbolType::VAR, &decl, getCurrentScope(), decl.getName()));
+                       std::make_unique<Symbol>(SymbolType::VAR, &decl,
+                                                getCurrentScope(),
+                                                decl.getName()));
   }
   void visitPre(ValDecl &decl) {
     symbolTable.insert(std::make_pair(getCurrentScope(), decl.getName()),
-                       std::make_unique<Symbol>(SymbolType::VAL, &decl, getCurrentScope(), decl.getName()));
+                       std::make_unique<Symbol>(SymbolType::VAL, &decl,
+                                                getCurrentScope(),
+                                                decl.getName()));
   }
   void visitPre(ValFormal &formal) {
     symbolTable.insert(std::make_pair(getCurrentScope(), formal.getName()),
-                       std::make_unique<Symbol>(SymbolType::VAL, &formal, getCurrentScope(), formal.getName()));
+                       std::make_unique<Symbol>(SymbolType::VAL, &formal,
+                                                getCurrentScope(),
+                                                formal.getName()));
   }
   void visitPre(ArrayFormal &formal) {
     symbolTable.insert(std::make_pair(getCurrentScope(), formal.getName()),
-                       std::make_unique<Symbol>(SymbolType::ARRAY, &formal, getCurrentScope(), formal.getName()));
+                       std::make_unique<Symbol>(SymbolType::ARRAY, &formal,
+                                                getCurrentScope(),
+                                                formal.getName()));
   }
   void visitPre(ProcFormal &formal) {
     symbolTable.insert(std::make_pair(getCurrentScope(), formal.getName()),
-                       std::make_unique<Symbol>(SymbolType::PROC, &formal, getCurrentScope(), formal.getName()));
+                       std::make_unique<Symbol>(SymbolType::PROC, &formal,
+                                                getCurrentScope(),
+                                                formal.getName()));
   }
   void visitPre(FuncFormal &formal) {
     symbolTable.insert(std::make_pair(getCurrentScope(), formal.getName()),
-                       std::make_unique<Symbol>(SymbolType::FUNC, &formal, getCurrentScope(), formal.getName()));
+                       std::make_unique<Symbol>(SymbolType::FUNC, &formal,
+                                                getCurrentScope(),
+                                                formal.getName()));
   }
 };
 
@@ -1808,9 +1950,10 @@ public:
 
 class ConstProp : public AstVisitor {
   SymbolTable &symbolTable;
+
 public:
-  ConstProp(SymbolTable &symbolTable) :
-    AstVisitor(true, true, true), symbolTable(symbolTable) {}
+  ConstProp(SymbolTable &symbolTable)
+      : AstVisitor(true, true, true), symbolTable(symbolTable) {}
   void visitPost(ValDecl &decl) {
     if (decl.getExpr()->isConst()) {
       decl.setValue(decl.getExpr()->getValue());
@@ -1823,18 +1966,39 @@ public:
       // Evaluate binary expression.
       int result;
       switch (expr.getOp()) {
-        case Token::PLUS:  result = LHS->getValue() +  RHS->getValue(); break;
-        case Token::MINUS: result = LHS->getValue() -  RHS->getValue(); break;
-        case Token::EQ:    result = LHS->getValue() == RHS->getValue(); break;
-        case Token::NE:    result = LHS->getValue() != RHS->getValue(); break;
-        case Token::LS:    result = LHS->getValue() <  RHS->getValue(); break;
-        case Token::LE:    result = LHS->getValue() <= RHS->getValue(); break;
-        case Token::GR:    result = LHS->getValue() >  RHS->getValue(); break;
-        case Token::GE:    result = LHS->getValue() >= RHS->getValue(); break;
-        case Token::AND:   result = LHS->getValue() == 0 ? 0 : (RHS->getValue() == 0 ? 0 : 1); break;
-        case Token::OR:    result = LHS->getValue() != 0 ? 1 : (RHS->getValue() == 0 ? 0 : 1); break;
-        default:
-          throw SemanticTokenError(expr.getLocation(), "unexpected binary op", expr.getOp());
+      case Token::PLUS:
+        result = LHS->getValue() + RHS->getValue();
+        break;
+      case Token::MINUS:
+        result = LHS->getValue() - RHS->getValue();
+        break;
+      case Token::EQ:
+        result = LHS->getValue() == RHS->getValue();
+        break;
+      case Token::NE:
+        result = LHS->getValue() != RHS->getValue();
+        break;
+      case Token::LS:
+        result = LHS->getValue() < RHS->getValue();
+        break;
+      case Token::LE:
+        result = LHS->getValue() <= RHS->getValue();
+        break;
+      case Token::GR:
+        result = LHS->getValue() > RHS->getValue();
+        break;
+      case Token::GE:
+        result = LHS->getValue() >= RHS->getValue();
+        break;
+      case Token::AND:
+        result = LHS->getValue() == 0 ? 0 : (RHS->getValue() == 0 ? 0 : 1);
+        break;
+      case Token::OR:
+        result = LHS->getValue() != 0 ? 1 : (RHS->getValue() == 0 ? 0 : 1);
+        break;
+      default:
+        throw SemanticTokenError(expr.getLocation(), "unexpected binary op",
+                                 expr.getOp());
       }
       expr.setValue(result);
     }
@@ -1845,27 +2009,29 @@ public:
       // Evaluate unary expression.
       int result;
       switch (expr.getOp()) {
-        case Token::MINUS: result = -element->getValue(); break;
-        case Token::NOT:   result = element->getValue() == 0 ? 1 : 0; break;
-        default:
-          throw SemanticTokenError(expr.getLocation(), "unexpected unary op", expr.getOp());
+      case Token::MINUS:
+        result = -element->getValue();
+        break;
+      case Token::NOT:
+        result = element->getValue() == 0 ? 1 : 0;
+        break;
+      default:
+        throw SemanticTokenError(expr.getLocation(), "unexpected unary op",
+                                 expr.getOp());
       }
       expr.setValue(result);
     }
   }
   void visitPost(StringExpr &expr) {}
-  void visitPost(BooleanExpr &expr) {
-    expr.setValue(expr.getValue());
-  }
-  void visitPost(NumberExpr &expr) {
-    expr.setValue(expr.getValue());
-  }
+  void visitPost(BooleanExpr &expr) { expr.setValue(expr.getValue()); }
+  void visitPost(NumberExpr &expr) { expr.setValue(expr.getValue()); }
   void visitPost(CallExpr &expr) {
     // Propagate constant values for syscalls.
     if (!expr.isSysCall()) {
-      auto symbol = symbolTable.lookup(std::make_pair(getCurrentScope(), expr.getName()),
-                                       expr.getLocation());
-      if (auto symbolExpr = dynamic_cast<const ValDecl*>(symbol->getNode())) {
+      auto symbol =
+          symbolTable.lookup(std::make_pair(getCurrentScope(), expr.getName()),
+                             expr.getLocation());
+      if (auto symbolExpr = dynamic_cast<const ValDecl *>(symbol->getNode())) {
         expr.setSysCallId(symbolExpr->getValue());
       } else {
         return;
@@ -1880,9 +2046,9 @@ public:
   void visitPost(ArraySubscriptExpr &expr) {}
   void visitPost(VarRefExpr &expr) {
     // Propagate constant values to variable references.
-    auto symbol = symbolTable.lookup(std::make_pair(getCurrentScope(), expr.getName()),
-                                     expr.getLocation());
-    if (auto symbolExpr = dynamic_cast<const ValDecl*>(symbol->getNode())) {
+    auto symbol = symbolTable.lookup(
+        std::make_pair(getCurrentScope(), expr.getName()), expr.getLocation());
+    if (auto symbolExpr = dynamic_cast<const ValDecl *>(symbol->getNode())) {
       expr.setValue(symbolExpr->getValue());
     }
   }
@@ -1899,53 +2065,55 @@ public:
     // Translate relational operators ~=, >=, >, <= to expressions only using
     // <, =, ~.
     switch (expr.getOp()) {
-      case Token::NE: {
-        // LHS ~= RHS -> not(LHS = RHS)
-        auto eq = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::EQ,
-                                                 std::move(expr.getLHS()),
-                                                 std::move(expr.getRHS()));
-        auto replace = std::make_unique<UnaryOpExpr>(expr.getLocation(),
-                                                     Token::NOT, std::move(eq));
-        setExprReplacement(std::move(replace));
-        break;
-      }
-      case Token::GE: {
-        // LHS >= RHS -> not(LHS < RHS)
-        auto eq = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::LS,
-                                                 std::move(expr.getLHS()),
-                                                 std::move(expr.getRHS()));
-        auto replace = std::make_unique<UnaryOpExpr>(expr.getLocation(),
-                                                     Token::NOT, std::move(eq));
-        setExprReplacement(std::move(replace));
-        break;
-      }
-      case Token::GR: {
-        // LHS > RHS -> RHS < LHS
-        auto replace = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::LS,
-                                                      std::move(expr.getRHS()),
-                                                      std::move(expr.getLHS()));
-        setExprReplacement(std::move(replace));
-        break;
-      }
-      case Token::LE: {
-        // LHS <= RHS -> not(RHS < LHS)
-        auto ls = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::LS,
-                                                 std::move(expr.getRHS()),
-                                                 std::move(expr.getLHS()));
-        auto replace = std::make_unique<UnaryOpExpr>(expr.getLocation(),
-                                                     Token::NOT, std::move(ls));
-        setExprReplacement(std::move(replace));
-        break;
-      }
-      default: break;
+    case Token::NE: {
+      // LHS ~= RHS -> not(LHS = RHS)
+      auto eq = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::EQ,
+                                               std::move(expr.getLHS()),
+                                               std::move(expr.getRHS()));
+      auto replace = std::make_unique<UnaryOpExpr>(expr.getLocation(),
+                                                   Token::NOT, std::move(eq));
+      setExprReplacement(std::move(replace));
+      break;
+    }
+    case Token::GE: {
+      // LHS >= RHS -> not(LHS < RHS)
+      auto eq = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::LS,
+                                               std::move(expr.getLHS()),
+                                               std::move(expr.getRHS()));
+      auto replace = std::make_unique<UnaryOpExpr>(expr.getLocation(),
+                                                   Token::NOT, std::move(eq));
+      setExprReplacement(std::move(replace));
+      break;
+    }
+    case Token::GR: {
+      // LHS > RHS -> RHS < LHS
+      auto replace = std::make_unique<BinaryOpExpr>(
+          expr.getLocation(), Token::LS, std::move(expr.getRHS()),
+          std::move(expr.getLHS()));
+      setExprReplacement(std::move(replace));
+      break;
+    }
+    case Token::LE: {
+      // LHS <= RHS -> not(RHS < LHS)
+      auto ls = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::LS,
+                                               std::move(expr.getRHS()),
+                                               std::move(expr.getLHS()));
+      auto replace = std::make_unique<UnaryOpExpr>(expr.getLocation(),
+                                                   Token::NOT, std::move(ls));
+      setExprReplacement(std::move(replace));
+      break;
+    }
+    default:
+      break;
     }
   }
   void visitPost(UnaryOpExpr &expr) {
     if (!expr.isConst() && expr.getOp() == Token::MINUS) {
       // Transform -x to 0 - x
       auto zero = std::make_unique<NumberExpr>(expr.getLocation(), 0);
-      auto replace = std::make_unique<BinaryOpExpr>(expr.getLocation(), expr.getOp(),
-                                                    std::move(zero), std::move(expr.getElement()));
+      auto replace = std::make_unique<BinaryOpExpr>(
+          expr.getLocation(), expr.getOp(), std::move(zero),
+          std::move(expr.getElement()));
       setExprReplacement(std::move(replace));
     }
   }
@@ -1981,8 +2149,10 @@ public:
 /// Procedure/function prologue.
 class Prologue : public IntermediateDirective {
   Symbol *symbol;
+
 public:
-  Prologue(Symbol *symbol) : IntermediateDirective(hexasm::Token::PROLOGUE), symbol(symbol) {}
+  Prologue(Symbol *symbol)
+      : IntermediateDirective(hexasm::Token::PROLOGUE), symbol(symbol) {}
   std::string toString() const { return "PROLOGUE " + symbol->getName(); }
   Symbol *getSymbol() { return symbol; }
   Frame *getFrame() { return symbol->getFrame(); }
@@ -1991,8 +2161,10 @@ public:
 /// Procedure/function epilogue.
 class Epilogue : public IntermediateDirective {
   Symbol *symbol;
+
 public:
-  Epilogue(Symbol *symbol) : IntermediateDirective(hexasm::Token::EPILOGUE), symbol(symbol) {}
+  Epilogue(Symbol *symbol)
+      : IntermediateDirective(hexasm::Token::EPILOGUE), symbol(symbol) {}
   std::string toString() const { return "EPILOGUE " + symbol->getName(); }
   Symbol *getSymbol() { return symbol; }
   Frame *getFrame() { return symbol->getFrame(); }
@@ -2002,9 +2174,10 @@ public:
 class InstrStackOffset : public hexasm::InstrImm {
   Frame *frame;
   int offset;
+
 public:
-  InstrStackOffset(hexasm::Token token, Frame *frame, int offset) :
-      InstrImm(token, 0), frame(frame), offset(offset) {}
+  InstrStackOffset(hexasm::Token token, Frame *frame, int offset)
+      : InstrImm(token, 0), frame(frame), offset(offset) {}
   std::string toString() const {
     return fmt::format("{} {}", hexasm::tokenEnumStr(getToken()), offset);
   }
@@ -2023,53 +2196,144 @@ class CodeBuffer {
   Frame *currentFrame;
 
 public:
-  CodeBuffer(SymbolTable &symbolTable) :
-    symbolTable(symbolTable), constCount(0), stringCount(0), labelCount(0) {}
+  CodeBuffer(SymbolTable &symbolTable)
+      : symbolTable(symbolTable), constCount(0), stringCount(0), labelCount(0) {
+  }
 
-  const std::string getLabel() { return std::string("lab") + std::to_string(labelCount++); }
-  void insertInstr(std::unique_ptr<hexasm::Directive> instr) { instrs.push_back(std::move(instr)); }
-  void insertData(std::unique_ptr<hexasm::Directive> data) { instrs.push_back(std::move(data)); }
+  const std::string getLabel() {
+    return std::string("lab") + std::to_string(labelCount++);
+  }
+  void insertInstr(std::unique_ptr<hexasm::Directive> instr) {
+    instrs.push_back(std::move(instr));
+  }
+  void insertData(std::unique_ptr<hexasm::Directive> data) {
+    instrs.push_back(std::move(data));
+  }
 
   /// Directive generation -------------------------------------------------///
-  void genData(uint32_t value)        { data.push_back(std::make_unique<hexasm::Data>(hexasm::Token::DATA, value)); }
-  void genDataLabel(std::string name) { data.push_back(std::make_unique<hexasm::Label>(hexasm::Token::IDENTIFIER, name)); }
-  void genInstrData(uint32_t value)   { instrs.push_back(std::make_unique<hexasm::Data>(hexasm::Token::DATA, value)); }
-  void genLabel(std::string name)     { instrs.push_back(std::make_unique<hexasm::Label>(hexasm::Token::IDENTIFIER, name)); }
-  void genFunc(std::string name)      { instrs.push_back(std::make_unique<hexasm::Func>(hexasm::Token::FUNC, name)); }
-  void genProc(std::string name)      { instrs.push_back(std::make_unique<hexasm::Proc>(hexasm::Token::PROC, name)); }
+  void genData(uint32_t value) {
+    data.push_back(std::make_unique<hexasm::Data>(hexasm::Token::DATA, value));
+  }
+  void genDataLabel(std::string name) {
+    data.push_back(
+        std::make_unique<hexasm::Label>(hexasm::Token::IDENTIFIER, name));
+  }
+  void genInstrData(uint32_t value) {
+    instrs.push_back(
+        std::make_unique<hexasm::Data>(hexasm::Token::DATA, value));
+  }
+  void genLabel(std::string name) {
+    instrs.push_back(
+        std::make_unique<hexasm::Label>(hexasm::Token::IDENTIFIER, name));
+  }
+  void genFunc(std::string name) {
+    instrs.push_back(std::make_unique<hexasm::Func>(hexasm::Token::FUNC, name));
+  }
+  void genProc(std::string name) {
+    instrs.push_back(std::make_unique<hexasm::Proc>(hexasm::Token::PROC, name));
+  }
 
   /// Instruction generation -----------------------------------------------///
-  void genLDAM(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAM, value)); }
-  void genLDBM(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDBM, value)); }
-  void genSTAM(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::STAM, value)); }
-  void genLDAM(std::string label) { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDAM, label, false)); }
-  void genLDBM(std::string label) { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDBM, label, false)); }
-  void genSTAM(std::string label) { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::STAM, label, false)); }
-  void genLDAC(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAC, value)); }
-  void genLDBC(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDBC, value)); }
-  void genLDAP(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAP, value)); }
-  void genLDAC(std::string label) { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDAC, label, false)); }
-  void genLDBC(std::string label) { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDBC, label, true)); }
-  void genLDAP(std::string label) { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDAP, label, true)); }
-  void genLDAI(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAI, value)); }
-  void genLDBI(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::LDBI, value)); }
-  void genSTAI(int value)         { instrs.push_back(std::make_unique<hexasm::InstrImm>(hexasm::Token::STAI, value)); }
-  void genBR(std::string label)   { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::BR, label, true)); }
-  void genBRZ(std::string label)  { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::BRZ, label, true)); }
-  void genBRN(std::string label)  { instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::BRN, label, true)); }
-  void genOPR(hexasm::Token op)   { instrs.push_back(std::make_unique<hexasm::InstrOp>(hexasm::Token::OPR, op)); }
+  void genLDAM(int value) {
+    instrs.push_back(
+        std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAM, value));
+  }
+  void genLDBM(int value) {
+    instrs.push_back(
+        std::make_unique<hexasm::InstrImm>(hexasm::Token::LDBM, value));
+  }
+  void genSTAM(int value) {
+    instrs.push_back(
+        std::make_unique<hexasm::InstrImm>(hexasm::Token::STAM, value));
+  }
+  void genLDAM(std::string label) {
+    instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDAM,
+                                                          label, false));
+  }
+  void genLDBM(std::string label) {
+    instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDBM,
+                                                          label, false));
+  }
+  void genSTAM(std::string label) {
+    instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::STAM,
+                                                          label, false));
+  }
+  void genLDAC(int value) {
+    instrs.push_back(
+        std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAC, value));
+  }
+  void genLDBC(int value) {
+    instrs.push_back(
+        std::make_unique<hexasm::InstrImm>(hexasm::Token::LDBC, value));
+  }
+  void genLDAP(int value) {
+    instrs.push_back(
+        std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAP, value));
+  }
+  void genLDAC(std::string label) {
+    instrs.push_back(std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDAC,
+                                                          label, false));
+  }
+  void genLDBC(std::string label) {
+    instrs.push_back(
+        std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDBC, label, true));
+  }
+  void genLDAP(std::string label) {
+    instrs.push_back(
+        std::make_unique<hexasm::InstrLabel>(hexasm::Token::LDAP, label, true));
+  }
+  void genLDAI(int value) {
+    instrs.push_back(
+        std::make_unique<hexasm::InstrImm>(hexasm::Token::LDAI, value));
+  }
+  void genLDBI(int value) {
+    instrs.push_back(
+        std::make_unique<hexasm::InstrImm>(hexasm::Token::LDBI, value));
+  }
+  void genSTAI(int value) {
+    instrs.push_back(
+        std::make_unique<hexasm::InstrImm>(hexasm::Token::STAI, value));
+  }
+  void genBR(std::string label) {
+    instrs.push_back(
+        std::make_unique<hexasm::InstrLabel>(hexasm::Token::BR, label, true));
+  }
+  void genBRZ(std::string label) {
+    instrs.push_back(
+        std::make_unique<hexasm::InstrLabel>(hexasm::Token::BRZ, label, true));
+  }
+  void genBRN(std::string label) {
+    instrs.push_back(
+        std::make_unique<hexasm::InstrLabel>(hexasm::Token::BRN, label, true));
+  }
+  void genOPR(hexasm::Token op) {
+    instrs.push_back(std::make_unique<hexasm::InstrOp>(hexasm::Token::OPR, op));
+  }
 
   /// Intermediate instruction for placeholder SP value --------------------///
   void genSPValue() { instrs.push_back(std::make_unique<SPValue>()); }
 
   /// Intermediate instructions for procedure calling ----------------------///
-  void genPrologue(Symbol *symbol) { instrs.push_back(std::make_unique<Prologue>(symbol)); }
-  void genEpilogue(Symbol *symbol) { instrs.push_back(std::make_unique<Epilogue>(symbol)); }
+  void genPrologue(Symbol *symbol) {
+    instrs.push_back(std::make_unique<Prologue>(symbol));
+  }
+  void genEpilogue(Symbol *symbol) {
+    instrs.push_back(std::make_unique<Epilogue>(symbol));
+  }
 
   /// Intermediate instructions for frame-base relative accesses -----------///
-  void genLDAI_FB(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::LDAI_FB, frame, offset)); }
-  void genLDBI_FB(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::LDBI_FB, frame, offset)); }
-  void genSTAI_FB(Frame *frame, int offset) { instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::STAI_FB, frame, offset)); }
+  void genLDAI_FB(Frame *frame, int offset) {
+    instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::LDAI_FB,
+                                                        frame, offset));
+  }
+  void genLDBI_FB(Frame *frame, int offset) {
+    instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::LDBI_FB,
+                                                        frame, offset));
+  }
+  void genSTAI_FB(Frame *frame, int offset) {
+    instrs.push_back(std::make_unique<InstrStackOffset>(hexasm::Token::STAI_FB,
+                                                        frame, offset));
+  }
 
   /// Helpers --------------------------------------------------------------///
   void genBRB() { genOPR(hexasm::Token::OPR); }
@@ -2081,9 +2345,10 @@ public:
 
   class ContainsCall : public AstVisitor {
     bool flag;
+
   public:
     ContainsCall() : flag(false) {}
-    void visitPost(CallExpr&) { flag = true; }
+    void visitPost(CallExpr &) { flag = true; }
     bool getFlag() { return flag; }
   };
 
@@ -2092,14 +2357,16 @@ public:
     CodeBuffer &cb;
     const std::string &currentScope;
     Reg reg;
+
   public:
     ExprCodeGen(SymbolTable &st, CodeBuffer &cb,
-                const std::string &currentScope, Reg reg) :
-      AstVisitor(false, false, false), st(st), cb(cb),
-      currentScope(currentScope), reg(reg) {}
+                const std::string &currentScope, Reg reg)
+        : AstVisitor(false, false, false), st(st), cb(cb),
+          currentScope(currentScope), reg(reg) {}
     /// Return true if the expr needs to be materialised in an A register.
     bool needsAReg(std::unique_ptr<Expr> &expr) {
-      return !(expr->isConst() || dynamic_cast<StringExpr*>(expr.get()) || dynamic_cast<VarRefExpr*>(expr.get()));
+      return !(expr->isConst() || dynamic_cast<StringExpr *>(expr.get()) ||
+               dynamic_cast<VarRefExpr *>(expr.get()));
     }
     void genBinopOperands(BinaryOpExpr &expr) {
       // For ADD and SUB binary operations:
@@ -2133,90 +2400,90 @@ public:
       } else {
         // Generate a binary op.
         switch (expr.getOp()) {
-          case Token::PLUS:
-            genBinopOperands(expr);
-            cb.genADD();
-            break;
-          case Token::MINUS:
-            genBinopOperands(expr);
-            cb.genSUB();
-            break;
-          case Token::AND: {
-            // Logical AND of operands. If first operand is false, result is
-            // false, otherwise the result is the value of the second operand.
-            auto endLabel = cb.getLabel();
-            cb.genExpr(expr.getLHS(), currentScope);
-            cb.genBRZ(endLabel);
+        case Token::PLUS:
+          genBinopOperands(expr);
+          cb.genADD();
+          break;
+        case Token::MINUS:
+          genBinopOperands(expr);
+          cb.genSUB();
+          break;
+        case Token::AND: {
+          // Logical AND of operands. If first operand is false, result is
+          // false, otherwise the result is the value of the second operand.
+          auto endLabel = cb.getLabel();
+          cb.genExpr(expr.getLHS(), currentScope);
+          cb.genBRZ(endLabel);
+          cb.genExpr(expr.getRHS(), currentScope);
+          cb.genLabel(endLabel);
+          break;
+        }
+        case Token::OR: {
+          // Logical OR of operands. If the value of the first operand is
+          // true, the result is true, otherwise the result is the value of
+          // the second operand.
+          auto falseLabel = cb.getLabel();
+          auto endLabel = cb.getLabel();
+          cb.genExpr(expr.getLHS(), currentScope);
+          cb.genBRZ(falseLabel);
+          cb.genBR(endLabel);
+          cb.genLabel(falseLabel);
+          cb.genExpr(expr.getRHS(), currentScope);
+          cb.genLabel(endLabel);
+          break;
+        }
+        case Token::EQ: {
+          if (expr.getLHS()->isConstZero()) {
             cb.genExpr(expr.getRHS(), currentScope);
-            cb.genLabel(endLabel);
-            break;
-          }
-          case Token::OR: {
-            // Logical OR of operands. If the value of the first operand is
-            // true, the result is true, otherwise the result is the value of
-            // the second operand.
-            auto falseLabel = cb.getLabel();
-            auto endLabel = cb.getLabel();
+          } else if (expr.getRHS()->isConstZero()) {
             cb.genExpr(expr.getLHS(), currentScope);
-            cb.genBRZ(falseLabel);
-            cb.genBR(endLabel);
-            cb.genLabel(falseLabel);
-            cb.genExpr(expr.getRHS(), currentScope);
-            cb.genLabel(endLabel);
-            break;
+          } else {
+            // Create a new AST node on the fly to generate the expression
+            // 'LHS - RHS'. Note that this modifies the program's AST,
+            // precluding this code from running again.
+            auto subtract = std::make_unique<BinaryOpExpr>(
+                expr.getLocation(), Token::MINUS, std::move(expr.getLHS()),
+                std::move(expr.getRHS()));
+            cb.genExpr(subtract.get(), currentScope);
           }
-          case Token::EQ: {
-            if (expr.getLHS()->isConstZero()) {
-              cb.genExpr(expr.getRHS(), currentScope);
-            }else if (expr.getRHS()->isConstZero()) {
-              cb.genExpr(expr.getLHS(), currentScope);
-            } else {
-              // Create a new AST node on the fly to generate the expression
-              // 'LHS - RHS'. Note that this modifies the program's AST,
-              // precluding this code from running again.
-              auto subtract = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::MINUS,
-                                                             std::move(expr.getLHS()),
-                                                             std::move(expr.getRHS()));
-              cb.genExpr(subtract.get(), currentScope);
-            }
-            auto trueLabel = cb.getLabel();
-            auto endLabel = cb.getLabel();
-            cb.genBRZ(trueLabel); // Equal if result is zero.
-            cb.genLDAC(0);
-            cb.genBR(endLabel);
-            cb.genLabel(trueLabel);
-            cb.genLDAC(1);
-            cb.genLabel(endLabel);
-            break;
+          auto trueLabel = cb.getLabel();
+          auto endLabel = cb.getLabel();
+          cb.genBRZ(trueLabel); // Equal if result is zero.
+          cb.genLDAC(0);
+          cb.genBR(endLabel);
+          cb.genLabel(trueLabel);
+          cb.genLDAC(1);
+          cb.genLabel(endLabel);
+          break;
+        }
+        case Token::LS: {
+          // LHS < RHS -> LHS - RHS < 0
+          if (expr.getRHS()->isConstZero()) {
+            // If RHS is zero, then only consider is LHS is negative.
+            cb.genExpr(expr.getLHS(), currentScope);
+          } else {
+            // Compute LHS - RHS by creating a subtraction AST node.
+            auto subtract = std::make_unique<BinaryOpExpr>(
+                expr.getLocation(), Token::MINUS, std::move(expr.getLHS()),
+                std::move(expr.getRHS()));
+            cb.genExpr(subtract.get(), currentScope);
+            // Restore the operand pointers.
+            expr.setLHS(subtract->getLHS());
+            expr.setRHS(subtract->getRHS());
           }
-          case Token::LS: {
-            // LHS < RHS -> LHS - RHS < 0
-            if (expr.getRHS()->isConstZero()) {
-              // If RHS is zero, then only consider is LHS is negative.
-              cb.genExpr(expr.getLHS(), currentScope);
-            } else {
-              // Compute LHS - RHS by creating a subtraction AST node.
-              auto subtract = std::make_unique<BinaryOpExpr>(expr.getLocation(), Token::MINUS,
-                                                             std::move(expr.getLHS()),
-                                                             std::move(expr.getRHS()));
-              cb.genExpr(subtract.get(), currentScope);
-              // Restore the operand pointers.
-              expr.setLHS(subtract->getLHS());
-              expr.setRHS(subtract->getRHS());
-            }
-            auto trueLabel = cb.getLabel();
-            auto endLabel = cb.getLabel();
-            cb.genBRN(trueLabel);
-            cb.genLDAC(0);
-            cb.genBR(endLabel);
-            cb.genLabel(trueLabel);
-            cb.genLDAC(1);
-            cb.genLabel(endLabel);
-            break;
-          }
-          default:
-            assert(0 && "unexpected token in binop codegen");
-            break;
+          auto trueLabel = cb.getLabel();
+          auto endLabel = cb.getLabel();
+          cb.genBRN(trueLabel);
+          cb.genLDAC(0);
+          cb.genBR(endLabel);
+          cb.genLabel(trueLabel);
+          cb.genLDAC(1);
+          cb.genLabel(endLabel);
+          break;
+        }
+        default:
+          assert(0 && "unexpected token in binop codegen");
+          break;
         }
       }
     }
@@ -2240,15 +2507,9 @@ public:
         }
       }
     }
-    void visitPost(StringExpr &expr) {
-      cb.genString(reg, expr.getValue());
-    }
-    void visitPost(BooleanExpr &expr) {
-      cb.genConst(reg, expr.getValue());
-    }
-    void visitPost(NumberExpr &expr) {
-      cb.genConst(reg, expr.getValue());
-    }
+    void visitPost(StringExpr &expr) { cb.genString(reg, expr.getValue()); }
+    void visitPost(BooleanExpr &expr) { cb.genConst(reg, expr.getValue()); }
+    void visitPost(NumberExpr &expr) { cb.genConst(reg, expr.getValue()); }
     void visitPost(CallExpr &expr) {
       if (expr.isSysCall()) {
         cb.genSysCall(expr.getSysCallId(), expr.getArgs(), currentScope);
@@ -2267,7 +2528,7 @@ public:
     void visitPost(ArraySubscriptExpr &expr) {
       // Generate array subscript.
       auto baseSymbol = st.lookup(std::make_pair(currentScope, expr.getName()),
-                                                 expr.getLocation());
+                                  expr.getLocation());
       if (expr.getExpr()->isConst()) {
         cb.genVar(Reg::A, baseSymbol);
         cb.genLDAI(expr.getExpr()->getValue());
@@ -2292,18 +2553,21 @@ public:
     SymbolTable &st;
     CodeBuffer &cb;
     const std::string &currentScope;
-  public:
-    StmtCodeGen(SymbolTable &st, CodeBuffer &cb, const std::string &currentScope) :
-      AstVisitor(false, false, false), st(st), cb(cb), currentScope(currentScope) {}
 
-    void visitPost(SkipStatement&) {
+  public:
+    StmtCodeGen(SymbolTable &st, CodeBuffer &cb,
+                const std::string &currentScope)
+        : AstVisitor(false, false, false), st(st), cb(cb),
+          currentScope(currentScope) {}
+
+    void visitPost(SkipStatement &) {
       // Do nothing.
     }
 
-    void visitPost(StopStatement&) {
+    void visitPost(StopStatement &) {
       // SVC exit 0
-      cb.genLDBM(SP_OFFSET); // breg = sp
-      cb.genLDAC(0); // areg = 0
+      cb.genLDBM(SP_OFFSET);            // breg = sp
+      cb.genLDAC(0);                    // areg = 0
       cb.genSTAI(FB_PARAM_OFFSET_FUNC); // sp[2] = areg (actual param 0)
       cb.genSVC();
     }
@@ -2317,8 +2581,8 @@ public:
     }
 
     void visitPost(IfStatement &stmt) {
-      bool skipThen = dynamic_cast<SkipStatement*>(stmt.getThenStmt().get());
-      bool skipElse = dynamic_cast<SkipStatement*>(stmt.getElseStmt().get());
+      bool skipThen = dynamic_cast<SkipStatement *>(stmt.getThenStmt().get());
+      bool skipElse = dynamic_cast<SkipStatement *>(stmt.getElseStmt().get());
       if (skipThen && skipElse) {
         // Do nothing.
       } else if (skipElse) {
@@ -2362,25 +2626,28 @@ public:
       cb.genLabel(endLabel);
     }
 
-    void visitPost(SeqStatement&) {
+    void visitPost(SeqStatement &) {
       // Handled by the visitor.
     }
 
     void visitPost(CallStatement &stmt) {
       if (stmt.getCall()->isSysCall()) {
-        cb.genSysCall(stmt.getCall()->getSysCallId(), stmt.getCall()->getArgs(), currentScope);
+        cb.genSysCall(stmt.getCall()->getSysCallId(), stmt.getCall()->getArgs(),
+                      currentScope);
       } else {
-        cb.genProcCall(stmt.getCall()->getName(), stmt.getCall()->getArgs(), currentScope);
+        cb.genProcCall(stmt.getCall()->getName(), stmt.getCall()->getArgs(),
+                       currentScope);
       }
     }
 
     void visitPost(AssStatement &expr) {
-      if (auto *varRefLHS = dynamic_cast<VarRefExpr*>(expr.getLHS().get())) {
+      if (auto *varRefLHS = dynamic_cast<VarRefExpr *>(expr.getLHS().get())) {
         // Generate RHS value into areg.
         cb.genExpr(expr.getRHS(), currentScope);
         // LHS variable reference.
-        auto symbol = st.lookup(std::make_pair(currentScope, varRefLHS->getName()),
-                                expr.getLocation());
+        auto symbol =
+            st.lookup(std::make_pair(currentScope, varRefLHS->getName()),
+                      expr.getLocation());
         if (symbol->getScope().empty()) {
           // Global scope.
           cb.genSTAM(symbol->getGlobalLabel());
@@ -2389,12 +2656,14 @@ public:
           cb.genLDBM(SP_OFFSET);
           cb.genSTAI_FB(cb.getCurrentFrame(), symbol->getStackOffset());
         }
-      } else if (auto *arraySubLHS = dynamic_cast<ArraySubscriptExpr*>(expr.getLHS().get())) {
+      } else if (auto *arraySubLHS =
+                     dynamic_cast<ArraySubscriptExpr *>(expr.getLHS().get())) {
         // Handle LHS subscript.
         // Note that arrays are always global.
         // Generate the array element address and save it to the stack.
         cb.genExpr(arraySubLHS->getExpr(), currentScope);
-        cb.genVar(Reg::B, st.lookup(std::make_pair(currentScope, arraySubLHS->getName()),
+        cb.genVar(Reg::B, st.lookup(std::make_pair(currentScope,
+                                                   arraySubLHS->getName()),
                                     arraySubLHS->getLocation()));
         cb.genADD();
         auto stackOffset = cb.getCurrentFrame()->getOffset();
@@ -2417,14 +2686,12 @@ public:
 
   /// Generate code for an expression using the ExprCodeGen visitor.
   void genExpr(const std::unique_ptr<Expr> &expr,
-               const std::string &currentScope,
-               Reg reg=Reg::A) {
+               const std::string &currentScope, Reg reg = Reg::A) {
     ExprCodeGen visitor(symbolTable, *this, currentScope, reg);
     expr->accept(&visitor);
   }
 
-  void genExpr(Expr *expr, const std::string &currentScope,
-               Reg reg=Reg::A) {
+  void genExpr(Expr *expr, const std::string &currentScope, Reg reg = Reg::A) {
     ExprCodeGen visitor(symbolTable, *this, currentScope, reg);
     expr->accept(&visitor);
   }
@@ -2460,18 +2727,27 @@ public:
 
   /// Generate a constant value.
   void genConst(Reg reg, int value) {
-    if (value > -(1<<16) && value < (1<<16)) {
+    if (value > -(1 << 16) && value < (1 << 16)) {
       // Load 16-bit values from prefixed operands.
       switch (reg) {
-      case Reg::A: genLDAC(value); break;
-      case Reg::B: genLDBC(value); break;
+      case Reg::A:
+        genLDAC(value);
+        break;
+      case Reg::B:
+        genLDBC(value);
+        break;
       }
     } else {
-      // Load larger values from the constant pool, adding them only if they don't exist.
+      // Load larger values from the constant pool, adding them only if they
+      // don't exist.
       auto label = genConstPool(value);
       switch (reg) {
-      case Reg::A: genLDAM(label); break;
-      case Reg::B: genLDBM(label); break;
+      case Reg::A:
+        genLDAM(label);
+        break;
+      case Reg::B:
+        genLDBM(label);
+        break;
       }
     }
   }
@@ -2495,8 +2771,12 @@ public:
     }
     // Load the address of the string.
     switch (reg) {
-    case Reg::A: genLDAC(label); break;
-    case Reg::B: genLDBC(label); break;
+    case Reg::A:
+      genLDAC(label);
+      break;
+    case Reg::B:
+      genLDBC(label);
+      break;
     }
   }
 
@@ -2548,8 +2828,8 @@ public:
     currentFrame->setOffset(stackOffset);
   }
 
-  void loadActuals(const std::vector<std::unique_ptr<Expr>> &args, size_t parameterOffset,
-                   const std::string &currentScope) {
+  void loadActuals(const std::vector<std::unique_ptr<Expr>> &args,
+                   size_t parameterOffset, const std::string &currentScope) {
     size_t parameterIndex = parameterOffset;
     for (auto &arg : args) {
       if (containsCall(arg)) {
@@ -2588,7 +2868,8 @@ public:
     currentFrame->setOffset(stackOffset);
   }
 
-  void genFuncCall(const std::string &name, const std::vector<std::unique_ptr<Expr>> &args,
+  void genFuncCall(const std::string &name,
+                   const std::vector<std::unique_ptr<Expr>> &args,
                    const std::string &currentScope) {
     auto stackOffset = currentFrame->getOffset();
     // Actual parameters.
@@ -2606,7 +2887,8 @@ public:
     currentFrame->setOffset(stackOffset);
   }
 
-  void genProcCall(const std::string &name, const std::vector<std::unique_ptr<Expr>> &args,
+  void genProcCall(const std::string &name,
+                   const std::vector<std::unique_ptr<Expr>> &args,
                    const std::string &currentScope) {
     auto stackOffset = currentFrame->getOffset();
     // Actual parameters.
@@ -2644,7 +2926,9 @@ public:
   }
 
   /// Member access --------------------------------------------------------//
-  std::vector<std::unique_ptr<hexasm::Directive>> &getInstrs() { return instrs; }
+  std::vector<std::unique_ptr<hexasm::Directive>> &getInstrs() {
+    return instrs;
+  }
   std::vector<std::unique_ptr<hexasm::Directive>> &getData() { return data; }
   void setCurrentFrame(Frame *frame) { currentFrame = frame; }
   Frame *getCurrentFrame() { return currentFrame; }
@@ -2666,18 +2950,22 @@ class FormalLocations : public AstVisitor {
     symbol->setStackOffset(frameBaseOffset++);
     symbol->setFrame(frame);
   }
+
 public:
   FormalLocations(SymbolTable &st, const std::string &currentScope,
-                  std::shared_ptr<Frame> &frame, bool isFunction) :
-    AstVisitor(false, false, false), st(st), currentScope(currentScope), frame(frame),
-    frameBaseOffset(1 + (isFunction ? FB_PARAM_OFFSET_FUNC : FB_PARAM_OFFSET_PROC)) {}
+                  std::shared_ptr<Frame> &frame, bool isFunction)
+      : AstVisitor(false, false, false), st(st), currentScope(currentScope),
+        frame(frame), frameBaseOffset(1 + (isFunction ? FB_PARAM_OFFSET_FUNC
+                                                      : FB_PARAM_OFFSET_PROC)) {
+  }
   void visitPost(ValFormal &formal) { assignLocation(formal); }
   void visitPost(ArrayFormal &formal) { assignLocation(formal); }
   void visitPost(ProcFormal &formal) { assignLocation(formal); }
   void visitPost(FuncFormal &formal) { assignLocation(formal); }
 };
 
-/// Assign stack locations to local variables, starting from the base of the frame.
+/// Assign stack locations to local variables, starting from the base of the
+/// frame.
 class LocalDeclLocations : public AstVisitor {
   SymbolTable &st;
   const std::string &currentScope;
@@ -2691,11 +2979,12 @@ class LocalDeclLocations : public AstVisitor {
     frame->incOffset(size);
     count += size;
   }
+
 public:
   LocalDeclLocations(SymbolTable &st, const std::string &currentScope,
-                     std::shared_ptr<Frame> &frame) :
-    AstVisitor(false, false, false), st(st), currentScope(currentScope),
-    frame(frame), count(0) {}
+                     std::shared_ptr<Frame> &frame)
+      : AstVisitor(false, false, false), st(st), currentScope(currentScope),
+        frame(frame), count(0) {}
   void visitPost(ArrayDecl &decl) { assignLocation(decl, decl.getSize()); }
   void visitPost(VarDecl &decl) { assignLocation(decl, 1); }
   void visitPost(ValDecl &decl) { assignLocation(decl, 1); }
@@ -2708,22 +2997,22 @@ class CodeGen : public AstVisitor {
   size_t globalsOffset;
 
 public:
-  CodeGen(SymbolTable &symbolTable) :
-    AstVisitor(false, false, false), st(symbolTable), cb(symbolTable),
-    globalsOffset(0) {}
+  CodeGen(SymbolTable &symbolTable)
+      : AstVisitor(false, false, false), st(symbolTable), cb(symbolTable),
+        globalsOffset(0) {}
 
   void visitPre(Program &tree) {
     // Setup.
     cb.genBR("start"); // Branch to the start.
-    cb.genSPValue(); // Placeholder for the stack pointer value.
+    cb.genSPValue();   // Placeholder for the stack pointer value.
     cb.genLabel("start");
     // Branch and link to main().
     cb.genLDAP("_exit");
     cb.genBR("main");
     // Exit.
     cb.genLabel("_exit");
-    cb.genLDBM(SP_OFFSET); // breg = sp
-    cb.genLDAC(0); // areg = 0
+    cb.genLDBM(SP_OFFSET);            // breg = sp
+    cb.genLDAC(0);                    // areg = 0
     cb.genSTAI(FB_PARAM_OFFSET_FUNC); // sp[2] = areg (actual param 0)
     cb.genSVC();
   }
@@ -2739,7 +3028,8 @@ public:
     symbol->setFrame(frame);
     cb.setCurrentFrame(symbol->getFrame());
     // Allocate storage locations to formals.
-    FormalLocations formalLocations(st, proc.getName(), frame, proc.isFunction());
+    FormalLocations formalLocations(st, proc.getName(), frame,
+                                    proc.isFunction());
     proc.accept(&formalLocations);
     // Allocate storage locations to local declarations.
     LocalDeclLocations localDeclLocations(st, proc.getName(), frame);
@@ -2812,7 +3102,7 @@ public:
         break;
       }
       case hexasm::Token::PROLOGUE: {
-        auto prologue = dynamic_cast<Prologue*>(instr.get());
+        auto prologue = dynamic_cast<Prologue *>(instr.get());
         auto name = prologue->getSymbol()->getName();
         if (prologue->getSymbol()->getType() == SymbolType::FUNC) {
           cb.genFunc(name);
@@ -2832,7 +3122,7 @@ public:
         break;
       }
       case hexasm::Token::EPILOGUE: {
-        auto epilogue = dynamic_cast<Epilogue*>(instr.get());
+        auto epilogue = dynamic_cast<Epilogue *>(instr.get());
         auto frameSize = epilogue->getFrame()->getSize();
         cb.genLabel(epilogue->getFrame()->getExitLabel());
         // Function
@@ -2871,17 +3161,25 @@ public:
       case hexasm::Token::LDAI_FB:
       case hexasm::Token::LDBI_FB:
       case hexasm::Token::STAI_FB: {
-        auto oldInstr = dynamic_cast<InstrStackOffset*>(instr.get());
+        auto oldInstr = dynamic_cast<InstrStackOffset *>(instr.get());
         // Calculate the new offset from the SP: frame size plus frame-base
         // offset (negative to access current frame, positive to access
         // previous frame).
-        int newOffset = oldInstr->getFrame()->getSize() - 1 + oldInstr->getOffset();
+        int newOffset =
+            oldInstr->getFrame()->getSize() - 1 + oldInstr->getOffset();
         switch (token) {
-        case hexasm::Token::LDAI_FB: cb.genLDAI(newOffset); break;
-        case hexasm::Token::LDBI_FB: cb.genLDBI(newOffset); break;
-        case hexasm::Token::STAI_FB: cb.genSTAI(newOffset); break;
+        case hexasm::Token::LDAI_FB:
+          cb.genLDAI(newOffset);
+          break;
+        case hexasm::Token::LDBI_FB:
+          cb.genLDBI(newOffset);
+          break;
+        case hexasm::Token::STAI_FB:
+          cb.genSTAI(newOffset);
+          break;
         default:
-          assert(0 && "unexpected token in lowering of FB-relative memory accesses");
+          assert(0 &&
+                 "unexpected token in lowering of FB-relative memory accesses");
           break;
         }
         break;
@@ -2914,23 +3212,23 @@ class OptimiseDirectives {
 
   /// Match BR <label>; <label>
   bool matchBranchZero(size_t index) {
-    if (instrs[index+0]->getToken() == hexasm::Token::BR &&
-        instrs[index+1]->getToken() == hexasm::Token::IDENTIFIER) {
-      auto branch = dynamic_cast<hexasm::InstrLabel*>(instrs[index].get());
-      auto label = dynamic_cast<hexasm::Label*>(instrs[index+1].get());
-      return branch != nullptr && label != nullptr && branch->getLabel() == label->getLabel();
+    if (instrs[index + 0]->getToken() == hexasm::Token::BR &&
+        instrs[index + 1]->getToken() == hexasm::Token::IDENTIFIER) {
+      auto branch = dynamic_cast<hexasm::InstrLabel *>(instrs[index].get());
+      auto label = dynamic_cast<hexasm::Label *>(instrs[index + 1].get());
+      return branch != nullptr && label != nullptr &&
+             branch->getLabel() == label->getLabel();
     }
     return false;
   }
 
   /// Match STAM <x>; LDAM <x>
   bool matchStoreThenLoad(size_t index) {
-    if (instrs[index+0]->getToken() == hexasm::Token::STAM &&
-        instrs[index+1]->getToken() == hexasm::Token::LDAM) {
-      auto inst0 = dynamic_cast<hexasm::Directive*>(instrs[index+0].get());
-      auto inst1 = dynamic_cast<hexasm::Directive*>(instrs[index+1].get());
-      return !inst0->operandIsLabel() &&
-             !inst1->operandIsLabel() &&
+    if (instrs[index + 0]->getToken() == hexasm::Token::STAM &&
+        instrs[index + 1]->getToken() == hexasm::Token::LDAM) {
+      auto inst0 = dynamic_cast<hexasm::Directive *>(instrs[index + 0].get());
+      auto inst1 = dynamic_cast<hexasm::Directive *>(instrs[index + 1].get());
+      return !inst0->operandIsLabel() && !inst1->operandIsLabel() &&
              inst0->getValue() == inst1->getValue();
     }
     return false;
@@ -2938,31 +3236,29 @@ class OptimiseDirectives {
 
   /// Match LDBM 1; STAI <x>; LDAM 1; LDAI <x>
   bool matchIndexStoreThenLoad(size_t index) {
-    if (instrs[index+0]->getToken() == hexasm::Token::LDBM &&
-        instrs[index+1]->getToken() == hexasm::Token::STAI &&
-        instrs[index+2]->getToken() == hexasm::Token::LDAM &&
-        instrs[index+3]->getToken() == hexasm::Token::LDAI) {
-      auto inst0 = dynamic_cast<hexasm::Directive*>(instrs[index+0].get());
-      auto inst1 = dynamic_cast<hexasm::Directive*>(instrs[index+1].get());
-      auto inst2 = dynamic_cast<hexasm::Directive*>(instrs[index+2].get());
-      auto inst3 = dynamic_cast<hexasm::Directive*>(instrs[index+3].get());
-      return inst0->getValue() == 1 &&
-             inst2->getValue() == 1 &&
-             !inst1->operandIsLabel() &&
-             !inst3->operandIsLabel() &&
+    if (instrs[index + 0]->getToken() == hexasm::Token::LDBM &&
+        instrs[index + 1]->getToken() == hexasm::Token::STAI &&
+        instrs[index + 2]->getToken() == hexasm::Token::LDAM &&
+        instrs[index + 3]->getToken() == hexasm::Token::LDAI) {
+      auto inst0 = dynamic_cast<hexasm::Directive *>(instrs[index + 0].get());
+      auto inst1 = dynamic_cast<hexasm::Directive *>(instrs[index + 1].get());
+      auto inst2 = dynamic_cast<hexasm::Directive *>(instrs[index + 2].get());
+      auto inst3 = dynamic_cast<hexasm::Directive *>(instrs[index + 3].get());
+      return inst0->getValue() == 1 && inst2->getValue() == 1 &&
+             !inst1->operandIsLabel() && !inst3->operandIsLabel() &&
              inst1->getValue() == inst3->getValue();
     }
     return false;
   }
 
 public:
-  OptimiseDirectives(SymbolTable &symbolTable, CodeBuffer &previousCodeBuffer) :
-      instrs(previousCodeBuffer.getInstrs()), cb(symbolTable) {
+  OptimiseDirectives(SymbolTable &symbolTable, CodeBuffer &previousCodeBuffer)
+      : instrs(previousCodeBuffer.getInstrs()), cb(symbolTable) {
     // Lower intermediate instruction directives.
-    for (size_t i=0; i<instrs.size(); i++) {
+    for (size_t i = 0; i < instrs.size(); i++) {
       if (matchBranchZero(i)) {
         // Omit branch.
-        cb.insertInstr(std::move(instrs[i+1]));
+        cb.insertInstr(std::move(instrs[i + 1]));
         i += 1;
       } else if (matchStoreThenLoad(i)) {
         cb.insertInstr(std::move(instrs[i]));
@@ -2970,7 +3266,7 @@ public:
         i += 1;
       } else if (matchIndexStoreThenLoad(i)) {
         cb.insertInstr(std::move(instrs[i]));
-        cb.insertInstr(std::move(instrs[i+1]));
+        cb.insertInstr(std::move(instrs[i + 1]));
         // Omit load.
         i += 3;
       } else {
@@ -3008,7 +3304,8 @@ class ReportMemoryInfo : public AstVisitor {
       for (auto &decl : proc.getFormals()) {
         auto symbol = st.lookup(std::make_pair(proc.getName(), decl->getName()),
                                 decl->getLocation());
-        auto index = symbol->getFrame()->getSize() - 1 + symbol->getStackOffset();
+        auto index =
+            symbol->getFrame()->getSize() - 1 + symbol->getStackOffset();
         outs << fmt::format("    {} at index {}\n", symbol->getName(), index);
       }
     }
@@ -3019,27 +3316,33 @@ class ReportMemoryInfo : public AstVisitor {
       for (auto &decl : proc.getDecls()) {
         auto symbol = st.lookup(std::make_pair(proc.getName(), decl->getName()),
                                 decl->getLocation());
-        auto index = symbol->getFrame()->getSize() - 1 + symbol->getStackOffset();
+        auto index =
+            symbol->getFrame()->getSize() - 1 + symbol->getStackOffset();
         outs << fmt::format("    {} at index {}\n", symbol->getName(), index);
       }
     }
     outs << "\n";
   }
+
 public:
-  ReportMemoryInfo(SymbolTable &symbolTable,
-                   const std::vector<std::unique_ptr<hexasm::Directive>> &directives,
-                   std::ostream &outs) :
-    AstVisitor(false, false, false), st(symbolTable), directives(directives), outs(outs) {}
+  ReportMemoryInfo(
+      SymbolTable &symbolTable,
+      const std::vector<std::unique_ptr<hexasm::Directive>> &directives,
+      std::ostream &outs)
+      : AstVisitor(false, false, false), st(symbolTable),
+        directives(directives), outs(outs) {}
   void visitPre(Program &program) {
-    auto stackPointer = dynamic_cast<hexasm::Data*>(directives[1].get())->getValue();
+    auto stackPointer =
+        dynamic_cast<hexasm::Data *>(directives[1].get())->getValue();
     outs << fmt::format("Memory range 0x{:x} - 0x{:x}\n", 0, MAX_ADDRESS);
     outs << fmt::format("Stack pointer initialised to 0x{:x}\n", stackPointer);
-    outs << fmt::format("Arrays allocated 0x{:x} - 0x{:x}\n", stackPointer+1, MAX_ADDRESS);
+    outs << fmt::format("Arrays allocated 0x{:x} - 0x{:x}\n", stackPointer + 1,
+                        MAX_ADDRESS);
     outs << "\n";
   }
   void visitPre(Proc &proc) {
-    auto procSymbol = st.lookup(std::make_pair(getCurrentScope(), proc.getName()),
-                                proc.getLocation());
+    auto procSymbol = st.lookup(
+        std::make_pair(getCurrentScope(), proc.getName()), proc.getLocation());
     reportFrame(procSymbol->getFrame(), proc);
   }
 };
@@ -3065,14 +3368,11 @@ class Driver {
   std::ostream &outStream;
 
 public:
-  Driver(std::ostream &outStream) :
-    parser(lexer), outStream(outStream) {}
+  Driver(std::ostream &outStream) : parser(lexer), outStream(outStream) {}
 
-  int run(DriverAction action,
-          const std::string &input,
-          bool inputIsFilename,
-          const std::string outputBinaryFilename="a.out",
-          bool reportMemoryInfo=false) {
+  int run(DriverAction action, const std::string &input, bool inputIsFilename,
+          const std::string outputBinaryFilename = "a.out",
+          bool reportMemoryInfo = false) {
 
     // Open the file.
     if (inputIsFilename) {
@@ -3082,7 +3382,8 @@ public:
     }
 
     // Tokenise only.
-    if (action == DriverAction::EMIT_TOKENS && action != DriverAction::EMIT_TREE) {
+    if (action == DriverAction::EMIT_TOKENS &&
+        action != DriverAction::EMIT_TREE) {
       lexer.emitTokens(outStream);
       return 0;
     }
@@ -3133,7 +3434,8 @@ public:
 
     // Report frame information.
     if (reportMemoryInfo) {
-      xcmp::ReportMemoryInfo reportMemoryInfo(symbolTable, lowerDirectives.getInstrs(), std::cout);
+      xcmp::ReportMemoryInfo reportMemoryInfo(
+          symbolTable, lowerDirectives.getInstrs(), std::cout);
       tree->accept(&reportMemoryInfo);
     }
 
@@ -3144,7 +3446,8 @@ public:
     }
 
     // Optimise the final set of assembly directives.
-    xcmp::OptimiseDirectives optimiseDirectives(symbolTable, lowerDirectives.getCodeBuffer());
+    xcmp::OptimiseDirectives optimiseDirectives(
+        symbolTable, lowerDirectives.getCodeBuffer());
 
     // Emit the lowered instructions only.
     if (action == DriverAction::EMIT_OPTIMISED_INSTS) {
@@ -3170,16 +3473,17 @@ public:
     return 1;
   }
 
-  int runCatchExceptions(DriverAction action,
-                         const std::string &input,
+  int runCatchExceptions(DriverAction action, const std::string &input,
                          bool inputIsFilename,
-                         const std::string outputBinaryFilename="a.out",
-                         bool reportMemoryInfo=false) {
+                         const std::string outputBinaryFilename = "a.out",
+                         bool reportMemoryInfo = false) {
     try {
-      return run(action, input, inputIsFilename, outputBinaryFilename, reportMemoryInfo);
+      return run(action, input, inputIsFilename, outputBinaryFilename,
+                 reportMemoryInfo);
     } catch (const hexutil::Error &e) {
       if (e.hasLocation()) {
-        std::cerr << fmt::format("Error {}: {}\n", e.getLocation().str(), e.what());
+        std::cerr << fmt::format("Error {}: {}\n", e.getLocation().str(),
+                                 e.what());
       } else {
         std::cerr << fmt::format("Error: {}\n", e.what());
       }

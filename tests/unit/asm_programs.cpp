@@ -1,6 +1,5 @@
-#include <catch2/catch_test_macros.hpp>
 #include "TestContext.hpp"
-
+#include <catch2/catch_test_macros.hpp>
 
 //===---------------------------------------------------------------------===//
 // Unit tests for X programs compiled with xhexb.S
@@ -39,7 +38,8 @@ tree size: 18631
 program size: 17093
 size: 177097
 )");
-  // Simulate the compiled program (compile hello_prints using xhexb.S:xhexb.x binary).
+  // Simulate the compiled program (compile hello_prints using xhexb.S:xhexb.x
+  // binary).
   ctx.simXBinary("simout2", helloContents);
   REQUIRE(ctx.simOutBuffer.str() == R"(error near line 74: illegal character
 tree size: 602

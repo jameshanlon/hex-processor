@@ -1,7 +1,8 @@
+env
 .DS_Store
 CMakeLists.txt.user
 Debug
 Release
+install
 Install
 build
-.vscode

@@ -20,7 +20,8 @@ static void help(const char *argv[]) {
   std::cout << "  -h,--help       Display this message\n";
   std::cout << "  -d,--dump       Dump the binary file contents\n";
   std::cout << "  -t,--trace      Enable instruction tracing\n";
-  std::cout << "  --max-cycles N  Limit the number of simulation cycles (default: 0)\n";
+  std::cout << "  --max-cycles N  Limit the number of simulation cycles "
+               "(default: 0)\n";
 }
 
 int main(int argc, const char *argv[]) {

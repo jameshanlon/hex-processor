@@ -17,27 +17,17 @@ enum Instr {
   LDAI = 0x6,
   LDBI = 0x7,
   STAI = 0x8,
-  BR   = 0x9,
-  BRZ  = 0xA,
-  BRN  = 0xB,
-  OPR  = 0xD,
+  BR = 0x9,
+  BRZ = 0xA,
+  BRN = 0xB,
+  OPR = 0xD,
   PFIX = 0xE,
   NFIX = 0xF,
 };
 
-enum OprInstr {
-  BRB = 0x0,
-  ADD = 0x1,
-  SUB = 0x2,
-  SVC = 0x3
-};
+enum OprInstr { BRB = 0x0, ADD = 0x1, SUB = 0x2, SVC = 0x3 };
 
-enum class Syscall {
-  EXIT  = 0,
-  WRITE = 1,
-  READ  = 2,
-  NUM_VALUES
-};
+enum class Syscall { EXIT = 0, WRITE = 1, READ = 2, NUM_VALUES };
 
 const char *instrEnumToStr(Instr instr);
 const char *oprInstrEnumToStr(OprInstr oprInstr);

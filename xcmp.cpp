@@ -2,13 +2,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fmt/format.h>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
-#include <map>
-#include <fmt/format.h>
 
 #include "hex.hpp"
 #include "hexasm.hpp"
@@ -28,13 +28,16 @@ static void help(const char *argv[]) {
   std::cout << "  --tokens          Tokenise the input only\n";
   std::cout << "  --tree            Display the syntax tree only\n";
   std::cout << "  --tree-opt        Display the optimised syntax tree only\n";
-  std::cout << "  --insts           Display the intermediate instructions only\n";
+  std::cout
+      << "  --insts           Display the intermediate instructions only\n";
   std::cout << "  --insts-lowered   Display the lowered instructions only\n";
-  std::cout << "  --insts-optimised Display the lowered optimised instructions only\n";
+  std::cout << "  --insts-optimised Display the lowered optimised instructions "
+               "only\n";
   std::cout << "  --memory-info     Report memory information\n";
   std::cout << "  -S                Emit the assembly program\n";
   std::cout << "  --insts-asm       Display the assembled instructions only\n";
-  std::cout << "  -o,--output file  Specify a file for output (default a.out)\n";
+  std::cout
+      << "  -o,--output file  Specify a file for output (default a.out)\n";
 }
 
 int main(int argc, const char *argv[]) {
@@ -73,7 +76,8 @@ int main(int argc, const char *argv[]) {
                  std::strcmp(argv[i], "-o") == 0) {
         outputFilename = argv[++i];
       } else if (argv[i][0] == '-') {
-          throw std::runtime_error(std::string("unrecognised argument: ")+argv[i]);
+        throw std::runtime_error(std::string("unrecognised argument: ") +
+                                 argv[i]);
       } else {
         if (!inputFilename) {
           inputFilename = argv[i];
@@ -88,7 +92,8 @@ int main(int argc, const char *argv[]) {
       std::exit(1);
     }
     // Run.
-    return driver.runCatchExceptions(driverAction, inputFilename, outputFilename, "a.out", reportMemoryInfo);
+    return driver.runCatchExceptions(driverAction, inputFilename,
+                                     outputFilename, "a.out", reportMemoryInfo);
   } catch (const std::exception &e) {
     std::cerr << fmt::format("Error: {}\n", e.what());
     return 1;

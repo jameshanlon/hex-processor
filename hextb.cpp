@@ -1,10 +1,10 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <fstream>
-#include <iostream>
 #include <exception>
 #include <fmt/format.h>
+#include <fstream>
+#include <iostream>
 #include <verilated.h>
 
 #include "Vhex_pkg.h"
@@ -21,8 +21,7 @@ constexpr size_t RESET_END = 10;
 
 hex::HexSimIO io(std::cin, std::cout);
 
-void load(const char *filename,
-          const std::unique_ptr<Vhex_pkg> &top) {
+void load(const char *filename, const std::unique_ptr<Vhex_pkg> &top) {
 
   // Load the binary file.
   std::streampos fileSize;
@@ -35,9 +34,10 @@ void load(const char *filename,
 
   // Check the file length matches.
   unsigned remainingFileSize = static_cast<unsigned>(fileSize) - 4;
-  remainingFileSize = (remainingFileSize + 3U) & ~3U; // Round up to multiple of 4.
+  remainingFileSize =
+      (remainingFileSize + 3U) & ~3U; // Round up to multiple of 4.
   unsigned programSize;
-  file.read(reinterpret_cast<char*>(&programSize), 4);
+  file.read(reinterpret_cast<char *>(&programSize), 4);
   programSize <<= 2;
   if (programSize != remainingFileSize) {
     std::cerr << fmt::format("Warning: mismatching program size {} != {}\n",
@@ -46,53 +46,50 @@ void load(const char *filename,
 
   // Read the file contents.
   std::vector<uint32_t> buffer(remainingFileSize);
-  file.read(reinterpret_cast<char*>(buffer.data()), remainingFileSize);
+  file.read(reinterpret_cast<char *>(buffer.data()), remainingFileSize);
 
   // Write program to DUT memory.
-  std::memcpy(top->hex->u_memory->memory_q.data(), buffer.data(), buffer.size());
+  std::memcpy(top->hex->u_memory->memory_q.data(), buffer.data(),
+              buffer.size());
 
   std::cout << "Wrote " << programSize << " bytes to memory\n";
 }
 
-void handleSyscall(hex::Syscall syscall,
-                   const std::unique_ptr<Vhex_pkg> &top,
-                   int &exitCode,
-                   bool trace) {
+void handleSyscall(hex::Syscall syscall, const std::unique_ptr<Vhex_pkg> &top,
+                   int &exitCode, bool trace) {
   unsigned spWordIndex = top->hex->u_memory->memory_q[1];
   switch (syscall) {
-    case hex::Syscall::EXIT:
-      exitCode = top->hex->u_memory->memory_q[spWordIndex+2];
-      if (trace) {
-        std::cout << fmt::format("exit {}\n", exitCode);
-      }
-      break;
-    case hex::Syscall::WRITE: {
-      char value = top->hex->u_memory->memory_q[spWordIndex+2];
-      int stream = top->hex->u_memory->memory_q[spWordIndex+3];
-      if (trace) {
-        std::cout << fmt::format("output({}, {})\n", value, stream);
-      }
-      io.output(value, stream);
-      break;
+  case hex::Syscall::EXIT:
+    exitCode = top->hex->u_memory->memory_q[spWordIndex + 2];
+    if (trace) {
+      std::cout << fmt::format("exit {}\n", exitCode);
     }
-    case hex::Syscall::READ: {
-      int stream = top->hex->u_memory->memory_q[spWordIndex+2];
-      if (trace) {
-        std::cout << fmt::format("input({})\n", stream);
-      }
-      // Truncated inputs (ie not sign extended).
-      top->hex->u_memory->memory_q[spWordIndex+1] = io.input(stream) & 0xFF;
-      break;
+    break;
+  case hex::Syscall::WRITE: {
+    char value = top->hex->u_memory->memory_q[spWordIndex + 2];
+    int stream = top->hex->u_memory->memory_q[spWordIndex + 3];
+    if (trace) {
+      std::cout << fmt::format("output({}, {})\n", value, stream);
     }
-    default:
-      throw std::runtime_error("invalid syscall");
+    io.output(value, stream);
+    break;
+  }
+  case hex::Syscall::READ: {
+    int stream = top->hex->u_memory->memory_q[spWordIndex + 2];
+    if (trace) {
+      std::cout << fmt::format("input({})\n", stream);
+    }
+    // Truncated inputs (ie not sign extended).
+    top->hex->u_memory->memory_q[spWordIndex + 1] = io.input(stream) & 0xFF;
+    break;
+  }
+  default:
+    throw std::runtime_error("invalid syscall");
   }
 }
 
 int run(const std::unique_ptr<VerilatedContext> &contextp,
-        const std::unique_ptr<Vhex_pkg> &top,
-        bool trace,
-        size_t maxCycles) {
+        const std::unique_ptr<Vhex_pkg> &top, bool trace, size_t maxCycles) {
   uint64_t cycle_count = 0;
   int exitCode = 0;
 
@@ -120,12 +117,12 @@ int run(const std::unique_ptr<VerilatedContext> &contextp,
     }
     // Trace
     if (trace && top->i_clk && contextp->time() > RESET_END) {
-      auto instr = instrEnumToStr(static_cast<hex::Instr>((top->hex->u_processor->instr >> 4) & 0xF));
-      std::cout << fmt::format("[{:6}] {:6} {:#04x} {:6}\n",
-                               contextp->time(),
-                               top->hex->u_processor->pc_q,
-                               static_cast<unsigned>(top->hex->u_processor->instr),
-                               instr);
+      auto instr = instrEnumToStr(
+          static_cast<hex::Instr>((top->hex->u_processor->instr >> 4) & 0xF));
+      std::cout << fmt::format(
+          "[{:6}] {:6} {:#04x} {:6}\n", contextp->time(),
+          top->hex->u_processor->pc_q,
+          static_cast<unsigned>(top->hex->u_processor->instr), instr);
     }
     // Handle syscalls
     if (top->i_clk && top->o_syscall_valid) {
@@ -149,10 +146,11 @@ static void help(const char **argv) {
   std::cout << "Optional arguments:\n";
   std::cout << "  -h,--help       Display this message\n";
   std::cout << "  -t,--trace      Enable instruction tracing\n";
-  std::cout << "  --max-cycles N  Limit the number of simulation cycles (default: 0)\n";
+  std::cout << "  --max-cycles N  Limit the number of simulation cycles "
+               "(default: 0)\n";
 }
 
-int main(int argc, const char** argv) {
+int main(int argc, const char **argv) {
   try {
     // Handle arguments.
     const char *filename = nullptr;

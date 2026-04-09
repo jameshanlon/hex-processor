@@ -1,10 +1,10 @@
-#include <iostream>
 #include <fmt/format.h>
+#include <iostream>
 
 #include "hexasm.hpp"
-#include "xcmp.hpp"
 #include "hexsim.hpp"
 #include "hexsimio.hpp"
+#include "xcmp.hpp"
 
 //===---------------------------------------------------------------------===//
 // Driver
@@ -18,7 +18,8 @@ static void help(char *argv[]) {
   std::cout << "Optional arguments:\n";
   std::cout << "  -h,--help         Display this message\n";
   std::cout << "  -t,--trace      Enable instruction tracing\n";
-  std::cout << "  --max-cycles N  Limit the number of simulation cycles (default: 0)\n";
+  std::cout << "  --max-cycles N  Limit the number of simulation cycles "
+               "(default: 0)\n";
 }
 
 int main(int argc, char *argv[]) {
@@ -38,7 +39,8 @@ int main(int argc, char *argv[]) {
       } else if (std::strcmp(argv[i], "--max-cycles") == 0) {
         maxCycles = std::stoull(argv[++i]);
       } else if (argv[i][0] == '-') {
-          throw std::runtime_error(std::string("unrecognised argument: ")+argv[i]);
+        throw std::runtime_error(std::string("unrecognised argument: ") +
+                                 argv[i]);
       } else {
         if (!inputFilename) {
           inputFilename = argv[i];
@@ -47,7 +49,8 @@ int main(int argc, char *argv[]) {
         }
       }
     }
-    if (driver.runCatchExceptions(xcmp::DriverAction::EMIT_BINARY, inputFilename, true, "a.bin", false) == 0) {
+    if (driver.runCatchExceptions(xcmp::DriverAction::EMIT_BINARY,
+                                  inputFilename, true, "a.bin", false) == 0) {
       hexsim::Processor processor(std::cin, std::cout, maxCycles);
       processor.setTracing(trace);
       processor.load("a.bin");
