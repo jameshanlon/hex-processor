@@ -53,7 +53,7 @@ int main(int argc, const char *argv[]) {
       if (std::strcmp(argv[i], "-h") == 0 ||
           std::strcmp(argv[i], "--help") == 0) {
         help(argv);
-        std::exit(1);
+        std::exit(0);
       } else if (std::strcmp(argv[i], "--tokens") == 0) {
         driverAction = xcmp::DriverAction::EMIT_TOKENS;
       } else if (std::strcmp(argv[i], "--tree") == 0) {
