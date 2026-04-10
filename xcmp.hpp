@@ -314,8 +314,8 @@ class Lexer {
   }
 
   bool isHexDigit(char c) {
-    return ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') ||
-           ('A' <= c && c <= 'Z');
+    return ('0' <= c && c <= '9') || ('a' <= c && c <= 'f') ||
+           ('A' <= c && c <= 'F');
   }
 
   void readHexInt() {

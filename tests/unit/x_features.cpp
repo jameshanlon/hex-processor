@@ -249,6 +249,18 @@ TEST_CASE("constants_hex") {
   REQUIRE(ctx.runXProgramSrc(program) == 16777216);
 }
 
+TEST_CASE("constants_hex_digits") {
+  TestContext ctx;
+
+  // Verify hex parsing accepts only valid hex digits (0-9, a-f, A-F).
+  REQUIRE(ctx.runXProgramSrc("proc main () is 0(#FF)") == 255);
+  REQUIRE(ctx.runXProgramSrc("proc main () is 0(#ff)") == 255);
+  REQUIRE(ctx.runXProgramSrc("proc main () is 0(#aB)") == 171);
+  // A hex literal followed by a non-hex character should stop at that char,
+  // so `#FFg` is parsed as `#FF` followed by identifier `g`.
+  REQUIRE(ctx.runXProgramSrc("val g = 0; proc main () is 0(#FF + g)") == 255);
+}
+
 TEST_CASE("constants_propagation_binop") {
   TestContext ctx;
 
