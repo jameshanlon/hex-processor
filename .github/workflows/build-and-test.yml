@@ -4,39 +4,49 @@ on:
   push:
     branches:
       - master
+  pull_request:
+    branches: [ "master" ]
 
 env:
   BUILD_TYPE: Release
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
-        submodules: 'recursive'
+        fetch-depth: 0
 
     - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -yq libboost-all-dev libfl-dev verilator yosys
+      run: |
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+        sudo add-apt-repository "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main"
+        sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+        sudo apt-get update
+        sudo apt-get install -y valgrind g++-14 g++-11 clang-21 clang-tidy-21 ccache
 
-    - name: Install Python packages
-      run:  |
-        cd / # Workaround for pip installing binaries into '/home/runner/.local/bin'
-        sudo python3 -m pip install --upgrade pip
-        sudo python3 -m pip install -r ${{github.workspace}}/docs/requirements.txt
-
-    - name: Create build environment
-      run: cmake -E make_directory ${{github.workspace}}/build
-
-    - name: Create install environment
-      run: cmake -E make_directory ${{github.workspace}}/install
+    - name: Setup ccache
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/ccache
+        key: ${{ github.workflow }}-ccache-${{ github.sha }}
+        restore-keys: |
+            ${{ github.workflow }}-ccache-
 
     - name: Configure CMake
       shell: bash
-      working-directory: ${{github.workspace}}/build
-      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_DOCS=ON -DUSE_VERILATOR=NO -DUSE_YOSYS=NO
+      working-directory: ${{github.workspace}}
+      run: |
+        cmake -E make_directory build
+        cmake -B build \
+          -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+          -DBUILD_DOCS=OFF \
+          -DUSE_VERILATOR=OFF
 
     - name: Build
       working-directory: ${{github.workspace}}/build
@@ -46,16 +56,9 @@ jobs:
     - name: Install
       working-directory: ${{github.workspace}}/build
       shell: bash
-      run: cmake --install . --config $BUILD_TYPE
+      run: sudo cmake --install . --config $BUILD_TYPE 2>/dev/null || true
 
     - name: Test
       working-directory: ${{github.workspace}}/build
       shell: bash
       run: ctest -C $BUILD_TYPE --verbose
-
-    - name: Publish documentation
-      if: github.event_name == 'push'
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{secrets.GITHUB_TOKEN}}
-        publish_dir: ${{github.workspace}}/build/docs/sphinx

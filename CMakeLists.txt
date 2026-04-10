@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14.0)
+cmake_minimum_required(VERSION 3.28.0)
 
 project(hex-processor)
 
@@ -9,14 +9,16 @@ include(FetchContent)
 FetchContent_Declare(
   fmt
   GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-  GIT_TAG 11.0.2)
+  GIT_TAG 11.0.2
+  EXCLUDE_FROM_ALL)
 FetchContent_MakeAvailable(fmt)
 
 # FetchContent for Catch2
 FetchContent_Declare(
   Catch2
   GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG v3.4.0)
+  GIT_TAG v3.4.0
+  EXCLUDE_FROM_ALL)
 FetchContent_MakeAvailable(Catch2)
 
 # Python
