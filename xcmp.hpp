@@ -2440,13 +2440,14 @@ public:
           } else if (expr.getRHS()->isConstZero()) {
             cb.genExpr(expr.getLHS(), currentScope);
           } else {
-            // Create a new AST node on the fly to generate the expression
-            // 'LHS - RHS'. Note that this modifies the program's AST,
-            // precluding this code from running again.
+            // Create a temporary subtraction node to generate 'LHS - RHS'.
             auto subtract = std::make_unique<BinaryOpExpr>(
                 expr.getLocation(), Token::MINUS, std::move(expr.getLHS()),
                 std::move(expr.getRHS()));
             cb.genExpr(subtract.get(), currentScope);
+            // Restore the operand pointers.
+            expr.setLHS(subtract->getLHS());
+            expr.setRHS(subtract->getRHS());
           }
           auto trueLabel = cb.getLabel();
           auto endLabel = cb.getLabel();
