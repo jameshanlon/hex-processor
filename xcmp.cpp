@@ -92,8 +92,8 @@ int main(int argc, const char *argv[]) {
       std::exit(1);
     }
     // Run.
-    return driver.runCatchExceptions(driverAction, inputFilename,
-                                     outputFilename, "a.out", reportMemoryInfo);
+    return driver.runCatchExceptions(driverAction, inputFilename, true,
+                                     outputFilename, reportMemoryInfo);
   } catch (const std::exception &e) {
     std::cerr << fmt::format("Error: {}\n", e.what());
     return 1;
