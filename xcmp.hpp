@@ -3157,6 +3157,7 @@ public:
           cb.genOPR(hexasm::Token::BRB);
           break;
         }
+        break;
       }
       case hexasm::Token::LDAI_FB:
       case hexasm::Token::LDBI_FB:
