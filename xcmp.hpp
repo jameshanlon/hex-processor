@@ -3382,8 +3382,7 @@ public:
     }
 
     // Tokenise only.
-    if (action == DriverAction::EMIT_TOKENS &&
-        action != DriverAction::EMIT_TREE) {
+    if (action == DriverAction::EMIT_TOKENS) {
       lexer.emitTokens(outStream);
       return 0;
     }
