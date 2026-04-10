@@ -799,28 +799,28 @@ public:
 };
 
 class NumberExpr : public Expr {
-  unsigned value;
+  unsigned number;
 
 public:
   NumberExpr(Location location, unsigned value)
-      : Expr(location), value(value) {}
+      : Expr(location), number(value) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
   }
-  unsigned getValue() const { return value; }
+  unsigned getNumber() const { return number; }
 };
 
 class BooleanExpr : public Expr {
-  bool value;
+  bool boolean;
 
 public:
-  BooleanExpr(Location location, bool value) : Expr(location), value(value) {}
+  BooleanExpr(Location location, bool value) : Expr(location), boolean(value) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
   }
-  bool getValue() const { return value; }
+  bool getBoolean() const { return boolean; }
 };
 
 class StringExpr : public Expr {
@@ -1254,12 +1254,12 @@ public:
   void visitPost(StringExpr &expr) override {}
   void visitPre(BooleanExpr &expr) override {
     indent();
-    outs << fmt::format("boolean {}{}\n", expr.getValue(), locString(expr));
+    outs << fmt::format("boolean {}{}\n", expr.getBoolean(), locString(expr));
   };
   void visitPost(BooleanExpr &expr) override {}
   void visitPre(NumberExpr &expr) override {
     indent();
-    outs << fmt::format("number {}{}\n", expr.getValue(), locString(expr));
+    outs << fmt::format("number {}{}\n", expr.getNumber(), locString(expr));
   };
   void visitPost(NumberExpr &expr) override {}
   void visitPre(CallExpr &expr) override {
@@ -2025,8 +2025,8 @@ public:
     }
   }
   void visitPost(StringExpr &expr) {}
-  void visitPost(BooleanExpr &expr) { expr.setValue(expr.getValue()); }
-  void visitPost(NumberExpr &expr) { expr.setValue(expr.getValue()); }
+  void visitPost(BooleanExpr &expr) { expr.setValue(expr.getBoolean()); }
+  void visitPost(NumberExpr &expr) { expr.setValue(expr.getNumber()); }
   void visitPost(CallExpr &expr) {
     // Propagate constant values for syscalls.
     if (!expr.isSysCall()) {
@@ -2510,8 +2510,8 @@ public:
       }
     }
     void visitPost(StringExpr &expr) { cb.genString(reg, expr.getValue()); }
-    void visitPost(BooleanExpr &expr) { cb.genConst(reg, expr.getValue()); }
-    void visitPost(NumberExpr &expr) { cb.genConst(reg, expr.getValue()); }
+    void visitPost(BooleanExpr &expr) { cb.genConst(reg, expr.getBoolean()); }
+    void visitPost(NumberExpr &expr) { cb.genConst(reg, expr.getNumber()); }
     void visitPost(CallExpr &expr) {
       if (expr.isSysCall()) {
         cb.genSysCall(expr.getSysCallId(), expr.getArgs(), currentScope);
