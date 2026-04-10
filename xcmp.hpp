@@ -735,15 +735,12 @@ public:
 
 class VarRefExpr : public Expr {
   std::string name;
-  std::unique_ptr<Expr> expr;
 
 public:
   VarRefExpr(Location location, std::string name)
       : Expr(location), name(name) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
-    // expr->accept(visitor);
-    // replaceExpr(expr, visitor);
     visitor->visitPost(*this);
   }
   const std::string &getName() const { return name; }
@@ -1881,15 +1878,11 @@ class SymbolTable {
 
 public:
   void insert(SymbolIDRef identifier, std::unique_ptr<Symbol> symbol) {
-    // std::cout << "insert " << identifier.first << ", " << identifier.second
-    // <<"\n";
     symbolMap[identifier] = std::move(symbol);
   }
 
   /// Lookup a symbol, and throw an exception if not found.
   Symbol *lookup(SymbolIDRef identifier, const Location &location) {
-    // std::cout << "lookup " << identifier.first << ", " << identifier.second
-    // <<"\n";
     auto it = symbolMap.find(identifier);
     if (it != symbolMap.end()) {
       return it->second.get();
@@ -2234,8 +2227,8 @@ public:
   void insertInstr(std::unique_ptr<hexasm::Directive> instr) {
     instrs.push_back(std::move(instr));
   }
-  void insertData(std::unique_ptr<hexasm::Directive> data) {
-    instrs.push_back(std::move(data));
+  void insertData(std::unique_ptr<hexasm::Directive> datum) {
+    data.push_back(std::move(datum));
   }
 
   /// Directive generation -------------------------------------------------///
