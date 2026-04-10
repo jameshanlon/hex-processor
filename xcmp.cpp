@@ -74,7 +74,10 @@ int main(int argc, const char *argv[]) {
         reportMemoryInfo = true;
       } else if (std::strcmp(argv[i], "--output") == 0 ||
                  std::strcmp(argv[i], "-o") == 0) {
-        outputFilename = argv[++i];
+        if (++i >= argc) {
+          throw std::runtime_error("expected filename after -o/--output");
+        }
+        outputFilename = argv[i];
       } else if (argv[i][0] == '-') {
         throw std::runtime_error(std::string("unrecognised argument: ") +
                                  argv[i]);
