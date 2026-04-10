@@ -3226,8 +3226,8 @@ class OptimiseDirectives {
   bool matchStoreThenLoad(size_t index) {
     if (instrs[index + 0]->getToken() == hexasm::Token::STAM &&
         instrs[index + 1]->getToken() == hexasm::Token::LDAM) {
-      auto inst0 = dynamic_cast<hexasm::Directive *>(instrs[index + 0].get());
-      auto inst1 = dynamic_cast<hexasm::Directive *>(instrs[index + 1].get());
+      auto *inst0 = instrs[index + 0].get();
+      auto *inst1 = instrs[index + 1].get();
       return !inst0->operandIsLabel() && !inst1->operandIsLabel() &&
              inst0->getValue() == inst1->getValue();
     }
@@ -3240,10 +3240,10 @@ class OptimiseDirectives {
         instrs[index + 1]->getToken() == hexasm::Token::STAI &&
         instrs[index + 2]->getToken() == hexasm::Token::LDAM &&
         instrs[index + 3]->getToken() == hexasm::Token::LDAI) {
-      auto inst0 = dynamic_cast<hexasm::Directive *>(instrs[index + 0].get());
-      auto inst1 = dynamic_cast<hexasm::Directive *>(instrs[index + 1].get());
-      auto inst2 = dynamic_cast<hexasm::Directive *>(instrs[index + 2].get());
-      auto inst3 = dynamic_cast<hexasm::Directive *>(instrs[index + 3].get());
+      auto *inst0 = instrs[index + 0].get();
+      auto *inst1 = instrs[index + 1].get();
+      auto *inst2 = instrs[index + 2].get();
+      auto *inst3 = instrs[index + 3].get();
       return inst0->getValue() == 1 && inst2->getValue() == 1 &&
              !inst1->operandIsLabel() && !inst3->operandIsLabel() &&
              inst1->getValue() == inst3->getValue();
