@@ -710,7 +710,7 @@ public:
   virtual void accept(AstVisitor *visitor) = 0;
   const Location &getLocation() const { return location; }
   void replaceExpr(std::unique_ptr<Expr> &expr, AstVisitor *visitor) {
-    // If the visitor wishes to replcae the expression, it will have created a
+    // If the visitor wishes to replace the expression, it will have created a
     // replacement, which can be moved in place of the original.
     if (visitor->hasExprReplacement()) {
       expr = std::move(visitor->getExprReplacement());
@@ -1847,7 +1847,7 @@ public:
 };
 
 /// A class to represent a symbol in the program, recording type, scope, AST
-/// declaration and Frame infromation where applicable.
+/// declaration and Frame information where applicable.
 class Symbol {
   SymbolType type;
   AstNode *node;
@@ -3070,7 +3070,7 @@ public:
     cb.genStmt(proc.getStatement(), proc.getName());
   }
 
-  /// Proceudre call completion.
+  /// Procedure call completion.
   void visitPost(Proc &proc) {
     auto symbol = st.lookup(std::make_pair(getCurrentScope(), proc.getName()),
                             proc.getLocation());
@@ -3161,7 +3161,7 @@ public:
           cb.genLDBM(SP_OFFSET);
           cb.genSTAI(frameSize + 1);
           if (epilogue->getFrame()->getSize() > 0) {
-            // Contract the stack poiner.
+            // Contract the stack pointer.
             cb.genLDAC(frameSize);
             cb.genOPR(hexasm::Token::ADD);
             cb.genSTAM(SP_OFFSET);
@@ -3176,7 +3176,7 @@ public:
         if (epilogue->getSymbol()->getType() == SymbolType::PROC) {
           cb.genLDBM(SP_OFFSET);
           if (epilogue->getFrame()->getSize() > 0) {
-            // Contract the stack poiner.
+            // Contract the stack pointer.
             cb.genLDAC(frameSize);
             cb.genOPR(hexasm::Token::ADD);
             cb.genSTAM(SP_OFFSET);
