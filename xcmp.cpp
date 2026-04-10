@@ -69,7 +69,7 @@ int main(int argc, const char *argv[]) {
       } else if (std::strcmp(argv[i], "-S") == 0) {
         driverAction = xcmp::DriverAction::EMIT_ASM;
       } else if (std::strcmp(argv[i], "--insts-asm") == 0) {
-        driverAction = xcmp::DriverAction::EMIT_TREE;
+        driverAction = xcmp::DriverAction::EMIT_ASM;
       } else if (std::strcmp(argv[i], "--memory-info") == 0) {
         reportMemoryInfo = true;
       } else if (std::strcmp(argv[i], "--output") == 0 ||
