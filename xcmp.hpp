@@ -566,7 +566,7 @@ public:
   }
 
   const std::string &getIdentifier() const { return identifier; }
-  int getNumber() const { return value; }
+  unsigned getNumber() const { return value; }
   const std::string &getString() const { return string; }
   Token getLastToken() const { return lastToken; }
   size_t getLineNumber() const { return currentLineNumber; }
