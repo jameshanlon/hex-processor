@@ -217,10 +217,9 @@ struct ParserTokenError : public Error {
               fmt::format("{}, got {}", message, tokenEnumStr(token))) {}
 };
 
-struct SemanticTokenError : public Error {
+struct SemanticTokenError : public ParserTokenError {
   SemanticTokenError(Location location, std::string message, Token token)
-      : Error(location,
-              fmt::format("{}, got {}", message, tokenEnumStr(token))) {}
+      : ParserTokenError(location, message, token) {}
 };
 
 struct UnknownSymbolError : public Error {
