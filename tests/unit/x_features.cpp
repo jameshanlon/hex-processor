@@ -1209,6 +1209,24 @@ TEST_CASE("parser_token_error_stmt_invalid") {
 
 // Semantic errors.
 
+TEST_CASE("var_formal_parameter") {
+  TestContext ctx;
+
+  // Verify `var` formal parameters are parsed and compiled without error.
+  auto program = R"(
+proc foo(var x) is 0(x)
+proc main() is foo(42))";
+  REQUIRE(ctx.runXProgramSrc(program) == 42);
+}
+
+TEST_CASE("var_formal_parameter_prev_error") {
+  TestContext ctx;
+
+  // Before the fix, `var` in a formal position would throw a parser error.
+  auto program = "proc foo(var x) is skip proc main() is foo(0)";
+  REQUIRE_NOTHROW(ctx.asmXProgramSrc(program));
+}
+
 TEST_CASE("string_expr_parsing") {
   TestContext ctx;
 

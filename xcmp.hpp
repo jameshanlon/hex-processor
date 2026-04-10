@@ -599,6 +599,7 @@ class CallExpr;
 class ArraySubscriptExpr;
 class VarRefExpr;
 class ValFormal;
+class VarFormal;
 class ArrayFormal;
 class ProcFormal;
 class FuncFormal;
@@ -673,6 +674,8 @@ public:
   virtual void visitPost(VarRefExpr &) {}
   virtual void visitPre(ValFormal &) {}
   virtual void visitPost(ValFormal &) {}
+  virtual void visitPre(VarFormal &) {}
+  virtual void visitPost(VarFormal &) {}
   virtual void visitPre(ArrayFormal &) {}
   virtual void visitPost(ArrayFormal &) {}
   virtual void visitPre(ProcFormal &) {}
@@ -950,6 +953,15 @@ public:
 class ValFormal : public Formal {
 public:
   ValFormal(Location location, std::string name) : Formal(location, name) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    visitor->visitPost(*this);
+  }
+};
+
+class VarFormal : public Formal {
+public:
+  VarFormal(Location location, std::string name) : Formal(location, name) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -1292,6 +1304,12 @@ public:
                         locString(formal));
   };
   void visitPost(ValFormal &formal) override {};
+  void visitPre(VarFormal &formal) override {
+    indent();
+    outs << fmt::format("varformal {}{}\n", formal.getName(),
+                        locString(formal));
+  };
+  void visitPost(VarFormal &formal) override {};
   void visitPre(ArrayFormal &formal) override {
     indent();
     outs << fmt::format("arrayformal {}{}\n", formal.getName(),
@@ -1633,6 +1651,9 @@ class Parser {
     case Token::VAL:
       lexer.getNextToken();
       return std::make_unique<ValFormal>(location, parseIdentifier());
+    case Token::VAR:
+      lexer.getNextToken();
+      return std::make_unique<VarFormal>(location, parseIdentifier());
     case Token::ARRAY:
       lexer.getNextToken();
       return std::make_unique<ArrayFormal>(location, parseIdentifier());
@@ -1923,6 +1944,12 @@ public:
   void visitPre(ValFormal &formal) {
     symbolTable.insert(std::make_pair(getCurrentScope(), formal.getName()),
                        std::make_unique<Symbol>(SymbolType::VAL, &formal,
+                                                getCurrentScope(),
+                                                formal.getName()));
+  }
+  void visitPre(VarFormal &formal) {
+    symbolTable.insert(std::make_pair(getCurrentScope(), formal.getName()),
+                       std::make_unique<Symbol>(SymbolType::VAR, &formal,
                                                 getCurrentScope(),
                                                 formal.getName()));
   }
@@ -2962,6 +2989,7 @@ public:
                                                       : FB_PARAM_OFFSET_PROC)) {
   }
   void visitPost(ValFormal &formal) { assignLocation(formal); }
+  void visitPost(VarFormal &formal) { assignLocation(formal); }
   void visitPost(ArrayFormal &formal) { assignLocation(formal); }
   void visitPost(ProcFormal &formal) { assignLocation(formal); }
   void visitPost(FuncFormal &formal) { assignLocation(formal); }
