@@ -1518,9 +1518,11 @@ class Parser {
         return std::make_unique<NumberExpr>(location, value);
       }
     }
-    case Token::STRING:
+    case Token::STRING: {
+      auto str = lexer.getString();
       lexer.getNextToken();
-      return std::make_unique<StringExpr>(location, lexer.getString());
+      return std::make_unique<StringExpr>(location, str);
+    }
     case Token::TRUE:
       lexer.getNextToken();
       return std::make_unique<BooleanExpr>(location, true);

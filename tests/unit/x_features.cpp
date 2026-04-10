@@ -1197,6 +1197,23 @@ TEST_CASE("parser_token_error_stmt_invalid") {
 
 // Semantic errors.
 
+TEST_CASE("string_expr_parsing") {
+  TestContext ctx;
+
+  // Verify that string literals are parsed correctly and not affected by
+  // subsequent tokens (regression test for stale lexer string buffer).
+  auto program = R"(
+val put = 1;
+proc putval(val c) is put(c, 0)
+proc prints(array s) is skip
+proc main() is {
+  prints("hello");
+  putval('x')
+})";
+  ctx.runXProgramSrc(program);
+  REQUIRE(ctx.simOutBuffer.str() == "x");
+}
+
 // Enable when (global) arrays are handled.
 TEST_CASE("semantics_non_const_array_length_error") {
   TestContext ctx;
