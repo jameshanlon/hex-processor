@@ -76,7 +76,7 @@ enum class Token {
   END_OF_FILE
 };
 
-static const char *tokenEnumStr(Token token) {
+inline const char *tokenEnumStr(Token token) {
   switch (token) {
   case Token::NONE:
     return "NONE";
@@ -166,7 +166,7 @@ static const char *tokenEnumStr(Token token) {
   }
 }
 
-static bool isBinaryOp(Token token) {
+inline bool isBinaryOp(Token token) {
   switch (token) {
   case Token::PLUS:
   case Token::MINUS:
