@@ -416,7 +416,7 @@ proc main() is exit(foo(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)))";
 TEST_CASE("prepare_call_actuals") {
   TestContext ctx;
 
-  // Check that multiple actuals containing calls are allocted stack space
+  // Check that multiple actuals containing calls are allocated stack space
   // correctly.
   auto program = R"(
 func nop(val v) is return v
@@ -469,7 +469,7 @@ TEST_CASE("unary_minus") {
   REQUIRE(ctx.runXProgramSrc("proc main () is 0(-(2(0)))", "0") == -'0');
   REQUIRE(ctx.runXProgramSrc("proc main () is 0(-(-(2(0))))", "0") == '0');
   REQUIRE(ctx.runXProgramSrc("proc main () is 0(-(-(-(2(0)))))", "0") == -'0');
-  // Constant popagation.
+  // Constant propagation.
   REQUIRE(ctx.runXProgramSrc("proc main () is 0(-42)") == -42);
   REQUIRE(ctx.runXProgramSrc("proc main () is 0(-(-42))") == 42);
   REQUIRE(ctx.runXProgramSrc("proc main () is 0(-(-(-42)))") == -42);
@@ -485,7 +485,7 @@ TEST_CASE("unary_not") {
   // With boolean literals.
   REQUIRE(ctx.runXProgramSrc("proc main () is 0(~(2(0)))", {1}) == 0);
   REQUIRE(ctx.runXProgramSrc("proc main () is 0(~(2(0)))", {0}) == 1);
-  // Constant popagation.
+  // Constant propagation.
   REQUIRE(ctx.runXProgramSrc("proc main () is 0(~42)") == 0);
   REQUIRE(ctx.runXProgramSrc("proc main () is 0(~(~42))") == 1);
   REQUIRE(ctx.runXProgramSrc("proc main () is 0(~(~(~42)))") == 0);
@@ -653,7 +653,7 @@ TEST_CASE("binary_add_constants") {
   }
 }
 
-TEST_CASE("bianry_sub_constants") {
+TEST_CASE("binary_sub_constants") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -664,7 +664,7 @@ TEST_CASE("bianry_sub_constants") {
   }
 }
 
-TEST_CASE("bianry_ls_constants") {
+TEST_CASE("binary_ls_constants") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -675,7 +675,7 @@ TEST_CASE("bianry_ls_constants") {
   }
 }
 
-TEST_CASE("bianry_le_constants") {
+TEST_CASE("binary_le_constants") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -686,7 +686,7 @@ TEST_CASE("bianry_le_constants") {
   }
 }
 
-TEST_CASE("bianry_gt_constants") {
+TEST_CASE("binary_gt_constants") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -697,7 +697,7 @@ TEST_CASE("bianry_gt_constants") {
   }
 }
 
-TEST_CASE("bianry_ge_constants") {
+TEST_CASE("binary_ge_constants") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -708,7 +708,7 @@ TEST_CASE("bianry_ge_constants") {
   }
 }
 
-TEST_CASE("bianry_eq_constants") {
+TEST_CASE("binary_eq_constants") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -719,7 +719,7 @@ TEST_CASE("bianry_eq_constants") {
   }
 }
 
-TEST_CASE("bianry_ne_constants") {
+TEST_CASE("binary_ne_constants") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -730,7 +730,7 @@ TEST_CASE("bianry_ne_constants") {
   }
 }
 
-TEST_CASE("bianry_and_constants") {
+TEST_CASE("binary_and_constants") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -741,7 +741,7 @@ TEST_CASE("bianry_and_constants") {
   }
 }
 
-TEST_CASE("bianry_or_constants") {
+TEST_CASE("binary_or_constants") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -1042,7 +1042,7 @@ TEST_CASE("scope_matching_locals") {
 TEST_CASE("proc_no_frame_return") {
   TestContext ctx;
 
-  // Check that procs with no stack allocation retrun correctly.
+  // Check that procs with no stack allocation return correctly.
   auto program = R"(
     var x; var y;
     proc bar(val z) is if z > y then x := z else skip
