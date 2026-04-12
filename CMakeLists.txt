@@ -57,11 +57,16 @@ target_link_libraries(hexasm fmt::fmt)
 add_executable(xcmp hex.cpp xcmp.cpp)
 target_link_libraries(xcmp fmt::fmt)
 
+# Disassembler
+add_executable(hexdis hex.cpp hexdis.cpp)
+target_link_libraries(hexdis fmt::fmt)
+
 # Compile and run
 add_executable(xrun hex.cpp xrun.cpp)
 target_link_libraries(xrun fmt::fmt)
 
-install(TARGETS hexasm xcmp xrun hexsim DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS hexasm xcmp xrun hexsim hexdis
+        DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # Verilator
 if(USE_VERILATOR)

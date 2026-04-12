@@ -77,6 +77,7 @@ Key features:
 | Tool     | Description |
 |----------|-------------|
 | `hexasm` | Assembler: compiles `.S` assembly files to `.bin` binaries |
+| `hexdis` | Disassembler: disassembles `.bin` binaries back to readable assembly |
 | `xcmp`   | Compiler: compiles `.x` X-language programs to `.bin` binaries |
 | `hexsim` | Simulator: executes `.bin` binaries (use `-t` for instruction tracing) |
 | `xrun`   | Runner: compiles and immediately executes an X program |
@@ -151,6 +152,26 @@ $ xcmp tests/x/hello_putval.x -o hello.bin
 $ hexsim hello.bin
 hello world
 ```
+
+Disassemble a binary to see the instruction listing. If the binary contains
+debug info (e.g. from `xcmp`), function labels are displayed:
+
+```bash
+$ hexdis hello.bin | head -10
+  0x0000  97  BR   7
+  0x0001  00  LDAM 0
+  ...
+  0x0008  51  LDAP 1
+  0x0009  94  BR   4
+  0x000a  11  LDBM 1
+  0x000b  30  LDAC 0
+  0x000c  82  STAI 2
+  0x000d  d3  SVC
+
+main:
+```
+
+Use `--no-labels` to suppress debug labels in the output.
 
 Run with instruction tracing (`-t`) to see each cycle's execution. The trace
 columns show: cycle number, PC address, symbol+offset, instruction, and the
