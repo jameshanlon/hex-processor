@@ -1080,6 +1080,48 @@ TEST_CASE("scope_matching_locals") {
 }
 
 //===---------------------------------------------------------------------===//
+// Return statement
+//===---------------------------------------------------------------------===//
+
+TEST_CASE("return_from_if") {
+  TestContext ctx;
+
+  auto program = R"(
+    func abs(val x) is if x < 0 then return 0 - x else return x
+    proc main() is 0(abs(-5) + abs(5)))";
+  REQUIRE(ctx.runXProgramSrc(program) == 10);
+}
+
+TEST_CASE("return_from_while") {
+  TestContext ctx;
+
+  // Return from inside a while loop.
+  auto program = R"(
+    func find10() is
+      var i;
+    { i := 0;
+      while true do
+      { if i = 10 then return i else skip;
+        i := i + 1
+      }
+    }
+    proc main() is 0(find10()))";
+  REQUIRE(ctx.runXProgramSrc(program) == 10);
+}
+
+TEST_CASE("return_from_nested_if") {
+  TestContext ctx;
+
+  auto program = R"(
+    func classify(val x) is
+      if x < 0 then return 0
+      else if x = 0 then return 1
+      else return 2
+    proc main() is 0(classify(-5) + classify(0) + classify(5)))";
+  REQUIRE(ctx.runXProgramSrc(program) == 3);
+}
+
+//===---------------------------------------------------------------------===//
 // Procs
 //===---------------------------------------------------------------------===//
 
