@@ -26,6 +26,32 @@ TEST_CASE("main_stop") {
   REQUIRE(ctx.runXProgramSrc(program) == 0);
 }
 
+TEST_CASE("stop_after_side_effect") {
+  TestContext ctx;
+
+  // Stop after performing a side effect to verify it executes up to stop.
+  auto program = R"(
+    val put = 1;
+    proc main() is { put('a', 0); stop }
+  )";
+  ctx.runXProgramSrc(program);
+  REQUIRE(ctx.simOutBuffer.str() == "a");
+}
+
+TEST_CASE("stop_in_conditional") {
+  TestContext ctx;
+
+  auto program = R"(
+    val put = 1;
+    proc main() is {
+      if true then { put('y', 0); stop } else skip;
+      put('n', 0)
+    }
+  )";
+  ctx.runXProgramSrc(program);
+  REQUIRE(ctx.simOutBuffer.str() == "y");
+}
+
 //===---------------------------------------------------------------------===//
 // Syscalls
 //===---------------------------------------------------------------------===//
