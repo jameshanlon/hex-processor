@@ -1413,6 +1413,20 @@ proc main() is {
   REQUIRE(ctx.simOutBuffer.str() == "x");
 }
 
+TEST_CASE("unknown_symbol_error_call") {
+  TestContext ctx;
+
+  auto program = "proc main() is foo(0)";
+  REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::UnknownSymbolError);
+}
+
+TEST_CASE("unknown_symbol_error_expr") {
+  TestContext ctx;
+
+  auto program = "proc main() is 0(x)";
+  REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::UnknownSymbolError);
+}
+
 // Enable when (global) arrays are handled.
 TEST_CASE("semantics_non_const_array_length_error") {
   TestContext ctx;
