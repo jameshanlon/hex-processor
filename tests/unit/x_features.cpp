@@ -520,6 +520,45 @@ TEST_CASE("unary_not") {
 }
 
 //===---------------------------------------------------------------------===//
+// Boolean literals
+//===---------------------------------------------------------------------===//
+
+TEST_CASE("bool_literal_true") {
+  TestContext ctx;
+
+  REQUIRE(ctx.runXProgramSrc("proc main() is if true then 0(1) else 0(2)") ==
+          1);
+}
+
+TEST_CASE("bool_literal_false") {
+  TestContext ctx;
+
+  REQUIRE(ctx.runXProgramSrc("proc main() is if false then 0(1) else 0(2)") ==
+          2);
+}
+
+TEST_CASE("bool_literal_while_false") {
+  TestContext ctx;
+
+  // while false should never execute the body.
+  auto program = R"(
+    val put = 1;
+    proc main() is { while false do put('x', 0); put('y', 0) }
+  )";
+  ctx.runXProgramSrc(program);
+  REQUIRE(ctx.simOutBuffer.str() == "y");
+}
+
+TEST_CASE("bool_literal_as_func_arg") {
+  TestContext ctx;
+
+  auto program = R"(
+    func id(val x) is return x
+    proc main() is 0(id(true) + id(false)))";
+  REQUIRE(ctx.runXProgramSrc(program) == 1);
+}
+
+//===---------------------------------------------------------------------===//
 // Binary operators.
 // Tests using only syscalls and functions.
 // Note that the order of evaluation in binary operations is not guaranteed
