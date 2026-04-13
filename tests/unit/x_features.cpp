@@ -1437,6 +1437,14 @@ TEST_CASE("unknown_symbol_error_expr") {
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::UnknownSymbolError);
 }
 
+TEST_CASE("missing_main_error") {
+  TestContext ctx;
+
+  // A program without a main proc should fail during assembly.
+  auto program = "proc foo() is skip";
+  REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), hexasm::UnknownLabelError);
+}
+
 // Enable when (global) arrays are handled.
 TEST_CASE("semantics_non_const_array_length_error") {
   TestContext ctx;
