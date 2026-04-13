@@ -920,6 +920,50 @@ proc main () is
 // Global variables
 //===---------------------------------------------------------------------===//
 
+TEST_CASE("global_var_write_read") {
+  TestContext ctx;
+
+  auto program = R"(
+    var x;
+    proc main() is { x := 42; 0(x) }
+  )";
+  REQUIRE(ctx.runXProgramSrc(program) == 42);
+}
+
+TEST_CASE("global_var_multiple") {
+  TestContext ctx;
+
+  auto program = R"(
+    var a; var b; var c;
+    proc main() is { a := 10; b := 20; c := 30; 0(a + b + c) }
+  )";
+  REQUIRE(ctx.runXProgramSrc(program) == 60);
+}
+
+TEST_CASE("global_var_cross_proc") {
+  TestContext ctx;
+
+  // Global variable written in one proc, read in another.
+  auto program = R"(
+    var x;
+    proc set_x(val v) is x := v
+    proc main() is { set_x(99); 0(x) }
+  )";
+  REQUIRE(ctx.runXProgramSrc(program) == 99);
+}
+
+TEST_CASE("global_var_func_read") {
+  TestContext ctx;
+
+  // Global variable read from a function.
+  auto program = R"(
+    var x;
+    func get_x() is return x
+    proc main() is { x := 77; 0(get_x()) }
+  )";
+  REQUIRE(ctx.runXProgramSrc(program) == 77);
+}
+
 //===---------------------------------------------------------------------===//
 // Global arrays
 //===---------------------------------------------------------------------===//
