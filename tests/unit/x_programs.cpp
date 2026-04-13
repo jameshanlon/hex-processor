@@ -106,6 +106,19 @@ TEST_CASE("printhex") {
   REQUIRE(ctx.simOutBuffer.str() == "7f");
 }
 
+TEST_CASE("exit") {
+  TestContext ctx;
+
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("exit.x")) == 0);
+}
+
+TEST_CASE("echo_char") {
+  TestContext ctx;
+
+  ctx.runXProgramFile(ctx.getXTestPath("echo_char.x"), "z");
+  REQUIRE(ctx.simOutBuffer.str() == "z");
+}
+
 TEST_CASE("strlen") {
   TestContext ctx;
 
