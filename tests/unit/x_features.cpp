@@ -1396,6 +1396,16 @@ TEST_CASE("var_formal_parameter_prev_error") {
   REQUIRE_NOTHROW(ctx.asmXProgramSrc(program));
 }
 
+TEST_CASE("var_formal_parameter_func") {
+  TestContext ctx;
+
+  // Verify `var` formal parameters work in functions.
+  auto program = R"(
+    func double(var x) is return x + x
+    proc main() is 0(double(21)))";
+  REQUIRE(ctx.runXProgramSrc(program) == 42);
+}
+
 TEST_CASE("string_expr_parsing") {
   TestContext ctx;
 
