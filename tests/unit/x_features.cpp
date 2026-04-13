@@ -295,6 +295,24 @@ TEST_CASE("constants_propagation_binop") {
   REQUIRE(ctx.runXProgramSrc(program) == 0);
 }
 
+TEST_CASE("local_val_declaration") {
+  TestContext ctx;
+
+  auto program = R"(
+    func foo() is val x = 42; return x
+    proc main() is 0(foo()))";
+  REQUIRE(ctx.runXProgramSrc(program) == 42);
+}
+
+TEST_CASE("local_val_in_expression") {
+  TestContext ctx;
+
+  auto program = R"(
+    func bar(val a) is val offset = 10; return a + offset
+    proc main() is 0(bar(5)))";
+  REQUIRE(ctx.runXProgramSrc(program) == 15);
+}
+
 //===---------------------------------------------------------------------===//
 // Procedure calling
 //===---------------------------------------------------------------------===//
