@@ -1,0 +1,152 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "linux-base",
+      "hidden": true,
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "installDir": "${sourceDir}/install/${presetName}",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "clang-debug",
+      "displayName": "Clang debug",
+      "inherits": [
+        "linux-base"
+      ],
+      "hidden": false,
+      "cacheVariables": {
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "On",
+        "ENABLE_PY_BINDINGS": "On",
+        "BUILD_DOCS": "Off"
+      }
+    },
+    {
+      "name": "clang-release",
+      "displayName": "Clang release",
+      "inherits": [
+        "linux-base"
+      ],
+      "hidden": false,
+      "cacheVariables": {
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "ENABLE_PY_BINDINGS": "On",
+        "BUILD_DOCS": "Off"
+      }
+    },
+    {
+      "name": "clang-sanitize",
+      "displayName": "Clang sanitize",
+      "inherits": [
+        "linux-base"
+      ],
+      "hidden": false,
+      "cacheVariables": {
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "USE_SANITIZER": "undefined,address,leak",
+        "USE_STATIC_ANALYZER": "clang-tidy",
+        "BUILD_DOCS": "Off"
+      }
+    },
+    {
+      "name": "clang-coverage",
+      "displayName": "Clang release with coverage",
+      "inherits": [
+        "linux-base"
+      ],
+      "hidden": false,
+      "cacheVariables": {
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "clang++-21",
+        "CODE_COVERAGE": "ON",
+        "BUILD_DOCS": "Off"
+      }
+    },
+    {
+      "name": "gcc-debug",
+      "displayName": "GCC debug",
+      "inherits": [
+        "linux-base"
+      ],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "g++",
+        "ENABLE_PY_BINDINGS": "On",
+        "BUILD_DOCS": "Off"
+      }
+    },
+    {
+      "name": "gcc-release",
+      "displayName": "GCC release",
+      "inherits": [
+        "linux-base"
+      ],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "g++",
+        "ENABLE_PY_BINDINGS": "On",
+        "BUILD_DOCS": "Off"
+      }
+    },
+    {
+      "name": "macos-base",
+      "hidden": true,
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "installDir": "${sourceDir}/install/${presetName}",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
+      "name": "macos-debug",
+      "displayName": "macOS debug",
+      "inherits": [
+        "macos-base"
+      ],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "On",
+        "ENABLE_PY_BINDINGS": "On",
+        "BUILD_DOCS": "Off"
+      }
+    },
+    {
+      "name": "macos-release",
+      "displayName": "macOS Release",
+      "inherits": [
+        "macos-base"
+      ],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ENABLE_PY_BINDINGS": "On",
+        "BUILD_DOCS": "Off"
+      }
+    },
+    {
+      "name": "docs",
+      "displayName": "Documentation",
+      "hidden": false,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "BUILD_DOCS": "On"
+      }
+    }
+  ]
+}
