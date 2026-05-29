@@ -12,6 +12,8 @@
 #include <memory>
 #include <optional>
 #include <ostream>
+#include <set>
+#include <sstream>
 #include <stack>
 #include <string>
 #include <vector>
@@ -247,6 +249,13 @@ struct NonConstArrayLengthError : public Error {
 struct InvalidSyscallError : public Error {
   InvalidSyscallError(Location location, int sysCallId)
       : Error(location, fmt::format("invalid syscall: {}", sysCallId)) {}
+};
+
+/// Errors detected when building the static process network from a top-level
+/// par.
+struct NetworkError : public Error {
+  NetworkError(Location location, std::string message)
+      : Error(location, message) {}
 };
 
 //===---------------------------------------------------------------------===//
@@ -1284,6 +1293,10 @@ public:
   std::vector<std::unique_ptr<Formal>> &getFormals() { return formals; }
   std::vector<std::unique_ptr<Decl>> &getDecls() { return decls; }
   const std::unique_ptr<Statement> &getStatement() { return statement; }
+  void setStatement(std::unique_ptr<Statement> stmt) {
+    statement = std::move(stmt);
+  }
+  void clearDecls() { decls.clear(); }
 };
 
 class Program : public AstNode {
@@ -1306,6 +1319,8 @@ public:
     visitor->exitProgram();
     visitor->visitPost(*this);
   }
+  std::vector<std::unique_ptr<Decl>> &getGlobalDecls() { return globalDecls; }
+  std::vector<std::unique_ptr<Proc>> &getProcDecls() { return procDecls; }
 };
 
 // AST printer visitor ===================================================== //
@@ -3623,6 +3638,156 @@ public:
 };
 
 //===---------------------------------------------------------------------===//
+// Static process network construction.
+//===---------------------------------------------------------------------===//
+
+namespace network {
+
+/// "HEXN" network-container magic. Must match hexsim::NETWORK_MAGIC.
+const uint32_t CONTAINER_MAGIC = 0x4E584548;
+
+/// A channel endpoint: the processor that touches a channel, the link slot it
+/// assigned to it, and how it uses it.
+struct Endpoint {
+  unsigned proc;
+  unsigned slot;
+  bool isWriter;
+  bool isReader;
+};
+
+/// A wiring edge connecting two processor link slots.
+struct Edge {
+  uint32_t procA, slotA, procB, slotB;
+};
+
+/// One processor in the network: the entry proc it runs and how many channels
+/// (link slots, assigned in argument order) it uses.
+struct ProcessorInfo {
+  std::string entryProc;
+  unsigned numChannels;
+};
+
+struct Network {
+  std::vector<ProcessorInfo> processors;
+  std::vector<Edge> edges;
+};
+
+/// Collect the names of channel formals used for output (writers) and input
+/// (readers) within a procedure body.
+class ChannelDirections : public AstVisitor {
+public:
+  std::set<std::string> writers;
+  std::set<std::string> readers;
+  void visitPre(OutStatement &stmt) override {
+    if (auto *vr = dynamic_cast<VarRefExpr *>(stmt.getChannel().get())) {
+      writers.insert(vr->getName());
+    }
+  }
+  void visitPre(InStatement &stmt) override {
+    if (auto *vr = dynamic_cast<VarRefExpr *>(stmt.getChannel().get())) {
+      readers.insert(vr->getName());
+    }
+  }
+};
+
+/// Find a top-level procedure by name (nullptr if absent).
+inline Proc *findProc(Program &program, const std::string &name) {
+  for (auto &proc : program.getProcDecls()) {
+    if (proc->getName() == name) {
+      return proc.get();
+    }
+  }
+  return nullptr;
+}
+
+/// Return main's statement if it is a top-level par, otherwise nullptr.
+inline ParStatement *getTopLevelPar(Program &program) {
+  auto *mainProc = findProc(program, "main");
+  if (!mainProc) {
+    return nullptr;
+  }
+  return dynamic_cast<ParStatement *>(mainProc->getStatement().get());
+}
+
+/// Analyse the static network described by main's par: one processor per
+/// branch, channels wired by shared arguments and assigned link slots in
+/// argument order. Validates endpoint counts, direction and the 4-link limit.
+inline Network analyseNetwork(Program &program, ParStatement &par) {
+  Network net;
+  std::map<std::string, std::vector<Endpoint>> channels;
+  unsigned procIdx = 0;
+  for (auto &branch : par.getBranches()) {
+    // The parser guarantees each branch is a procedure call.
+    auto *call = static_cast<CallStatement *>(branch.get())->getCall();
+    auto *entry = findProc(program, call->getName());
+    if (!entry) {
+      throw NetworkError(call->getLocation(),
+                         fmt::format("par branch calls unknown procedure {}",
+                                     call->getName()));
+    }
+    ChannelDirections dirs;
+    entry->getStatement()->accept(&dirs);
+    auto &args = call->getArgs();
+    auto &formals = entry->getFormals();
+    if (args.size() > 4) {
+      throw NetworkError(call->getLocation(),
+                         fmt::format("process {} exceeds the 4-channel link "
+                                     "limit",
+                                     call->getName()));
+    }
+    if (args.size() != formals.size()) {
+      throw NetworkError(
+          call->getLocation(),
+          fmt::format("call to {} has the wrong number of arguments",
+                      call->getName()));
+    }
+    for (unsigned argIdx = 0; argIdx < args.size(); argIdx++) {
+      auto *vr = dynamic_cast<VarRefExpr *>(args[argIdx].get());
+      if (!vr) {
+        throw NetworkError(call->getLocation(),
+                           "par branch arguments must be channels");
+      }
+      const std::string &formalName = formals[argIdx]->getName();
+      Endpoint ep;
+      ep.proc = procIdx;
+      ep.slot = argIdx;
+      ep.isWriter = dirs.writers.count(formalName) > 0;
+      ep.isReader = dirs.readers.count(formalName) > 0;
+      channels[vr->getName()].push_back(ep);
+    }
+    net.processors.push_back(
+        {call->getName(), static_cast<unsigned>(args.size())});
+    procIdx++;
+  }
+  // Validate channels and build wiring edges.
+  for (auto &entry : channels) {
+    const std::string &name = entry.first;
+    auto &eps = entry.second;
+    if (eps.size() != 2) {
+      throw NetworkError(
+          par.getLocation(),
+          fmt::format("channel {} must connect exactly two processes", name));
+    }
+    unsigned writers = 0;
+    unsigned readers = 0;
+    for (auto &ep : eps) {
+      writers += ep.isWriter ? 1 : 0;
+      readers += ep.isReader ? 1 : 0;
+    }
+    if (writers != 1 || readers != 1) {
+      throw NetworkError(par.getLocation(),
+                         fmt::format("channel {} must have exactly one writer "
+                                     "and one reader",
+                                     name));
+    }
+    net.edges.push_back({eps[0].proc, eps[0].slot, eps[1].proc, eps[1].slot});
+  }
+  return net;
+}
+
+} // namespace network
+
+//===---------------------------------------------------------------------===//
 // Driver.
 //===---------------------------------------------------------------------===//
 
@@ -3641,6 +3806,87 @@ class Driver {
   Lexer lexer;
   Parser parser;
   std::ostream &outStream;
+
+  /// Read a whole file into a string.
+  static std::string readFileToString(const std::string &filename) {
+    std::ifstream file(filename, std::ios::binary);
+    if (!file) {
+      throw std::runtime_error("could not open file: " + filename);
+    }
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+  }
+
+  /// Compile a single processor image: re-parse the source, replace main with a
+  /// call to the processor's entry proc passing its link-slot indices (0..n-1)
+  /// as constants, run the full pipeline and return the image bytes.
+  std::string compileProcessorImage(const std::string &source,
+                                    const network::ProcessorInfo &proc) {
+    Lexer imageLexer;
+    Parser imageParser(imageLexer);
+    imageLexer.loadBuffer(source);
+    auto tree = imageParser.parseProgram();
+    auto *mainProc = network::findProc(*tree, "main");
+    Location loc = mainProc->getLocation();
+    std::vector<std::unique_ptr<Expr>> args;
+    for (unsigned i = 0; i < proc.numChannels; i++) {
+      args.push_back(std::make_unique<NumberExpr>(loc, i));
+    }
+    auto call =
+        std::make_unique<CallExpr>(loc, proc.entryProc, std::move(args));
+    mainProc->clearDecls();
+    mainProc->setStatement(
+        std::make_unique<CallStatement>(loc, std::move(call)));
+
+    SymbolTable symbolTable;
+    CreateSymbols createSymbols(symbolTable);
+    tree->accept(&createSymbols);
+    ConstProp constProp(symbolTable);
+    tree->accept(&constProp);
+    OptimiseExpr optimiseExpr;
+    tree->accept(&optimiseExpr);
+    CodeGen codeGen(symbolTable);
+    tree->accept(&codeGen);
+    LowerDirectives lowerDirectives(symbolTable, codeGen);
+    OptimiseDirectives optimiseDirectives(symbolTable,
+                                          lowerDirectives.getCodeBuffer());
+    hexasm::CodeGen asmCodeGen(optimiseDirectives.getInstrs());
+    std::ostringstream out;
+    asmCodeGen.emitImage(out);
+    return out.str();
+  }
+
+  /// Emit a network container: magic, processor count, edges, then each
+  /// processor's image (size-prefixed standard single-image binary).
+  void emitNetworkContainer(const std::string &source,
+                            const network::Network &net,
+                            const std::string &filename) {
+    std::vector<std::string> images;
+    for (auto &proc : net.processors) {
+      images.push_back(compileProcessorImage(source, proc));
+    }
+    std::ofstream out(filename, std::ios::binary);
+    if (!out) {
+      throw std::runtime_error("could not open output file: " + filename);
+    }
+    auto writeU32 = [&](uint32_t value) {
+      out.write(reinterpret_cast<const char *>(&value), sizeof(uint32_t));
+    };
+    writeU32(network::CONTAINER_MAGIC);
+    writeU32(static_cast<uint32_t>(images.size()));
+    writeU32(static_cast<uint32_t>(net.edges.size()));
+    for (auto &e : net.edges) {
+      writeU32(e.procA);
+      writeU32(e.slotA);
+      writeU32(e.procB);
+      writeU32(e.slotB);
+    }
+    for (auto &image : images) {
+      writeU32(static_cast<uint32_t>(image.size()));
+      out.write(image.data(), image.size());
+    }
+  }
 
 public:
   Driver(std::ostream &outStream) : parser(lexer), outStream(outStream) {}
@@ -3680,6 +3926,16 @@ public:
       xcmp::AstPrinter printer(outStream);
       tree->accept(&printer);
       return 0;
+    }
+
+    // A top-level par in main compiles to a multi-processor network container.
+    if (action == DriverAction::EMIT_BINARY) {
+      if (auto *par = network::getTopLevelPar(*tree)) {
+        auto net = network::analyseNetwork(*tree, *par);
+        std::string source = inputIsFilename ? readFileToString(input) : input;
+        emitNetworkContainer(source, net, outputBinaryFilename);
+        return 0;
+      }
     }
 
     // Optimise expressions.

@@ -183,12 +183,11 @@ struct TestContext {
     std::istringstream simInBuffer(input);
     simOutBuffer.str("");
     simOutBuffer.clear();
-    // Run the program.
-    hexsim::Processor processor(simInBuffer, simOutBuffer);
-    processor.load(path.c_str());
-    processor.setTracing(trace);
-    processor.setTruncateInputs(false);
-    return processor.run();
+    // Run the program (single image or multi-processor network container).
+    hexsim::System system(simInBuffer, simOutBuffer);
+    system.setTracing(trace);
+    system.loadNetwork(path.c_str());
+    return system.run();
   }
 
   /// Run an X program from a file.
