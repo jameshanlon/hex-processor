@@ -1472,3 +1472,22 @@ TEST_CASE("chan_declaration_and_formal_tree") {
   REQUIRE(output.find("chandecl c") != std::string::npos);
   REQUIRE(output.find("chanformal d") != std::string::npos);
 }
+
+TEST_CASE("par_statement_tree") {
+  TestContext ctx;
+  auto output = ctx.treeXProgramSrc(
+                       "proc source(chan c) is skip\n"
+                       "proc sink(chan c) is skip\n"
+                       "proc main() is chan a; par { source(a) sink(a) }")
+                    .str();
+  REQUIRE(output.find("parstmt") != std::string::npos);
+  REQUIRE(output.find("call source") != std::string::npos);
+  REQUIRE(output.find("call sink") != std::string::npos);
+}
+
+TEST_CASE("par_branch_must_be_call_error") {
+  TestContext ctx;
+  auto program = "proc sink(chan c) is skip\n"
+                 "proc main() is chan a; par { skip sink(a) }";
+  REQUIRE_THROWS_AS(ctx.treeXProgramSrc(program), xcmp::ParserTokenError);
+}
