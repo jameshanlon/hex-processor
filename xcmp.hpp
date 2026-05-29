@@ -1205,6 +1205,50 @@ public:
   std::vector<std::unique_ptr<Statement>> &getBranches() { return branches; }
 };
 
+class OutStatement : public Statement {
+  std::unique_ptr<Expr> channel, value;
+
+public:
+  OutStatement(Location location, std::unique_ptr<Expr> channel,
+               std::unique_ptr<Expr> value)
+      : Statement(location), channel(std::move(channel)),
+        value(std::move(value)) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    if (visitor->shouldRecurseStmts()) {
+      channel->accept(visitor);
+      replaceExpr(channel, visitor);
+      value->accept(visitor);
+      replaceExpr(value, visitor);
+    }
+    visitor->visitPost(*this);
+  }
+  const std::unique_ptr<Expr> &getChannel() { return channel; }
+  const std::unique_ptr<Expr> &getValue() { return value; }
+};
+
+class InStatement : public Statement {
+  std::unique_ptr<Expr> channel, target;
+
+public:
+  InStatement(Location location, std::unique_ptr<Expr> channel,
+              std::unique_ptr<Expr> target)
+      : Statement(location), channel(std::move(channel)),
+        target(std::move(target)) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    if (visitor->shouldRecurseStmts()) {
+      channel->accept(visitor);
+      replaceExpr(channel, visitor);
+      target->accept(visitor);
+      replaceExpr(target, visitor);
+    }
+    visitor->visitPost(*this);
+  }
+  const std::unique_ptr<Expr> &getChannel() { return channel; }
+  const std::unique_ptr<Expr> &getTarget() { return target; }
+};
+
 // Procedures and functions ================================================= //
 
 class Proc : public AstNode {
@@ -1465,6 +1509,18 @@ public:
     indentCount++;
   };
   void visitPost(ParStatement &stmt) override { indentCount--; };
+  void visitPre(OutStatement &stmt) override {
+    indent();
+    outs << fmt::format("outstmt{}\n", locString(stmt));
+    indentCount++;
+  };
+  void visitPost(OutStatement &stmt) override { indentCount--; };
+  void visitPre(InStatement &stmt) override {
+    indent();
+    outs << fmt::format("instmt{}\n", locString(stmt));
+    indentCount++;
+  };
+  void visitPost(InStatement &stmt) override { indentCount--; };
 };
 
 //===---------------------------------------------------------------------===//
@@ -1849,6 +1905,18 @@ class Parser {
         auto callExpr = std::unique_ptr<CallExpr>(
             static_cast<CallExpr *>(element.release()));
         return std::make_unique<CallStatement>(location, std::move(callExpr));
+      }
+      // Channel output: <channel> "!" <expr>
+      if (lexer.getLastToken() == Token::PLING) {
+        lexer.getNextToken();
+        return std::make_unique<OutStatement>(location, std::move(element),
+                                              parseExpr());
+      }
+      // Channel input: <channel> "?" <element>
+      if (lexer.getLastToken() == Token::QUERY) {
+        lexer.getNextToken();
+        return std::make_unique<InStatement>(location, std::move(element),
+                                             parseElement());
       }
       // Assignment
       expect(Token::ASS);
