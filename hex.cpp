@@ -47,6 +47,10 @@ const char *hex::oprInstrEnumToStr(OprInstr oprInstr) {
     return "SUB";
   case SVC:
     return "SVC";
+  case IN:
+    return "IN";
+  case OUT:
+    return "OUT";
   default:
     return "UNKNOWN";
   }
