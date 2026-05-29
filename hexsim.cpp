@@ -56,13 +56,16 @@ int main(int argc, const char *argv[]) {
       help(argv);
       return 1;
     }
-    hexsim::Processor p(std::cin, std::cout, maxCycles);
-    p.setTracing(trace);
-    p.load(filename, dumpBinary);
     if (dumpBinary) {
+      // Dumping inspects a single image directly.
+      hexsim::Processor p(std::cin, std::cout, maxCycles);
+      p.load(filename, true);
       return 0;
     }
-    return p.run();
+    hexsim::System system(std::cin, std::cout, maxCycles);
+    system.setTracing(trace);
+    system.loadNetwork(filename);
+    return system.run();
   } catch (std::exception &e) {
     std::cerr << "Error: " << e.what() << "\n";
     return 1;
