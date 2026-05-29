@@ -25,7 +25,7 @@ enum Instr {
   NFIX = 0xF,
 };
 
-enum OprInstr { BRB = 0x0, ADD = 0x1, SUB = 0x2, SVC = 0x3 };
+enum OprInstr { BRB = 0x0, ADD = 0x1, SUB = 0x2, SVC = 0x3, IN = 0x4, OUT = 0x5 };
 
 enum class Syscall { EXIT = 0, WRITE = 1, READ = 2, NUM_VALUES };
 

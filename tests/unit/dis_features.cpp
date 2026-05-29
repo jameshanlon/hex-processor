@@ -79,6 +79,14 @@ TEST_CASE("[dis_features] opr_sub_instructions") {
   REQUIRE(output.find("SVC") != std::string::npos);
 }
 
+TEST_CASE("[dis_features] in_out_opcodes") {
+  std::vector<uint8_t> program = {0xD4, 0xD5};
+  hexdis::DebugInfo debugInfo;
+  std::ostringstream out;
+  hexdis::disassemble(program, out, debugInfo, false);
+  REQUIRE(out.str() == "  0x0000  d4  IN\n  0x0001  d5  OUT\n");
+}
+
 TEST_CASE("[dis_features] pfix_extended_operand") {
   TestContext ctx;
   // LDAC 32 requires PFIX 2, LDAC 0 -> operand becomes 0x20 = 32.
