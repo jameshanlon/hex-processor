@@ -87,6 +87,14 @@ TEST_CASE("[dis_features] in_out_opcodes") {
   REQUIRE(out.str() == "  0x0000  d4  IN\n  0x0001  d5  OUT\n");
 }
 
+TEST_CASE("[dis_features] in_out_assemble_roundtrip") {
+  TestContext ctx;
+  auto output = assembleAndDisassemble(ctx, "OPR IN\n"
+                                            "OPR OUT\n");
+  REQUIRE(output.find("IN") != std::string::npos);
+  REQUIRE(output.find("OUT") != std::string::npos);
+}
+
 TEST_CASE("[dis_features] pfix_extended_operand") {
   TestContext ctx;
   // LDAC 32 requires PFIX 2, LDAC 0 -> operand becomes 0x20 = 32.
