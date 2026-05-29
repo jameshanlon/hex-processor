@@ -79,6 +79,8 @@ enum class Token {
   SVC,
   ADD,
   SUB,
+  IN,
+  OUT,
   OPR,
   IDENTIFIER,
   END_OF_FILE,
@@ -138,6 +140,10 @@ static const char *tokenEnumStr(Token token) {
     return "ADD";
   case Token::SUB:
     return "SUB";
+  case Token::IN:
+    return "IN";
+  case Token::OUT:
+    return "OUT";
   case Token::OPR:
     return "OPR";
   case Token::IDENTIFIER:
@@ -208,6 +214,10 @@ static hex::OprInstr tokenToOprInstr(Token token) {
     return hex::OprInstr::ADD;
   case Token::SUB:
     return hex::OprInstr::SUB;
+  case Token::IN:
+    return hex::OprInstr::IN;
+  case Token::OUT:
+    return hex::OprInstr::OUT;
   default:
     throw std::runtime_error(
         std::string("unexpected operand instrucion token: ") +
@@ -437,14 +447,14 @@ class InstrOp : public Directive {
 public:
   InstrOp(Token token, Token opcode) : Directive(token), opcode(opcode) {
     if (opcode != Token::BRB && opcode != Token::ADD && opcode != Token::SUB &&
-        opcode != Token::SVC) {
+        opcode != Token::SVC && opcode != Token::IN && opcode != Token::OUT) {
       throw InvalidOprError(opcode);
     }
   }
   InstrOp(Location location, Token token, Token opcode)
       : Directive(location, token), opcode(opcode) {
     if (opcode != Token::BRB && opcode != Token::ADD && opcode != Token::SUB &&
-        opcode != Token::SVC) {
+        opcode != Token::SVC && opcode != Token::IN && opcode != Token::OUT) {
       throw InvalidOprError(location, opcode);
     }
   }
@@ -512,6 +522,7 @@ class Lexer {
     table.insert("BRZ", Token::BRZ);
     table.insert("DATA", Token::DATA);
     table.insert("FUNC", Token::FUNC);
+    table.insert("IN", Token::IN);
     table.insert("LDAC", Token::LDAC);
     table.insert("LDAI", Token::LDAI);
     table.insert("LDAM", Token::LDAM);
@@ -520,6 +531,7 @@ class Lexer {
     table.insert("LDBI", Token::LDBI);
     table.insert("LDBM", Token::LDBM);
     table.insert("OPR", Token::OPR);
+    table.insert("OUT", Token::OUT);
     table.insert("PROC", Token::PROC);
     table.insert("STAI", Token::STAI);
     table.insert("STAM", Token::STAM);
