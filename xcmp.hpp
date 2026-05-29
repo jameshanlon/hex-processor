@@ -1188,6 +1188,23 @@ public:
   const std::unique_ptr<Expr> &getRHS() { return RHS; }
 };
 
+class ParStatement : public Statement {
+  std::vector<std::unique_ptr<Statement>> branches;
+
+public:
+  ParStatement(Location location,
+               std::vector<std::unique_ptr<Statement>> branches)
+      : Statement(location), branches(std::move(branches)) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    for (auto &branch : branches) {
+      branch->accept(visitor);
+    }
+    visitor->visitPost(*this);
+  }
+  std::vector<std::unique_ptr<Statement>> &getBranches() { return branches; }
+};
+
 // Procedures and functions ================================================= //
 
 class Proc : public AstNode {
@@ -1442,6 +1459,12 @@ public:
     indentCount++;
   };
   void visitPost(AssStatement &stmt) override { indentCount--; };
+  void visitPre(ParStatement &stmt) override {
+    indent();
+    outs << fmt::format("parstmt{}\n", locString(stmt));
+    indentCount++;
+  };
+  void visitPost(ParStatement &stmt) override { indentCount--; };
 };
 
 //===---------------------------------------------------------------------===//
@@ -1799,6 +1822,25 @@ class Parser {
       auto body = parseStatements();
       expect(Token::END);
       return std::make_unique<SeqStatement>(location, std::move(body));
+    }
+    case Token::PAR: {
+      lexer.getNextToken();
+      expect(Token::BEGIN);
+      std::vector<std::unique_ptr<Statement>> branches;
+      while (lexer.getLastToken() != Token::END) {
+        auto branchLocation = lexer.getLocation();
+        auto branch = parseStatement();
+        // Each par branch must be a procedure call (the entry process for one
+        // processor).
+        if (!dynamic_cast<CallStatement *>(branch.get())) {
+          throw ParserTokenError(branchLocation,
+                                 "par branch must be a procedure call",
+                                 lexer.getLastToken());
+        }
+        branches.push_back(std::move(branch));
+      }
+      expect(Token::END);
+      return std::make_unique<ParStatement>(location, std::move(branches));
     }
     case Token::IDENTIFIER: {
       auto element = parseElement();
