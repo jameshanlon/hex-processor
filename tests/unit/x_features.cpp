@@ -1453,3 +1453,13 @@ TEST_CASE("semantics_non_const_array_length_error") {
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program),
                     xcmp::NonConstArrayLengthError);
 }
+
+//===---------------------------------------------------------------------===//
+// Message passing: chan, par, !, ? (front-end)
+//===---------------------------------------------------------------------===//
+
+TEST_CASE("chan_par_pling_query_tokens") {
+  TestContext ctx;
+  auto output = ctx.tokeniseXProgramSrc("chan par ! ?").str();
+  REQUIRE(output == "chan\npar\n!\n?\nEOF\n");
+}
