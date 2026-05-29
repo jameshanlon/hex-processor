@@ -73,6 +73,10 @@ enum class Token {
   LE,
   GR,
   GE,
+  CHAN,
+  PAR,
+  PLING,
+  QUERY,
   END_OF_FILE
 };
 
@@ -158,6 +162,14 @@ inline const char *tokenEnumStr(Token token) {
     return ">";
   case Token::GE:
     return ">=";
+  case Token::CHAN:
+    return "chan";
+  case Token::PAR:
+    return "par";
+  case Token::PLING:
+    return "!";
+  case Token::QUERY:
+    return "?";
   case Token::END_OF_FILE:
     return "END_OF_FILE";
   default:
@@ -276,6 +288,7 @@ class Lexer {
   void declareKeywords() {
     table.insert("and", Token::AND);
     table.insert("array", Token::ARRAY);
+    table.insert("chan", Token::CHAN);
     table.insert("do", Token::DO);
     table.insert("else", Token::ELSE);
     table.insert("false", Token::FALSE);
@@ -283,6 +296,7 @@ class Lexer {
     table.insert("if", Token::IF);
     table.insert("is", Token::IS);
     table.insert("or", Token::OR);
+    table.insert("par", Token::PAR);
     table.insert("proc", Token::PROC);
     table.insert("return", Token::RETURN);
     table.insert("skip", Token::SKIP);
@@ -436,6 +450,14 @@ class Lexer {
     case ';':
       readChar();
       token = Token::SEMICOLON;
+      break;
+    case '!':
+      readChar();
+      token = Token::PLING;
+      break;
+    case '?':
+      readChar();
+      token = Token::QUERY;
       break;
     case ',':
       readChar();
