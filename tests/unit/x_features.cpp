@@ -1538,3 +1538,21 @@ TEST_CASE("message_passing_ring_tree") {
   REQUIRE(output.find("chanformal in") != std::string::npos);
   REQUIRE(output.find("chanformal out") != std::string::npos);
 }
+
+TEST_CASE("out_statement_codegen") {
+  TestContext ctx;
+  auto asmText = ctx.asmXProgramSrc("proc worker(chan c) is c ! 42\n"
+                                    "proc main() is skip",
+                                    true)
+                     .str();
+  REQUIRE(asmText.find("OPR OUT") != std::string::npos);
+}
+
+TEST_CASE("in_statement_codegen") {
+  TestContext ctx;
+  auto asmText = ctx.asmXProgramSrc("proc worker(chan c) is var v; c ? v\n"
+                                    "proc main() is skip",
+                                    true)
+                     .str();
+  REQUIRE(asmText.find("OPR IN") != std::string::npos);
+}

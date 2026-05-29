@@ -2561,6 +2561,8 @@ public:
   void genADD() { genOPR(hexasm::Token::ADD); }
   void genSUB() { genOPR(hexasm::Token::SUB); }
   void genSVC() { genOPR(hexasm::Token::SVC); }
+  void genIN() { genOPR(hexasm::Token::IN); }
+  void genOUT() { genOPR(hexasm::Token::OUT); }
 
   /// Code generation visitors ---------------------------------------------///
 
@@ -2904,6 +2906,52 @@ public:
         assert(0 && "unexpected target of assignment statement");
       }
     }
+
+    void visitPost(OutStatement &stmt) {
+      // Channel output c ! e: materialise e in areg, the channel slot in breg,
+      // then OPR OUT.
+      cb.genExpr(stmt.getValue(), currentScope);
+      cb.genExpr(stmt.getChannel(), currentScope, Reg::B);
+      cb.genOUT();
+    }
+
+    void visitPost(InStatement &stmt) {
+      if (auto *varRef = dynamic_cast<VarRefExpr *>(stmt.getTarget().get())) {
+        // Channel input c ? v: load the channel slot in breg, OPR IN leaves the
+        // received word in areg, then store it to the target variable.
+        cb.genExpr(stmt.getChannel(), currentScope, Reg::B);
+        cb.genIN();
+        auto symbol = st.lookup(std::make_pair(currentScope, varRef->getName()),
+                                stmt.getLocation());
+        if (symbol->getScope().empty()) {
+          cb.genSTAM(symbol->getGlobalLabel());
+        } else {
+          cb.genLDBM(SP_OFFSET);
+          cb.genSTAI_FB(cb.getCurrentFrame(), symbol->getStackOffset());
+        }
+      } else if (auto *arraySub = dynamic_cast<ArraySubscriptExpr *>(
+                     stmt.getTarget().get())) {
+        // Channel input into an array element c ? a[i]: compute the element
+        // address and stash it, perform the input, then store areg there.
+        cb.genExpr(arraySub->getExpr(), currentScope);
+        cb.genVar(Reg::B,
+                  st.lookup(std::make_pair(currentScope, arraySub->getName()),
+                            arraySub->getLocation()));
+        cb.genADD();
+        auto stackOffset = cb.getCurrentFrame()->getOffset();
+        cb.getCurrentFrame()->incOffset(1);
+        cb.genLDBM(SP_OFFSET);
+        cb.genSTAI_FB(cb.getCurrentFrame(), -stackOffset);
+        cb.genExpr(stmt.getChannel(), currentScope, Reg::B);
+        cb.genIN();
+        cb.genLDBM(SP_OFFSET);
+        cb.genLDBI_FB(cb.getCurrentFrame(), -stackOffset);
+        cb.genSTAI(0);
+        cb.getCurrentFrame()->decOffset(1);
+      } else {
+        assert(0 && "unexpected target of channel input statement");
+      }
+    }
   };
 
   /// Generate code for an expression using the ExprCodeGen visitor.
@@ -3185,6 +3233,9 @@ public:
   void visitPost(ArrayFormal &formal) { assignLocation(formal); }
   void visitPost(ProcFormal &formal) { assignLocation(formal); }
   void visitPost(FuncFormal &formal) { assignLocation(formal); }
+  // A channel formal is a one-word value (the link slot index), passed by
+  // value exactly like a val formal.
+  void visitPost(ChanFormal &formal) { assignLocation(formal); }
 };
 
 /// Assign stack locations to local variables, starting from the base of the
