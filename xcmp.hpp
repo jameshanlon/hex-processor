@@ -611,6 +611,7 @@ class Expr;
 class ArrayDecl;
 class ValDecl;
 class VarDecl;
+class ChanDecl;
 class BinaryOpExpr;
 class UnaryOpExpr;
 class StringExpr;
@@ -624,6 +625,7 @@ class VarFormal;
 class ArrayFormal;
 class ProcFormal;
 class FuncFormal;
+class ChanFormal;
 class SkipStatement;
 class StopStatement;
 class ReturnStatement;
@@ -632,6 +634,9 @@ class WhileStatement;
 class SeqStatement;
 class CallStatement;
 class AssStatement;
+class ParStatement;
+class OutStatement;
+class InStatement;
 
 /// A visitor base class for the AST.
 class AstVisitor {
@@ -675,6 +680,8 @@ public:
   virtual void visitPost(ArrayDecl &) {}
   virtual void visitPre(VarDecl &) {}
   virtual void visitPost(VarDecl &) {}
+  virtual void visitPre(ChanDecl &) {}
+  virtual void visitPost(ChanDecl &) {}
   virtual void visitPre(ValDecl &) {}
   virtual void visitPost(ValDecl &) {}
   virtual void visitPre(BinaryOpExpr &) {}
@@ -703,6 +710,8 @@ public:
   virtual void visitPost(ProcFormal &) {}
   virtual void visitPre(FuncFormal &) {}
   virtual void visitPost(FuncFormal &) {}
+  virtual void visitPre(ChanFormal &) {}
+  virtual void visitPost(ChanFormal &) {}
   virtual void visitPre(SkipStatement &) {}
   virtual void visitPost(SkipStatement &) {}
   virtual void visitPre(StopStatement &) {}
@@ -719,6 +728,12 @@ public:
   virtual void visitPost(CallStatement &) {}
   virtual void visitPre(AssStatement &) {}
   virtual void visitPost(AssStatement &) {}
+  virtual void visitPre(ParStatement &) {}
+  virtual void visitPost(ParStatement &) {}
+  virtual void visitPre(OutStatement &) {}
+  virtual void visitPost(OutStatement &) {}
+  virtual void visitPre(InStatement &) {}
+  virtual void visitPost(InStatement &) {}
 };
 
 /// AST node base class.
@@ -938,6 +953,15 @@ public:
   }
 };
 
+class ChanDecl : public Decl {
+public:
+  ChanDecl(Location location, std::string name) : Decl(location, name) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    visitor->visitPost(*this);
+  }
+};
+
 class ArrayDecl : public Decl {
   std::unique_ptr<Expr> expr;
 
@@ -1007,6 +1031,15 @@ public:
 class FuncFormal : public Formal {
 public:
   FuncFormal(Location location, std::string name) : Formal(location, name) {}
+  virtual void accept(AstVisitor *visitor) override {
+    visitor->visitPre(*this);
+    visitor->visitPost(*this);
+  }
+};
+
+class ChanFormal : public Formal {
+public:
+  ChanFormal(Location location, std::string name) : Formal(location, name) {}
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -1257,6 +1290,11 @@ public:
     outs << fmt::format("vardecl {}{}\n", decl.getName(), locString(decl));
   };
   void visitPost(VarDecl &decl) override {}
+  void visitPre(ChanDecl &decl) override {
+    indent();
+    outs << fmt::format("chandecl {}{}\n", decl.getName(), locString(decl));
+  };
+  void visitPost(ChanDecl &decl) override {}
   void visitPre(ValDecl &decl) override {
     indent();
     outs << fmt::format("valdecl {}{}\n", decl.getName(), locString(decl));
@@ -1346,6 +1384,12 @@ public:
                         locString(formal));
   };
   void visitPost(FuncFormal &formal) override {};
+  void visitPre(ChanFormal &formal) override {
+    indent();
+    outs << fmt::format("chanformal {}{}\n", formal.getName(),
+                        locString(formal));
+  };
+  void visitPost(ChanFormal &formal) override {};
   void visitPre(SkipStatement &stmt) override {
     indent();
     outs << fmt::format("skipstmt{}\n", locString(stmt));
@@ -1598,6 +1642,12 @@ class Parser {
       expect(Token::SEMICOLON);
       return std::make_unique<VarDecl>(location, name);
     }
+    case Token::CHAN: {
+      lexer.getNextToken();
+      auto name = parseIdentifier();
+      expect(Token::SEMICOLON);
+      return std::make_unique<ChanDecl>(location, name);
+    }
     case Token::ARRAY: {
       lexer.getNextToken();
       auto name = parseIdentifier();
@@ -1621,7 +1671,8 @@ class Parser {
   std::vector<std::unique_ptr<Decl>> parseLocalDecls() {
     std::vector<std::unique_ptr<Decl>> decls;
     while (lexer.getLastToken() == Token::VAL ||
-           lexer.getLastToken() == Token::VAR) {
+           lexer.getLastToken() == Token::VAR ||
+           lexer.getLastToken() == Token::CHAN) {
       decls.push_back(parseDecl());
     }
     return decls;
@@ -1637,6 +1688,7 @@ class Parser {
     std::vector<std::unique_ptr<Decl>> decls;
     while (lexer.getLastToken() == Token::VAL ||
            lexer.getLastToken() == Token::VAR ||
+           lexer.getLastToken() == Token::CHAN ||
            lexer.getLastToken() == Token::ARRAY) {
       decls.push_back(parseDecl());
     }
@@ -1672,6 +1724,9 @@ class Parser {
     case Token::VAR:
       lexer.getNextToken();
       return std::make_unique<VarFormal>(location, parseIdentifier());
+    case Token::CHAN:
+      lexer.getNextToken();
+      return std::make_unique<ChanFormal>(location, parseIdentifier());
     case Token::ARRAY:
       lexer.getNextToken();
       return std::make_unique<ArrayFormal>(location, parseIdentifier());
@@ -1799,7 +1854,8 @@ class Parser {
     // Declarations
     std::vector<std::unique_ptr<Decl>> decls;
     if (lexer.getLastToken() == Token::VAL ||
-        lexer.getLastToken() == Token::VAR) {
+        lexer.getLastToken() == Token::VAR ||
+        lexer.getLastToken() == Token::CHAN) {
       decls = parseLocalDecls();
     }
     auto statement = parseStatement();
@@ -1837,7 +1893,7 @@ public:
 // Symbol table.
 //===---------------------------------------------------------------------===//
 
-enum class SymbolType { VAL, VAR, ARRAY, FUNC, PROC };
+enum class SymbolType { VAL, VAR, ARRAY, FUNC, PROC, CHAN };
 
 class Symbol;
 
@@ -1949,6 +2005,12 @@ public:
                                                 getCurrentScope(),
                                                 decl.getName()));
   }
+  void visitPre(ChanDecl &decl) {
+    symbolTable.insert(std::make_pair(getCurrentScope(), decl.getName()),
+                       std::make_unique<Symbol>(SymbolType::CHAN, &decl,
+                                                getCurrentScope(),
+                                                decl.getName()));
+  }
   void visitPre(ValDecl &decl) {
     symbolTable.insert(std::make_pair(getCurrentScope(), decl.getName()),
                        std::make_unique<Symbol>(SymbolType::VAL, &decl,
@@ -1982,6 +2044,12 @@ public:
   void visitPre(FuncFormal &formal) {
     symbolTable.insert(std::make_pair(getCurrentScope(), formal.getName()),
                        std::make_unique<Symbol>(SymbolType::FUNC, &formal,
+                                                getCurrentScope(),
+                                                formal.getName()));
+  }
+  void visitPre(ChanFormal &formal) {
+    symbolTable.insert(std::make_pair(getCurrentScope(), formal.getName()),
+                       std::make_unique<Symbol>(SymbolType::CHAN, &formal,
                                                 getCurrentScope(),
                                                 formal.getName()));
   }

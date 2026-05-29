@@ -1257,7 +1257,7 @@ TEST_CASE("token_error_string") {
 TEST_CASE("token_error_unexpected_char") {
   TestContext ctx;
 
-  auto program = "val foo = ?";
+  auto program = "val foo = @";
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::TokenError);
 }
 
@@ -1462,4 +1462,13 @@ TEST_CASE("chan_par_pling_query_tokens") {
   TestContext ctx;
   auto output = ctx.tokeniseXProgramSrc("chan par ! ?").str();
   REQUIRE(output == "chan\npar\n!\n?\nEOF\n");
+}
+
+TEST_CASE("chan_declaration_and_formal_tree") {
+  TestContext ctx;
+  auto output = ctx.treeXProgramSrc("chan c;\n"
+                                    "proc main(chan d) is skip")
+                    .str();
+  REQUIRE(output.find("chandecl c") != std::string::npos);
+  REQUIRE(output.find("chanformal d") != std::string::npos);
 }
