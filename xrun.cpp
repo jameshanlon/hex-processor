@@ -51,10 +51,10 @@ int main(int argc, char *argv[]) {
     }
     if (driver.runCatchExceptions(xcmp::DriverAction::EMIT_BINARY,
                                   inputFilename, true, "a.bin", false) == 0) {
-      hexsim::Processor processor(std::cin, std::cout, maxCycles);
-      processor.setTracing(trace);
-      processor.load("a.bin");
-      processor.run();
+      hexsim::System system(std::cin, std::cout, maxCycles);
+      system.setTracing(trace);
+      system.loadNetwork("a.bin");
+      return system.run();
     }
   } catch (const std::exception &e) {
     std::cerr << fmt::format("Error: {}\n", e.what());

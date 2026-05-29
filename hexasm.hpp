@@ -974,9 +974,8 @@ public:
     }
   }
 
-  /// Emit the binary.
-  void emitBin(std::string outputFilename) {
-    std::fstream outputFile(outputFilename, std::ios::out | std::ios::binary);
+  /// Emit a complete image (size-word + program + debug info) to a stream.
+  void emitImage(std::ostream &outputFile) {
     // The first four bytes are the remaining binary size.
     uint32_t programSizeWords = programSizeBytes >> 2;
     outputFile.write(reinterpret_cast<const char *>(&programSizeWords),
@@ -984,7 +983,12 @@ public:
     // Emit the program.
     emitProgramBin(outputFile);
     emitDebugInfo(outputFile);
-    // Done.
+  }
+
+  /// Emit the binary.
+  void emitBin(std::string outputFilename) {
+    std::fstream outputFile(outputFilename, std::ios::out | std::ios::binary);
+    emitImage(outputFile);
     outputFile.close();
   }
 };

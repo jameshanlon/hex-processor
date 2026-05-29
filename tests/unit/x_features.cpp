@@ -1,5 +1,6 @@
 #include "TestContext.hpp"
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include <fmt/format.h>
 #include <iostream>
 #include <ostream>
@@ -1555,4 +1556,64 @@ TEST_CASE("in_statement_codegen") {
                                     true)
                      .str();
   REQUIRE(asmText.find("OPR IN") != std::string::npos);
+}
+
+TEST_CASE("message_passing_run_pipeline") {
+  TestContext ctx;
+  // source sends 'A' to sink over channel c; sink writes it to simout.
+  auto program = "val put = 1;\n"
+                 "proc putval(val c) is put(c, 0)\n"
+                 "proc source(chan out) is out ! 65\n"
+                 "proc sink(chan in) is var v; { in ? v; putval(v) }\n"
+                 "proc main() is chan c; par { source(c) sink(c) }";
+  REQUIRE(ctx.runXProgramSrc(program) == 0);
+  REQUIRE(ctx.simOutBuffer.str() == "A");
+}
+
+TEST_CASE("message_passing_run_relay") {
+  TestContext ctx;
+  // A 3-stage pipeline: source -> relay -> sink, sink prints the relayed char.
+  auto program = "val put = 1;\n"
+                 "proc putval(val c) is put(c, 0)\n"
+                 "proc source(chan out) is out ! 90\n"
+                 "proc relay(chan in, chan out) is var v; "
+                 "{ in ? v; out ! v }\n"
+                 "proc sink(chan in) is var v; { in ? v; putval(v) }\n"
+                 "proc main() is chan a; chan b; "
+                 "par { source(a) relay(a, b) sink(b) }";
+  REQUIRE(ctx.runXProgramSrc(program) == 0);
+  REQUIRE(ctx.simOutBuffer.str() == "Z");
+}
+
+TEST_CASE("message_passing_run_deadlock") {
+  TestContext ctx;
+  // Both workers read before writing, so the ring deadlocks at runtime.
+  auto program = "proc worker(chan in, chan out) is var v; "
+                 "{ in ? v; out ! v }\n"
+                 "proc main() is chan a; chan b; "
+                 "par { worker(a, b) worker(b, a) }";
+  REQUIRE_THROWS_WITH(ctx.runXProgramSrc(program),
+                      Catch::Matchers::ContainsSubstring("deadlock"));
+}
+
+TEST_CASE("message_passing_channel_endpoint_error") {
+  TestContext ctx;
+  // Channel a is used by only one process.
+  auto program = "proc reader(chan c) is var v; c ? v\n"
+                 "proc main() is chan a; par { reader(a) }";
+  REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::NetworkError);
+}
+
+TEST_CASE("message_passing_channel_direction_error") {
+  TestContext ctx;
+  // Channel a has two readers and no writer.
+  auto program = "proc reader(chan c) is var v; c ? v\n"
+                 "proc main() is chan a; par { reader(a) reader(a) }";
+  REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::NetworkError);
+}
+
+TEST_CASE("message_passing_run_pipe_x_file") {
+  TestContext ctx;
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("pipe.x")) == 0);
+  REQUIRE(ctx.simOutBuffer.str() == "P");
 }
