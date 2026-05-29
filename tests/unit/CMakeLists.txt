@@ -8,7 +8,8 @@ add_executable(
   asm_programs.cpp
   x_features.cpp
   x_programs.cpp
-  dis_features.cpp)
+  dis_features.cpp
+  sim_features.cpp)
 
 target_link_libraries(UnitTests PRIVATE Catch2::Catch2WithMain fmt::fmt)
 
