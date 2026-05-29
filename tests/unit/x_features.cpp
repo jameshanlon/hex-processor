@@ -1491,3 +1491,50 @@ TEST_CASE("par_branch_must_be_call_error") {
                  "proc main() is chan a; par { skip sink(a) }";
   REQUIRE_THROWS_AS(ctx.treeXProgramSrc(program), xcmp::ParserTokenError);
 }
+
+TEST_CASE("out_statement_tree") {
+  TestContext ctx;
+  auto output = ctx.treeXProgramSrc("proc worker(chan c) is c ! 42\n"
+                                    "proc main() is skip")
+                    .str();
+  REQUIRE(output.find("outstmt") != std::string::npos);
+  REQUIRE(output.find("number 42") != std::string::npos);
+}
+
+TEST_CASE("in_statement_tree") {
+  TestContext ctx;
+  auto output = ctx.treeXProgramSrc("proc worker(chan c) is var v; c ? v\n"
+                                    "proc main() is skip")
+                    .str();
+  REQUIRE(output.find("instmt") != std::string::npos);
+  REQUIRE(output.find("varref v") != std::string::npos);
+}
+
+TEST_CASE("in_statement_array_target_tree") {
+  TestContext ctx;
+  auto output = ctx.treeXProgramSrc("array a[4];\n"
+                                    "proc worker(chan c) is c ? a[0]\n"
+                                    "proc main() is skip")
+                    .str();
+  REQUIRE(output.find("instmt") != std::string::npos);
+  REQUIRE(output.find("arraysubscript a") != std::string::npos);
+}
+
+TEST_CASE("message_passing_ring_tree") {
+  TestContext ctx;
+  // A reused worker proc placed on a two-processor ring exercises chan
+  // declarations/formals, par, ! and ? together.
+  auto output = ctx.treeXProgramSrc(
+                       "proc worker(chan in, chan out) is var v; "
+                       "{ in ? v; out ! v }\n"
+                       "proc main() is chan a; chan b; "
+                       "par { worker(a, b) worker(b, a) }")
+                    .str();
+  REQUIRE(output.find("parstmt") != std::string::npos);
+  REQUIRE(output.find("instmt") != std::string::npos);
+  REQUIRE(output.find("outstmt") != std::string::npos);
+  REQUIRE(output.find("chandecl a") != std::string::npos);
+  REQUIRE(output.find("chandecl b") != std::string::npos);
+  REQUIRE(output.find("chanformal in") != std::string::npos);
+  REQUIRE(output.find("chanformal out") != std::string::npos);
+}
