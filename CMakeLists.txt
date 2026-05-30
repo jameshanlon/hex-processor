@@ -165,6 +165,12 @@ if(USE_VERILATOR)
   verilate(liu_tb SOURCES verilog/hex_pkg.sv verilog/link_interface.sv
            PREFIX Vlink_interface TOP_MODULE link_interface
            VERILATOR_ARGS -Wall -Wno-UNUSEDPARAM -Wno-UNUSEDSIGNAL)
+
+  add_executable(core_tb tests/rtl/core_tb.cpp)
+  verilate(core_tb SOURCES verilog/hex_pkg.sv verilog/memory.sv
+           verilog/processor.sv verilog/link_interface.sv verilog/core.sv
+           PREFIX Vcore TOP_MODULE core
+           VERILATOR_ARGS -Wall -Wno-UNUSEDPARAM -Wno-UNUSEDSIGNAL)
 endif()
 
 enable_testing()

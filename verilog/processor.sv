@@ -14,7 +14,14 @@ module processor
     input  hex_pkg::data_t    i_d_data,
     // Syscall interface
     output logic              o_syscall_valid,
-    output hex_pkg::syscall_t o_syscall
+    output hex_pkg::syscall_t o_syscall,
+    // Channel link interface (to the per-core link_interface unit).
+    output logic              o_op_out,
+    output logic              o_op_in,
+    output hex_pkg::slot_t    o_chan_slot,
+    output hex_pkg::data_t    o_chan_areg,
+    input  logic              i_liu_busy,
+    input  hex_pkg::data_t    i_liu_in_word
   );
 
   // State
@@ -26,6 +33,9 @@ module processor
   // Nets
   hex_pkg::instr_t   instr /* verilator public */;
   logic              instr_svc;
+  logic              instr_in;
+  logic              instr_out;
+  logic              stall;
   hex_pkg::iaddr_t   pc_d;
   hex_pkg::data_t    areg_d;
   hex_pkg::data_t    breg_d;
@@ -41,7 +51,7 @@ module processor
       areg_q <= '0;
       breg_q <= '0;
       oreg_q <= '0;
-    end else begin
+    end else if (!stall) begin
       pc_q   <= pc_d;
       areg_q <= areg_d;
       breg_q <= breg_d;
@@ -55,6 +65,17 @@ module processor
   assign instr_opc = instr.opcode;
   assign instr_opr = instr.operand;
   assign instr_svc = instr.opcode == hex_pkg::OPR && instr.operand == hex_pkg::SVC;
+  assign instr_in  = instr.opcode == hex_pkg::OPR && instr.operand == hex_pkg::IN;
+  assign instr_out = instr.opcode == hex_pkg::OPR && instr.operand == hex_pkg::OUT;
+
+  // Channel ops hand off to the link interface; the channel index is in breg
+  // and the word to send is in areg. The processor stalls (freezes all state)
+  // until the link interface completes the rendezvous.
+  assign o_op_out    = instr_out;
+  assign o_op_in     = instr_in;
+  assign o_chan_slot = breg_q[hex_pkg::SLOT_W-1:0];
+  assign o_chan_areg = areg_q;
+  assign stall       = (instr_in || instr_out) && i_liu_busy;
 
   // Current operand (oreg) value.
   assign opr_d = oreg_q | {28'b0, instr.operand};
@@ -96,6 +117,7 @@ module processor
         unique case(instr.operand)
           hex_pkg::ADD: areg_d = {areg_q + breg_q};
           hex_pkg::SUB: areg_d = {areg_q - breg_q};
+          hex_pkg::IN:  areg_d = i_liu_in_word;
           default:;
         endcase
       default:;
