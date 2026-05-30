@@ -1897,20 +1897,18 @@ class Parser {
     case Token::PAR: {
       lexer.getNextToken();
       expect(Token::BEGIN);
-      std::vector<std::unique_ptr<Statement>> branches;
-      while (lexer.getLastToken() != Token::END) {
-        auto branchLocation = lexer.getLocation();
-        auto branch = parseStatement();
-        // Each par branch must be a procedure call (the entry process for one
-        // processor).
+      // Branches are separated by ";", consistent with the other "{ }" blocks.
+      auto branches = parseStatements();
+      expect(Token::END);
+      // Each par branch must be a procedure call (the entry process for one
+      // processor).
+      for (auto &branch : branches) {
         if (!dynamic_cast<CallStatement *>(branch.get())) {
-          throw ParserTokenError(branchLocation,
+          throw ParserTokenError(branch->getLocation(),
                                  "par branch must be a procedure call",
                                  lexer.getLastToken());
         }
-        branches.push_back(std::move(branch));
       }
-      expect(Token::END);
       return std::make_unique<ParStatement>(location, std::move(branches));
     }
     case Token::IDENTIFIER: {
