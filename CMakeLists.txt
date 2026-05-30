@@ -160,6 +160,11 @@ if(USE_VERILATOR)
   add_executable(router_tb tests/rtl/router_tb.cpp)
   verilate(router_tb PREFIX Vrouter SOURCES verilog/hex_pkg.sv verilog/router.sv
            TOP_MODULE router VERILATOR_ARGS -Wall -Wno-UNUSEDPARAM)
+
+  add_executable(liu_tb tests/rtl/liu_tb.cpp)
+  verilate(liu_tb SOURCES verilog/hex_pkg.sv verilog/link_interface.sv
+           PREFIX Vlink_interface TOP_MODULE link_interface
+           VERILATOR_ARGS -Wall -Wno-UNUSEDPARAM -Wno-UNUSEDSIGNAL)
 endif()
 
 enable_testing()
