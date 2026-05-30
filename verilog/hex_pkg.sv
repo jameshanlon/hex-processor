@@ -12,6 +12,13 @@ package hex_pkg;
   localparam INSTR_WIDTH = INSTR_OPC_WIDTH + INSTR_OPR_WIDTH;
   localparam SYSCALL_OPC_WIDTH = 2;
 
+  // Message passing: each core has NUM_LINKS logical channels (slots), and the
+  // network connects up to NUM_CORES cores.
+  localparam NUM_LINKS = 4;
+  localparam NUM_CORES = 4;
+  localparam SLOT_W    = $clog2(NUM_LINKS); // = 2
+  localparam CID_W     = $clog2(NUM_CORES); // = 2
+
   typedef logic [MEM_ADDR_WIDTH-1:0]  iaddr_t; // Byte/instruction address
   typedef logic [MEM_ADDR_WIDTH-1:2]  waddr_t; // Word address
   typedef logic [MEM_WIDTH-1:0]       data_t;
@@ -39,7 +46,9 @@ package hex_pkg;
     BRB = 0,
     ADD = 1,
     SUB = 2,
-    SVC = 3
+    SVC = 3,
+    IN  = 4,
+    OUT = 5
   } opr_opcode_t;
 
   typedef enum logic [SYSCALL_OPC_WIDTH-1:0] {
@@ -52,5 +61,23 @@ package hex_pkg;
     opcode_t  opcode;
     operand_t operand;
   } instr_t;
+
+  // Network addressing and flits.
+  typedef logic [CID_W-1:0]  core_id_t;
+  typedef logic [SLOT_W-1:0] slot_t;
+
+  // A data packet: one word to (dst_core, dst_slot), carrying its source core
+  // so the reader can address the acknowledgement back.
+  typedef struct packed {
+    core_id_t dst_core;
+    slot_t    dst_slot;
+    core_id_t src_core;
+    data_t    word;
+  } data_flit_t;
+
+  // An acknowledgement packet: routed back to the waiting writer.
+  typedef struct packed {
+    core_id_t dst_core;
+  } ack_flit_t;
 
 endpackage
