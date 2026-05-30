@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.28.0)
+cmake_minimum_required(VERSION 3.20)
 
 project(hex-processor)
 
@@ -156,6 +156,10 @@ if(USE_VERILATOR)
     verilog/memory.sv)
 
   install(TARGETS hextb DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+  add_executable(router_tb tests/rtl/router_tb.cpp)
+  verilate(router_tb PREFIX Vrouter SOURCES verilog/hex_pkg.sv verilog/router.sv
+           TOP_MODULE router VERILATOR_ARGS -Wall -Wno-UNUSEDPARAM)
 endif()
 
 enable_testing()
