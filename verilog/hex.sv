@@ -30,7 +30,14 @@ module hex
     .o_d_data        (req_d_data),
     .i_d_data        (res_d_data),
     .o_syscall_valid (o_syscall_valid),
-    .o_syscall       (o_syscall)
+    .o_syscall       (o_syscall),
+    // No channels in the single-core top: never stall, no received word.
+    .o_op_out        (),
+    .o_op_in         (),
+    .o_chan_slot     (),
+    .o_chan_areg     (),
+    .i_liu_busy      (1'b0),
+    .i_liu_in_word   ('0)
   );
 
   memory u_memory (
