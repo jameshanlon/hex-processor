@@ -1479,7 +1479,7 @@ TEST_CASE("par_statement_tree") {
   auto output = ctx.treeXProgramSrc(
                        "proc source(chan c) is skip\n"
                        "proc sink(chan c) is skip\n"
-                       "proc main() is chan a; par { source(a) sink(a) }")
+                       "proc main() is chan a; par { source(a); sink(a) }")
                     .str();
   REQUIRE(output.find("parstmt") != std::string::npos);
   REQUIRE(output.find("call source") != std::string::npos);
@@ -1489,7 +1489,7 @@ TEST_CASE("par_statement_tree") {
 TEST_CASE("par_branch_must_be_call_error") {
   TestContext ctx;
   auto program = "proc sink(chan c) is skip\n"
-                 "proc main() is chan a; par { skip sink(a) }";
+                 "proc main() is chan a; par { skip; sink(a) }";
   REQUIRE_THROWS_AS(ctx.treeXProgramSrc(program), xcmp::ParserTokenError);
 }
 
@@ -1529,7 +1529,7 @@ TEST_CASE("message_passing_ring_tree") {
                        "proc worker(chan in, chan out) is var v; "
                        "{ in ? v; out ! v }\n"
                        "proc main() is chan a; chan b; "
-                       "par { worker(a, b) worker(b, a) }")
+                       "par { worker(a, b); worker(b, a) }")
                     .str();
   REQUIRE(output.find("parstmt") != std::string::npos);
   REQUIRE(output.find("instmt") != std::string::npos);
@@ -1565,7 +1565,7 @@ TEST_CASE("message_passing_run_pipeline") {
                  "proc putval(val c) is put(c, 0)\n"
                  "proc source(chan out) is out ! 65\n"
                  "proc sink(chan in) is var v; { in ? v; putval(v) }\n"
-                 "proc main() is chan c; par { source(c) sink(c) }";
+                 "proc main() is chan c; par { source(c); sink(c) }";
   REQUIRE(ctx.runXProgramSrc(program) == 0);
   REQUIRE(ctx.simOutBuffer.str() == "A");
 }
@@ -1580,7 +1580,7 @@ TEST_CASE("message_passing_run_relay") {
                  "{ in ? v; out ! v }\n"
                  "proc sink(chan in) is var v; { in ? v; putval(v) }\n"
                  "proc main() is chan a; chan b; "
-                 "par { source(a) relay(a, b) sink(b) }";
+                 "par { source(a); relay(a, b); sink(b) }";
   REQUIRE(ctx.runXProgramSrc(program) == 0);
   REQUIRE(ctx.simOutBuffer.str() == "Z");
 }
@@ -1591,7 +1591,7 @@ TEST_CASE("message_passing_run_deadlock") {
   auto program = "proc worker(chan in, chan out) is var v; "
                  "{ in ? v; out ! v }\n"
                  "proc main() is chan a; chan b; "
-                 "par { worker(a, b) worker(b, a) }";
+                 "par { worker(a, b); worker(b, a) }";
   REQUIRE_THROWS_WITH(ctx.runXProgramSrc(program),
                       Catch::Matchers::ContainsSubstring("deadlock"));
 }
@@ -1608,7 +1608,7 @@ TEST_CASE("message_passing_channel_direction_error") {
   TestContext ctx;
   // Channel a has two readers and no writer.
   auto program = "proc reader(chan c) is var v; c ? v\n"
-                 "proc main() is chan a; par { reader(a) reader(a) }";
+                 "proc main() is chan a; par { reader(a); reader(a) }";
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::NetworkError);
 }
 

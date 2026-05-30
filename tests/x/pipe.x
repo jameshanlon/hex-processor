@@ -15,4 +15,4 @@ proc sink(chan in) is
 proc main() is
   chan a;
   chan b;
-  par { source(a) relay(a, b) sink(b) }
+  par { source(a); relay(a, b); sink(b) }
