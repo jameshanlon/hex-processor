@@ -506,6 +506,9 @@ class System {
   std::ostream &out;
   size_t maxCycles;
   bool tracing = false;
+  // Default to truncating character inputs, matching the hardware and xhexb.x
+  // behaviour. Tests may enable sign-extension to exercise negative values.
+  bool truncateInputs = true;
   int exitCode = 0;
   bool haveExit = false;
 
@@ -514,6 +517,7 @@ public:
       : in(in), out(out), maxCycles(maxCycles) {}
 
   void setTracing(bool value) { tracing = value; }
+  void setTruncateInputs(bool value) { truncateInputs = value; }
 
   /// Load a network container, or fall back to a single-processor system if the
   /// file is a plain image (no network magic).
@@ -628,7 +632,7 @@ private:
     auto p = std::make_unique<Processor>(in, out, maxCycles);
     p->setId(id);
     p->setTracing(tracing);
-    p->setTruncateInputs(false);
+    p->setTruncateInputs(truncateInputs);
     p->loadFromStream(image, imageSize);
     procs.push_back(std::move(p));
   }

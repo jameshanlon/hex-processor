@@ -186,6 +186,7 @@ struct TestContext {
     // Run the program (single image or multi-processor network container).
     hexsim::System system(simInBuffer, simOutBuffer);
     system.setTracing(trace);
+    system.setTruncateInputs(false);
     system.loadNetwork(path.c_str());
     return system.run();
   }
