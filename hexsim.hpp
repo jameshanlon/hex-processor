@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "hex.hpp"
+#include "hexcontainer.hpp"
 #include "hexsimio.hpp"
 
 namespace hexsim {
@@ -522,52 +523,17 @@ public:
   /// Load a network container, or fall back to a single-processor system if the
   /// file is a plain image (no network magic).
   void loadNetwork(const char *filename) {
-    std::ifstream file(filename, std::ios::binary);
-    if (!file) {
-      throw std::runtime_error(std::string("could not open file: ") + filename);
-    }
-    file.seekg(0, std::ios::end);
-    auto fileSize = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-    uint32_t magic;
-    file.read(reinterpret_cast<char *>(&magic), sizeof(uint32_t));
-    if (magic != NETWORK_MAGIC) {
-      // Plain single image: rewind and load the whole file as one processor.
-      file.seekg(0, std::ios::beg);
-      addProcessor(file, static_cast<unsigned>(fileSize), 0);
-      return;
-    }
-
-    uint32_t numProcessors;
-    uint32_t numEdges;
-    file.read(reinterpret_cast<char *>(&numProcessors), sizeof(uint32_t));
-    file.read(reinterpret_cast<char *>(&numEdges), sizeof(uint32_t));
-
-    struct Edge {
-      uint32_t procA, slotA, procB, slotB;
-    };
-    std::vector<Edge> edges(numEdges);
-    for (auto &e : edges) {
-      file.read(reinterpret_cast<char *>(&e.procA), sizeof(uint32_t));
-      file.read(reinterpret_cast<char *>(&e.slotA), sizeof(uint32_t));
-      file.read(reinterpret_cast<char *>(&e.procB), sizeof(uint32_t));
-      file.read(reinterpret_cast<char *>(&e.slotB), sizeof(uint32_t));
-    }
-
-    // Read each embedded image into its own processor.
-    for (uint32_t i = 0; i < numProcessors; i++) {
-      uint32_t imageSize;
-      file.read(reinterpret_cast<char *>(&imageSize), sizeof(uint32_t));
-      std::vector<char> buffer(imageSize);
-      file.read(buffer.data(), imageSize);
-      std::istringstream imageStream(std::string(buffer.begin(), buffer.end()),
+    auto container = hexcontainer::read(filename);
+    // One processor per image (a plain single image yields one processor).
+    for (size_t i = 0; i < container.images.size(); i++) {
+      auto &image = container.images[i];
+      std::istringstream imageStream(std::string(image.begin(), image.end()),
                                      std::ios::binary);
-      addProcessor(imageStream, imageSize, i);
+      addProcessor(imageStream, static_cast<unsigned>(image.size()),
+                   static_cast<unsigned>(i));
     }
-
     // Wire up the channels.
-    for (auto &e : edges) {
+    for (auto &e : container.edges) {
       auto channel = std::make_unique<Channel>();
       procs[e.procA]->setLink(e.slotA, channel.get());
       procs[e.procB]->setLink(e.slotB, channel.get());

@@ -86,18 +86,23 @@ if(USE_VERILATOR)
                               --prefix=${VERILATOR_INSTALL_DIR}
                       WORKING_DIRECTORY ${verilator_SOURCE_DIR}
                       RESULT_VARIABLE VL_CONFIGURE)
+      if(VL_CONFIGURE)
+        message(FATAL_ERROR "Verilator ./configure failed (need flex and bison).")
+      endif()
       # Build only the binaries (verilator_exe) and install without man pages,
       # so help2man is not required.
       execute_process(COMMAND make -j${NPROC} verilator_exe
                       WORKING_DIRECTORY ${verilator_SOURCE_DIR}
                       RESULT_VARIABLE VL_MAKE)
+      if(VL_MAKE)
+        message(FATAL_ERROR "Verilator build (make) failed.")
+      endif()
       execute_process(COMMAND make installbin installredirect installdata
                               install-msg
                       WORKING_DIRECTORY ${verilator_SOURCE_DIR}
                       RESULT_VARIABLE VL_INSTALL)
-      if(VL_CONFIGURE OR VL_MAKE OR VL_INSTALL)
-        message(FATAL_ERROR
-          "Verilator build failed. Ensure autoconf, flex and bison are installed.")
+      if(VL_INSTALL)
+        message(FATAL_ERROR "Verilator install failed.")
       endif()
     endif()
 

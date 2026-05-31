@@ -99,35 +99,25 @@ class Tests(unittest.TestCase):
             pass
 
     def run_message_passing(self, filename, expected):
-        # Compile a message-passing program (xcmp) to a network container and
-        # run it on the C++ simulator, checking its output.
+        # Compile a message-passing program (xcmp) to a network container once,
+        # then run that same container on the C++ simulator and, under
+        # Verilator, on the RTL -- a golden cross-check that both agree.
         src = os.path.join(defs.X_TEST_SRC_PREFIX, filename)
         subprocess.run([CMP_BINARY, src, "-o", "net.bin"])
         sim = subprocess.run([SIM_BINARY, "net.bin"], capture_output=True)
         self.assertTrue(sim.stdout.decode("utf-8") == expected)
-
-    def run_message_passing_verilator(self, filename, expected):
-        # The same container must produce the same result on the RTL (golden
-        # cross-check against the C++ simulator).
         if defs.USE_VERILATOR:
-            src = os.path.join(defs.X_TEST_SRC_PREFIX, filename)
-            subprocess.run([CMP_BINARY, src, "-o", "net.bin"])
             tb = subprocess.run([VTB_BINARY, "net.bin"], capture_output=True)
             self.assertTrue(tb.stdout.decode("utf-8").endswith(expected))
-        else:
-            pass
 
     def test_message_passing_pipe(self):
         self.run_message_passing("pipe.x", "P")
-        self.run_message_passing_verilator("pipe.x", "P")
 
     def test_message_passing_pingpong(self):
         self.run_message_passing("pingpong.x", "X")
-        self.run_message_passing_verilator("pingpong.x", "X")
 
     def test_message_passing_ring(self):
         self.run_message_passing("ring.x", "Z")
-        self.run_message_passing_verilator("ring.x", "Z")
 
 
 if __name__ == "__main__":

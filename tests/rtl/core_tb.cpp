@@ -3,16 +3,10 @@
 #include "Vcore_core.h"
 #include "Vcore_memory.h"
 #include "Vcore_processor.h"
+#include "flit_layout.hpp"
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
-
-// data_flit_t layout (38 bits, QData): [37:36]=dst_core [35:34]=dst_slot
-// [33:32]=src_core [31:0]=word.
-static uint32_t flit_word(uint64_t f) { return (uint32_t)(f & 0xFFFFFFFFu); }
-static unsigned flit_src(uint64_t f) { return (f >> 32) & 0x3; }
-static unsigned flit_dslot(uint64_t f) { return (f >> 34) & 0x3; }
-static unsigned flit_dcore(uint64_t f) { return (f >> 36) & 0x3; }
 
 static void tick(Vcore *d) { d->i_clk = 0; d->eval(); d->i_clk = 1; d->eval(); }
 
@@ -50,9 +44,9 @@ int main() {
 
   // Check the emitted flit.
   assert(d->o_dnet_dst == 1 && "wrong destination core");
-  assert(flit_dcore(d->o_dnet_flit) == 1 && "flit dst_core wrong");
-  assert(flit_dslot(d->o_dnet_flit) == 0 && "flit dst_slot wrong");
-  assert(flit_src(d->o_dnet_flit) == 2 && "flit src_core wrong");
+  assert(flit_dst_core(d->o_dnet_flit) == 1 && "flit dst_core wrong");
+  assert(flit_dst_slot(d->o_dnet_flit) == 0 && "flit dst_slot wrong");
+  assert(flit_src_core(d->o_dnet_flit) == 2 && "flit src_core wrong");
   assert(flit_word(d->o_dnet_flit) == 65 && "flit word wrong");
 
   // The writer must stall (PC frozen) until the ACK returns.

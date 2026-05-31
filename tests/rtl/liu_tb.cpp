@@ -1,33 +1,9 @@
 #include <verilated.h>
 #include "Vlink_interface.h"
+#include "flit_layout.hpp"
 #include <cassert>
 #include <cstdio>
 #include <cstdint>
-
-// data_flit_t packed layout (38 bits total, MSB..LSB):
-//   [37:36] dst_core  (2 bits)
-//   [35:34] dst_slot  (2 bits)
-//   [33:32] src_core  (2 bits)
-//   [31:0]  word      (32 bits)
-//
-// Verilator exposes this as QData (uint64_t) since it is 33-64 bits.
-//
-// ack_flit_t packed layout (2 bits):
-//   [1:0] dst_core
-// Exposed as CData (uint8_t).
-
-static uint64_t make_dnet_flit(uint32_t dst_core, uint32_t dst_slot,
-                                uint32_t src_core, uint32_t word) {
-    return ((uint64_t)(dst_core & 0x3) << 36)
-         | ((uint64_t)(dst_slot & 0x3) << 34)
-         | ((uint64_t)(src_core & 0x3) << 32)
-         | (uint64_t)word;
-}
-
-static uint32_t flit_word(uint64_t f)     { return (uint32_t)(f & 0xFFFFFFFF); }
-static uint32_t flit_src_core(uint64_t f) { return (uint32_t)((f >> 32) & 0x3); }
-static uint32_t flit_dst_slot(uint64_t f) { return (uint32_t)((f >> 34) & 0x3); }
-static uint32_t flit_dst_core(uint64_t f) { return (uint32_t)((f >> 36) & 0x3); }
 
 // One clock edge.
 static void tick(Vlink_interface *d) { d->i_clk = 0; d->eval(); d->i_clk = 1; d->eval(); }
