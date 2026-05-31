@@ -2,14 +2,13 @@ configure_file(definitions.hpp.in definitions.hpp)
 
 add_executable(
   UnitTests
-  main.cpp
   ../../hex.cpp
-  asm_features.cpp
-  asm_programs.cpp
-  x_features.cpp
-  x_programs.cpp
-  dis_features.cpp
-  sim_features.cpp)
+  AssemblerTests.cpp
+  AssemblerProgramTests.cpp
+  XLanguageTests.cpp
+  XProgramTests.cpp
+  DisassemblerTests.cpp
+  SimTests.cpp)
 
 target_link_libraries(UnitTests PRIVATE Catch2::Catch2WithMain fmt::fmt)
 
