@@ -120,24 +120,27 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 add_compile_options(-Wall -pedantic)
 
+# Library headers (header-only modules + shared hex.cpp) live in src/.
+include_directories(${PROJECT_SOURCE_DIR}/src)
+
 # Simulator
-add_executable(hexsim hex.cpp hexsim.cpp)
+add_executable(hexsim src/hex.cpp tools/hexsim.cpp)
 target_link_libraries(hexsim fmt::fmt)
 
 # Assembler
-add_executable(hexasm hex.cpp hexasm.cpp)
+add_executable(hexasm src/hex.cpp tools/hexasm.cpp)
 target_link_libraries(hexasm fmt::fmt)
 
 # Compiler
-add_executable(xcmp hex.cpp xcmp.cpp)
+add_executable(xcmp src/hex.cpp tools/xcmp.cpp)
 target_link_libraries(xcmp fmt::fmt)
 
 # Disassembler
-add_executable(hexdis hex.cpp hexdis.cpp)
+add_executable(hexdis src/hex.cpp tools/hexdis.cpp)
 target_link_libraries(hexdis fmt::fmt)
 
 # Compile and run
-add_executable(xrun hex.cpp xrun.cpp)
+add_executable(xrun src/hex.cpp tools/xrun.cpp)
 target_link_libraries(xrun fmt::fmt)
 
 install(TARGETS hexasm xcmp xrun hexsim hexdis
@@ -145,7 +148,7 @@ install(TARGETS hexasm xcmp xrun hexsim hexdis
 
 # Verilator
 if(USE_VERILATOR)
-  add_executable(hextb hex.cpp hextb.cpp)
+  add_executable(hextb src/hex.cpp tools/hextb.cpp)
   target_link_libraries(hextb PUBLIC fmt::fmt)
 
   verilate(
@@ -154,28 +157,28 @@ if(USE_VERILATOR)
     TOP_MODULE network_top
     VERILATOR_ARGS -Wall -Wno-UNUSEDPARAM -Wno-UNUSEDSIGNAL
     SOURCES
-    verilog/hex_pkg.sv
-    verilog/memory.sv
-    verilog/processor.sv
-    verilog/link_interface.sv
-    verilog/core.sv
-    verilog/router.sv
-    verilog/network_top.sv)
+    rtl/hex_pkg.sv
+    rtl/memory.sv
+    rtl/processor.sv
+    rtl/link_interface.sv
+    rtl/core.sv
+    rtl/router.sv
+    rtl/network_top.sv)
 
   install(TARGETS hextb DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   add_executable(router_tb tests/rtl/router_tb.cpp)
-  verilate(router_tb PREFIX Vrouter SOURCES verilog/hex_pkg.sv verilog/router.sv
+  verilate(router_tb PREFIX Vrouter SOURCES rtl/hex_pkg.sv rtl/router.sv
            TOP_MODULE router VERILATOR_ARGS -Wall -Wno-UNUSEDPARAM)
 
   add_executable(liu_tb tests/rtl/liu_tb.cpp)
-  verilate(liu_tb SOURCES verilog/hex_pkg.sv verilog/link_interface.sv
+  verilate(liu_tb SOURCES rtl/hex_pkg.sv rtl/link_interface.sv
            PREFIX Vlink_interface TOP_MODULE link_interface
            VERILATOR_ARGS -Wall -Wno-UNUSEDPARAM -Wno-UNUSEDSIGNAL)
 
   add_executable(core_tb tests/rtl/core_tb.cpp)
-  verilate(core_tb SOURCES verilog/hex_pkg.sv verilog/memory.sv
-           verilog/processor.sv verilog/link_interface.sv verilog/core.sv
+  verilate(core_tb SOURCES rtl/hex_pkg.sv rtl/memory.sv
+           rtl/processor.sv rtl/link_interface.sv rtl/core.sv
            PREFIX Vcore TOP_MODULE core
            VERILATOR_ARGS -Wall -Wno-UNUSEDPARAM -Wno-UNUSEDSIGNAL)
 endif()

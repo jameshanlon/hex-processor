@@ -6,3 +6,10 @@ Release
 install
 Install
 build
+
+# Generated binaries and simulator I/O (e.g. from running tools in the tree)
+*.bin
+a.out
+simout*
+simin*
+logs/

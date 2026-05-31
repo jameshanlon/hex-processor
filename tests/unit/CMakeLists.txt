@@ -2,7 +2,7 @@ configure_file(definitions.hpp.in definitions.hpp)
 
 add_executable(
   UnitTests
-  ../../hex.cpp
+  ../../src/hex.cpp
   AssemblerTests.cpp
   AssemblerProgramTests.cpp
   XLanguageTests.cpp
@@ -12,7 +12,7 @@ add_executable(
 
 target_link_libraries(UnitTests PRIVATE Catch2::Catch2WithMain fmt::fmt)
 
-target_include_directories(UnitTests PUBLIC ${CMAKE_SOURCE_DIR}
+target_include_directories(UnitTests PUBLIC ${CMAKE_SOURCE_DIR}/src
                                             ${CMAKE_CURRENT_BINARY_DIR})
 
 add_test(NAME UnitTests COMMAND ./UnitTests)
