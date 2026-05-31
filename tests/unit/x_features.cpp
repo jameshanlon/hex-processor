@@ -1617,3 +1617,15 @@ TEST_CASE("message_passing_run_pipe_x_file") {
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("pipe.x")) == 0);
   REQUIRE(ctx.simOutBuffer.str() == "P");
 }
+
+TEST_CASE("message_passing_run_pingpong_x_file") {
+  TestContext ctx;
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("pingpong.x")) == 0);
+  REQUIRE(ctx.simOutBuffer.str() == "X");
+}
+
+TEST_CASE("message_passing_run_ring_x_file") {
+  TestContext ctx;
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("ring.x")) == 0);
+  REQUIRE(ctx.simOutBuffer.str() == "Z");
+}
