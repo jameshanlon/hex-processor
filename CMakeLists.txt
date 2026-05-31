@@ -145,15 +145,17 @@ if(USE_VERILATOR)
 
   verilate(
     hextb
-    TRACE
-    VERILATOR_ARGS
-    --top-module
-    hex
+    PREFIX Vntb
+    TOP_MODULE network_top
+    VERILATOR_ARGS -Wall -Wno-UNUSEDPARAM -Wno-UNUSEDSIGNAL
     SOURCES
     verilog/hex_pkg.sv
-    verilog/hex.sv
+    verilog/memory.sv
     verilog/processor.sv
-    verilog/memory.sv)
+    verilog/link_interface.sv
+    verilog/core.sv
+    verilog/router.sv
+    verilog/network_top.sv)
 
   install(TARGETS hextb DESTINATION ${CMAKE_INSTALL_BINDIR})
 
