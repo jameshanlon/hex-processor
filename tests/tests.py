@@ -98,6 +98,25 @@ class Tests(unittest.TestCase):
         else:
             pass
 
+    def test_message_passing_pipe(self):
+        # Compile a 3-processor message-passing pipeline (xcmp) to a network
+        # container and run it on the C++ simulator; it must print "P".
+        pipe = os.path.join(defs.X_TEST_SRC_PREFIX, "pipe.x")
+        subprocess.run([CMP_BINARY, pipe, "-o", "pipe.bin"])
+        sim = subprocess.run([SIM_BINARY, "pipe.bin"], capture_output=True)
+        self.assertTrue(sim.stdout.decode("utf-8") == "P")
+
+    def test_message_passing_pipe_verilator(self):
+        # The same container must produce the same result on the RTL (golden
+        # cross-check against the C++ simulator).
+        if defs.USE_VERILATOR:
+            pipe = os.path.join(defs.X_TEST_SRC_PREFIX, "pipe.x")
+            subprocess.run([CMP_BINARY, pipe, "-o", "pipe.bin"])
+            tb = subprocess.run([VTB_BINARY, "pipe.bin"], capture_output=True)
+            self.assertTrue(tb.stdout.decode("utf-8").endswith("P"))
+        else:
+            pass
+
 
 if __name__ == "__main__":
     unittest.main()
