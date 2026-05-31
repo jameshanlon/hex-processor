@@ -3,134 +3,190 @@
 #include <cstring>
 #include <exception>
 #include <fmt/format.h>
-#include <fstream>
 #include <iostream>
+#include <vector>
 #include <verilated.h>
 
-#include "Vhex_pkg.h"
-#include "Vhex_pkg_hex.h"
-#include "Vhex_pkg_memory.h"
-#include "Vhex_pkg_processor.h"
+#include "Vntb.h"
+#include "Vntb_core.h"
+#include "Vntb_memory.h"
+#include "Vntb_network_top.h"
+#include "Vntb_processor.h"
 #include "hex.hpp"
+#include "hexcontainer.hpp"
 #include "hexsimio.hpp"
 
 double sc_time_stamp() { return 0; }
 
-constexpr size_t RESET_BEGIN = 1;
-constexpr size_t RESET_END = 10;
-
 hex::HexSimIO io(std::cin, std::cout);
 
-void load(const char *filename, const std::unique_ptr<Vhex_pkg> &top) {
+// Must match hex_pkg::NUM_CORES in the SystemVerilog.
+constexpr unsigned NUM_CORES = 4;
 
-  // Load the binary file.
-  std::streampos fileSize;
-  std::ifstream file(filename, std::ios::binary);
+// A two-instruction loop (NFIX F; BR F) that spins in place without performing
+// any syscall or channel op. Used to keep cores with no image quiescent.
+constexpr uint32_t HALT_LOOP = 0x00009FFFu;
 
-  // Get length of file.
-  file.seekg(0, std::ios::end);
-  fileSize = file.tellg();
-  file.seekg(0, std::ios::beg);
-
-  // Check the file length matches.
-  unsigned remainingFileSize = static_cast<unsigned>(fileSize) - 4;
-  remainingFileSize =
-      (remainingFileSize + 3U) & ~3U; // Round up to multiple of 4.
-  unsigned programSize;
-  file.read(reinterpret_cast<char *>(&programSize), 4);
-  programSize <<= 2;
-  if (programSize != remainingFileSize) {
-    std::cerr << fmt::format("Warning: mismatching program size {} != {}\n",
-                             programSize, remainingFileSize);
+// Reach core k. network_top instantiates the cores in a generate loop, so
+// Verilator exposes them under mangled names (g_core[k].u_core); the names are
+// stable because the Verilator version is pinned.
+static Vntb_core *coreOf(const std::unique_ptr<Vntb> &top, unsigned k) {
+  switch (k) {
+  case 0: return top->network_top->g_core__BRA__0__KET____DOT__u_core;
+  case 1: return top->network_top->g_core__BRA__1__KET____DOT__u_core;
+  case 2: return top->network_top->g_core__BRA__2__KET____DOT__u_core;
+  case 3: return top->network_top->g_core__BRA__3__KET____DOT__u_core;
+  default: throw std::runtime_error("core index out of range");
   }
-
-  // Read the file contents.
-  std::vector<uint32_t> buffer(remainingFileSize);
-  file.read(reinterpret_cast<char *>(buffer.data()), remainingFileSize);
-
-  // Write program to DUT memory.
-  std::memcpy(top->hex->u_memory->memory_q.data(), buffer.data(),
-              buffer.size());
-
-  std::cout << "Wrote " << programSize << " bytes to memory\n";
 }
 
-void handleSyscall(hex::Syscall syscall, const std::unique_ptr<Vhex_pkg> &top,
-                   int &exitCode, bool trace) {
-  unsigned spWordIndex = top->hex->u_memory->memory_q[1];
+static IData *memOf(const std::unique_ptr<Vntb> &top, unsigned k) {
+  return coreOf(top, k)->u_memory->memory_q.data();
+}
+
+// Service one core's syscall, reading arguments from its own memory.
+static void handleSyscall(unsigned k, hex::Syscall syscall,
+                          const std::unique_ptr<Vntb> &top, int &exitCode,
+                          bool &exited) {
+  IData *mem = memOf(top, k);
+  unsigned sp = mem[1];
   switch (syscall) {
   case hex::Syscall::EXIT:
-    exitCode = top->hex->u_memory->memory_q[spWordIndex + 2];
-    if (trace) {
-      std::cout << fmt::format("exit {}\n", exitCode);
-    }
+    exitCode = mem[sp + 2];
+    exited = true;
     break;
-  case hex::Syscall::WRITE: {
-    char value = top->hex->u_memory->memory_q[spWordIndex + 2];
-    int stream = top->hex->u_memory->memory_q[spWordIndex + 3];
-    if (trace) {
-      std::cout << fmt::format("output({}, {})\n", value, stream);
-    }
-    io.output(value, stream);
+  case hex::Syscall::WRITE:
+    io.output(static_cast<char>(mem[sp + 2]), static_cast<int>(mem[sp + 3]));
     break;
-  }
-  case hex::Syscall::READ: {
-    int stream = top->hex->u_memory->memory_q[spWordIndex + 2];
-    if (trace) {
-      std::cout << fmt::format("input({})\n", stream);
-    }
-    // Truncated inputs (ie not sign extended).
-    top->hex->u_memory->memory_q[spWordIndex + 1] = io.input(stream) & 0xFF;
+  case hex::Syscall::READ:
+    mem[sp + 1] = io.input(mem[sp + 2]) & 0xFF;
     break;
-  }
   default:
     throw std::runtime_error("invalid syscall");
   }
 }
 
-int run(const std::unique_ptr<VerilatedContext> &contextp,
-        const std::unique_ptr<Vhex_pkg> &top, bool trace, size_t maxCycles) {
-  uint64_t cycle_count = 0;
-  int exitCode = 0;
+// Load a container: fill every core with the halt loop, load the images into
+// the active cores, and program the route tables from the wiring edges.
+static unsigned load(const char *filename, const std::unique_ptr<Vntb> &top) {
+  auto container = hexcontainer::read(filename);
+  unsigned numActive = container.images.size();
+  if (numActive > NUM_CORES) {
+    throw std::runtime_error("container has more processors than NUM_CORES");
+  }
 
-  // Set input signals
-  top->i_rst = 0;
+  // Quiescent default for every core.
+  for (unsigned k = 0; k < NUM_CORES; k++) {
+    memOf(top, k)[0] = HALT_LOOP;
+  }
+
+  // Load each image's code into its core's memory.
+  for (unsigned i = 0; i < numActive; i++) {
+    auto &image = container.images[i];
+    uint32_t programSizeWords;
+    std::memcpy(&programSizeWords, image.data(), 4);
+    std::memcpy(memOf(top, i), image.data() + 4, programSizeWords << 2);
+  }
+  std::cout << fmt::format("Loaded {} processor image(s)\n", numActive);
+  return numActive;
+}
+
+// Program one route-table entry: core->slot maps to (dstCore, dstSlot). Driven
+// over one clock with the config write enable asserted.
+static void writeRoute(const std::unique_ptr<VerilatedContext> &ctx,
+                       const std::unique_ptr<Vntb> &top, unsigned core,
+                       unsigned slot, unsigned dstCore, unsigned dstSlot) {
+  top->i_cfg_we = 1;
+  top->i_cfg_core = core;
+  top->i_cfg_slot = slot;
+  top->i_cfg_dst_core = dstCore;
+  top->i_cfg_dst_slot = dstSlot;
+  ctx->timeInc(1); top->i_clk = 0; top->eval();
+  ctx->timeInc(1); top->i_clk = 1; top->eval();
+  top->i_cfg_we = 0;
+}
+
+int run(const std::unique_ptr<VerilatedContext> &ctx,
+        const std::unique_ptr<Vntb> &top, const char *filename, bool trace,
+        size_t maxCycles) {
   top->i_clk = 0;
+  top->i_cfg_we = 0;
+  top->i_rst = 1;
+  top->eval();
 
-  while (!contextp->gotFinish() &&
-         (maxCycles > 0 ? cycle_count <= maxCycles : true)) {
-    contextp->timeInc(1);
-    // Toggle the clock.
-    top->i_clk = !top->i_clk;
-    // Assert reset initially.
-    if (top->i_clk) {
-      if (contextp->time() > RESET_BEGIN && contextp->time() < RESET_END) {
-        top->i_rst = 1; // Assert reset
-      } else {
-        top->i_rst = 0; // Deassert reset
+  unsigned numActive = load(filename, top);
+  auto container = hexcontainer::read(filename);
+
+  // Hold reset for a few cycles, then program the routing tables (config writes
+  // are independent of reset).
+  for (int i = 0; i < 4; i++) {
+    ctx->timeInc(1); top->i_clk = 0; top->eval();
+    ctx->timeInc(1); top->i_clk = 1; top->eval();
+  }
+  for (auto &e : container.edges) {
+    writeRoute(ctx, top, e.procA, e.slotA, e.procB, e.slotB);
+    writeRoute(ctx, top, e.procB, e.slotB, e.procA, e.slotA);
+  }
+  top->i_rst = 0;
+
+  std::vector<bool> exited(numActive, false);
+  std::vector<unsigned> prevPc(numActive, 0xFFFFFFFFu);
+  unsigned numExited = 0;
+  int exitCode = 0;
+  bool haveExit = false;
+  uint64_t cycles = 0;
+  // A channel rendezvous legitimately freezes the participating cores' PCs for
+  // a few cycles while the flit/ACK traverse the routers. Only declare deadlock
+  // after a sustained stretch with no PC change and no syscall anywhere.
+  unsigned noProgress = 0;
+  constexpr unsigned DEADLOCK_THRESHOLD = 256;
+
+  while (numExited < numActive && (maxCycles == 0 || cycles <= maxCycles)) {
+    // Falling then rising edge.
+    ctx->timeInc(1); top->i_clk = 0; top->eval();
+    ctx->timeInc(1); top->i_clk = 1; top->eval();
+    cycles++;
+
+    bool progressed = false;
+    for (unsigned k = 0; k < numActive; k++) {
+      if (exited[k]) {
+        continue;
+      }
+      // Syscalls.
+      if ((top->o_syscall_valid >> k) & 1) {
+        bool justExited = false;
+        handleSyscall(k, static_cast<hex::Syscall>(top->o_syscall[k]), top,
+                      exitCode, justExited);
+        progressed = true;
+        if (justExited) {
+          exited[k] = true;
+          numExited++;
+          if (!haveExit) {
+            haveExit = true; // first EXIT sets the system exit code
+          }
+        }
+      }
+      // Progress detection for deadlock.
+      unsigned pc = coreOf(top, k)->u_processor->pc_q;
+      if (pc != prevPc[k]) {
+        progressed = true;
+      }
+      prevPc[k] = pc;
+      if (trace) {
+        std::cout << fmt::format("[{:6}] core{} pc={}\n", cycles, k, pc);
       }
     }
-    // Evaluate the design.
-    top->eval();
-    if (top->i_clk) {
-      cycle_count++;
-    }
-    // Trace
-    if (trace && top->i_clk && contextp->time() > RESET_END) {
-      auto instr = instrEnumToStr(
-          static_cast<hex::Instr>((top->hex->u_processor->instr >> 4) & 0xF));
-      std::cout << fmt::format(
-          "[{:6}] {:6} {:#04x} {:6}\n", contextp->time(),
-          top->hex->u_processor->pc_q,
-          static_cast<unsigned>(top->hex->u_processor->instr), instr);
-    }
-    // Handle syscalls
-    if (top->i_clk && top->o_syscall_valid) {
-      auto syscall = static_cast<hex::Syscall>(top->o_syscall);
-      handleSyscall(syscall, top, exitCode, trace);
-      if (syscall == hex::Syscall::EXIT) {
-        break;
+
+    noProgress = progressed ? 0 : noProgress + 1;
+    if (noProgress > DEADLOCK_THRESHOLD && numExited < numActive) {
+      std::string msg = "deadlock: cores blocked:";
+      for (unsigned k = 0; k < numActive; k++) {
+        if (!exited[k]) {
+          msg += fmt::format(" {}", k);
+        }
       }
+      top->final();
+      throw std::runtime_error(msg);
     }
   }
 
@@ -139,20 +195,16 @@ int run(const std::unique_ptr<VerilatedContext> &contextp,
 }
 
 static void help(const char **argv) {
-  std::cout << "Hex processor testbench\n\n";
+  std::cout << "Hex multi-core processor testbench\n\n";
   std::cout << "Usage: " << argv[0] << " file\n\n";
-  std::cout << "Positional arguments:\n";
-  std::cout << "  file A binary file to execute\n\n";
-  std::cout << "Optional arguments:\n";
+  std::cout << "  file            A binary or network container to execute\n";
   std::cout << "  -h,--help       Display this message\n";
-  std::cout << "  -t,--trace      Enable instruction tracing\n";
-  std::cout << "  --max-cycles N  Limit the number of simulation cycles "
-               "(default: 0)\n";
+  std::cout << "  -t,--trace      Enable per-core PC tracing\n";
+  std::cout << "  --max-cycles N  Limit simulation cycles (default: 0)\n";
 }
 
 int main(int argc, const char **argv) {
   try {
-    // Handle arguments.
     const char *filename = nullptr;
     bool trace = false;
     size_t maxCycles = 0;
@@ -167,28 +219,21 @@ int main(int argc, const char **argv) {
       } else if (std::strcmp(argv[i], "--max-cycles") == 0) {
         maxCycles = std::stoull(argv[++i]);
       } else if (argv[i][0] == '+') {
-        // Skip plusargs.
         continue;
+      } else if (!filename) {
+        filename = argv[i];
       } else {
-        // Positional argument.
-        if (!filename) {
-          filename = argv[i];
-        } else {
-          throw std::runtime_error("cannot specify more than one file");
-        }
+        throw std::runtime_error("cannot specify more than one file");
       }
     }
-    // Setup TB and DUT.
-    Verilated::mkdir("logs");
-    const std::unique_ptr<VerilatedContext> contextp{new VerilatedContext};
-    contextp->debug(0);
-    contextp->randReset(2);
-    contextp->traceEverOn(true);
-    contextp->commandArgs(argc, argv);
-    const std::unique_ptr<Vhex_pkg> top{new Vhex_pkg{contextp.get(), "TOP"}};
-    // Run.
-    load(filename, top);
-    return run(contextp, top, trace, maxCycles);
+    if (!filename) {
+      help(argv);
+      return 1;
+    }
+    const std::unique_ptr<VerilatedContext> ctx{new VerilatedContext};
+    ctx->commandArgs(argc, argv);
+    const std::unique_ptr<Vntb> top{new Vntb{ctx.get(), "TOP"}};
+    return run(ctx, top, filename, trace, maxCycles);
   } catch (std::exception &e) {
     std::cerr << "Error: " << e.what() << "\n";
     return 1;
