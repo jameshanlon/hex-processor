@@ -22,10 +22,14 @@ hex::HexSimIO io(std::cin, std::cout);
 
 // Must match hex_pkg::NUM_CORES in the SystemVerilog.
 constexpr unsigned NUM_CORES = 4;
+static_assert(NUM_CORES == 4,
+              "coreOf() enumerates exactly 4 cores by their generate-loop "
+              "names; extend it if NUM_CORES changes.");
 
-// A two-instruction loop (NFIX F; BR F) that spins in place without performing
-// any syscall or channel op. Used to keep cores with no image quiescent.
-constexpr uint32_t HALT_LOOP = 0x00009FFFu;
+// A two-instruction loop (NFIX F; BR E) that spins in place forever (BR E adds
+// -2, returning to the NFIX) without any syscall or channel op, keeping cores
+// with no image quiescent.
+constexpr uint32_t HALT_LOOP = 0x00009EFFu;
 
 // Reach core k. network_top instantiates the cores in a generate loop, so
 // Verilator exposes them under mangled names (g_core[k].u_core); the names are
@@ -46,13 +50,13 @@ static IData *memOf(const std::unique_ptr<Vntb> &top, unsigned k) {
 
 // Service one core's syscall, reading arguments from its own memory.
 static void handleSyscall(unsigned k, hex::Syscall syscall,
-                          const std::unique_ptr<Vntb> &top, int &exitCode,
+                          const std::unique_ptr<Vntb> &top, int &exitValue,
                           bool &exited) {
   IData *mem = memOf(top, k);
   unsigned sp = mem[1];
   switch (syscall) {
   case hex::Syscall::EXIT:
-    exitCode = mem[sp + 2];
+    exitValue = mem[sp + 2];
     exited = true;
     break;
   case hex::Syscall::WRITE:
@@ -66,9 +70,11 @@ static void handleSyscall(unsigned k, hex::Syscall syscall,
   }
 }
 
-// Load a container: fill every core with the halt loop, load the images into
-// the active cores, and program the route tables from the wiring edges.
-static unsigned load(const char *filename, const std::unique_ptr<Vntb> &top) {
+// Read the container, fill every core with the halt loop, and load the images
+// into the active cores. Returns the parsed container (its edges are used to
+// program the route tables).
+static hexcontainer::Container load(const char *filename,
+                                    const std::unique_ptr<Vntb> &top) {
   auto container = hexcontainer::read(filename);
   unsigned numActive = container.images.size();
   if (numActive > NUM_CORES) {
@@ -88,7 +94,7 @@ static unsigned load(const char *filename, const std::unique_ptr<Vntb> &top) {
     std::memcpy(memOf(top, i), image.data() + 4, programSizeWords << 2);
   }
   std::cout << fmt::format("Loaded {} processor image(s)\n", numActive);
-  return numActive;
+  return container;
 }
 
 // Program one route-table entry: core->slot maps to (dstCore, dstSlot). Driven
@@ -114,8 +120,8 @@ int run(const std::unique_ptr<VerilatedContext> &ctx,
   top->i_rst = 1;
   top->eval();
 
-  unsigned numActive = load(filename, top);
-  auto container = hexcontainer::read(filename);
+  auto container = load(filename, top);
+  unsigned numActive = container.images.size();
 
   // Hold reset for a few cycles, then program the routing tables (config writes
   // are independent of reset).
@@ -155,14 +161,16 @@ int run(const std::unique_ptr<VerilatedContext> &ctx,
       // Syscalls.
       if ((top->o_syscall_valid >> k) & 1) {
         bool justExited = false;
+        int exitValue = 0;
         handleSyscall(k, static_cast<hex::Syscall>(top->o_syscall[k]), top,
-                      exitCode, justExited);
+                      exitValue, justExited);
         progressed = true;
         if (justExited) {
           exited[k] = true;
           numExited++;
           if (!haveExit) {
-            haveExit = true; // first EXIT sets the system exit code
+            exitCode = exitValue; // first EXIT sets the system exit code
+            haveExit = true;
           }
         }
       }
