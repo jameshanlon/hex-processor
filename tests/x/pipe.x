@@ -1,3 +1,8 @@
+| A three-stage pipeline on three processors connected by two channels:
+| source -> relay -> sink. The source emits a character, the relay forwards
+| it, and the sink prints it ('P'). Demonstrates par, chan formals and the
+| ! / ? channel operators.
+
 val put = 1;
 
 proc putval(val c) is put(c, 0)
