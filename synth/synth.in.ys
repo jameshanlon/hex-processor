@@ -1,3 +1,0 @@
-read_verilog -sv ${CMAKE_CURRENT_SOURCE_DIR}/verilog/processor.sv
-synth -top processor
-write_verilog ${CMAKE_CURRENT_BINARY_DIR}/netlist.v
