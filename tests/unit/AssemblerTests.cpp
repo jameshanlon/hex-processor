@@ -7,7 +7,7 @@
 // Unit tests for assembly languages features.
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("[asm_features] exit_tokens") {
+TEST_CASE("Exit tokens", "[asm_features]") {
   TestContext ctx;
   auto output = ctx.tokHexProgramFile(ctx.getAsmTestPath("exit0.S")).str();
   std::string expected = ""
@@ -31,7 +31,7 @@ EOF
   REQUIRE(output == expected);
 }
 
-TEST_CASE("[asm_features] exit_tree") {
+TEST_CASE("Exit tree", "[asm_features]") {
   TestContext ctx;
   auto output =
       ctx.asmHexProgramFile(ctx.getAsmTestPath("exit0.S"), true).str();
@@ -50,32 +50,32 @@ TEST_CASE("[asm_features] exit_tree") {
   REQUIRE(output == expected);
 }
 
-TEST_CASE("[asm_features] exit_bin") {
+TEST_CASE("Exit bin", "[asm_features]") {
   TestContext ctx;
   auto output = ctx.asmHexProgramFile(ctx.getAsmTestPath("exit0.S"));
   output.seekp(0, std::ios::end);
   REQUIRE(output.tellp() == 16);
 }
 
-TEST_CASE("[asm_features] exit0_run") {
+TEST_CASE("Exit0 run", "[asm_features]") {
   TestContext ctx;
   auto ret = ctx.runHexProgramFile(ctx.getAsmTestPath("exit0.S"));
   REQUIRE(ret == 0);
 }
 
-TEST_CASE("[asm_features] exit255_run") {
+TEST_CASE("Exit255 run", "[asm_features]") {
   TestContext ctx;
   auto ret = ctx.runHexProgramFile(ctx.getAsmTestPath("exit255.S"));
   REQUIRE(ret == 255);
 }
 
-TEST_CASE("[asm_features] hello_run") {
+TEST_CASE("Hello run", "[asm_features]") {
   TestContext ctx;
   ctx.runHexProgramFile(ctx.getAsmTestPath("hello.S"));
   REQUIRE(ctx.simOutBuffer.str() == "hello\n");
 }
 
-TEST_CASE("[asm_features] hello_procedure_run") {
+TEST_CASE("Hello procedure run", "[asm_features]") {
   TestContext ctx;
   ctx.runHexProgramFile(ctx.getAsmTestPath("hello_procedure.S"));
   REQUIRE(ctx.simOutBuffer.str() == "hello\n");
@@ -85,27 +85,27 @@ TEST_CASE("[asm_features] hello_procedure_run") {
 // Error handling.
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("[asm_features] error_unexpected_opr_operand") {
+TEST_CASE("Error unexpected opr operand", "[asm_features]") {
   TestContext ctx;
   auto program = "OPR OPR";
   REQUIRE_THROWS_AS(ctx.asmHexProgramSrc(program), hexasm::InvalidOprError);
 }
 
-TEST_CASE("[asm_features] error_unrecognised_token") {
+TEST_CASE("Error unrecognised token", "[asm_features]") {
   TestContext ctx;
   auto program = "123";
   REQUIRE_THROWS_AS(ctx.asmHexProgramSrc(program),
                     hexasm::UnrecognisedTokenError);
 }
 
-TEST_CASE("[asm_features] error_expected_number") {
+TEST_CASE("Error expected number", "[asm_features]") {
   TestContext ctx;
   auto program = "BR .";
   REQUIRE_THROWS_AS(ctx.asmHexProgramSrc(program),
                     hexasm::UnexpectedTokenError);
 }
 
-TEST_CASE("[asm_features] error_expected_negative_integer") {
+TEST_CASE("Error expected negative integer", "[asm_features]") {
   TestContext ctx;
   auto program = "BR -foo";
   REQUIRE_THROWS_AS(ctx.asmHexProgramSrc(program),

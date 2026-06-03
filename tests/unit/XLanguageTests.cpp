@@ -13,21 +13,21 @@
 // Null programs
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("main_skip") {
+TEST_CASE("Main skip", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc main () is skip";
   REQUIRE(ctx.runXProgramSrc(program) == 0);
 }
 
-TEST_CASE("main_stop") {
+TEST_CASE("Main stop", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc main () is stop";
   REQUIRE(ctx.runXProgramSrc(program) == 0);
 }
 
-TEST_CASE("stop_after_side_effect") {
+TEST_CASE("Stop after side effect", "[x_features]") {
   TestContext ctx;
 
   // Stop after performing a side effect to verify it executes up to stop.
@@ -39,7 +39,7 @@ TEST_CASE("stop_after_side_effect") {
   REQUIRE(ctx.simOutBuffer.str() == "a");
 }
 
-TEST_CASE("stop_in_conditional") {
+TEST_CASE("Stop in conditional", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(
@@ -57,42 +57,42 @@ TEST_CASE("stop_in_conditional") {
 // Syscalls
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("syscall_exit_0_no_val") {
+TEST_CASE("Syscall exit 0 no val", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc main() is 0(0)";
   REQUIRE(ctx.runXProgramSrc(program) == 0);
 }
 
-TEST_CASE("syscall_exit_0") {
+TEST_CASE("Syscall exit 0", "[x_features]") {
   TestContext ctx;
 
   auto program = "val exit=0; proc main() is exit(0)";
   REQUIRE(ctx.runXProgramSrc(program) == 0);
 }
 
-TEST_CASE("syscall_exit_1") {
+TEST_CASE("Syscall exit 1", "[x_features]") {
   TestContext ctx;
 
   auto program = "val exit=0; proc main() is exit(1)";
   REQUIRE(ctx.runXProgramSrc(program) == 1);
 }
 
-TEST_CASE("syscall_exit_255") {
+TEST_CASE("Syscall exit 255", "[x_features]") {
   TestContext ctx;
 
   auto program = "val exit=0; proc main() is exit(255)";
   REQUIRE(ctx.runXProgramSrc(program) == 255);
 }
 
-TEST_CASE("syscall_exit_neg_255") {
+TEST_CASE("Syscall exit neg 255", "[x_features]") {
   TestContext ctx;
 
   auto program = "val exit=0; proc main() is exit(-255)";
   REQUIRE(ctx.runXProgramSrc(program) == -255);
 }
 
-TEST_CASE("syscall_put_stream_0_no_val") {
+TEST_CASE("Syscall put stream 0 no val", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc main() is 1('x', 0)";
@@ -100,7 +100,7 @@ TEST_CASE("syscall_put_stream_0_no_val") {
   REQUIRE(ctx.simOutBuffer.str() == "x");
 }
 
-TEST_CASE("syscall_put_stream_0") {
+TEST_CASE("Syscall put stream 0", "[x_features]") {
   TestContext ctx;
 
   auto program = "val put=1; proc main() is put('x', 0)";
@@ -108,7 +108,7 @@ TEST_CASE("syscall_put_stream_0") {
   REQUIRE(ctx.simOutBuffer.str() == "x");
 }
 
-TEST_CASE("syscall_put_stream_255") {
+TEST_CASE("Syscall put stream 255", "[x_features]") {
   TestContext ctx;
 
   auto program = "val put=1; proc main() is put('x', 255)";
@@ -116,28 +116,28 @@ TEST_CASE("syscall_put_stream_255") {
   REQUIRE(ctx.simOutBuffer.str() == "x");
 }
 
-TEST_CASE("syscall_get_stream_0_no_vals") {
+TEST_CASE("Syscall get stream 0 no vals", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc main() is 0(2(0))";
   REQUIRE(ctx.runXProgramSrc(program, "a") == 'a');
 }
 
-TEST_CASE("syscall_get_stream_0") {
+TEST_CASE("Syscall get stream 0", "[x_features]") {
   TestContext ctx;
 
   auto program = "val exit=0; val get=2; proc main() is exit(get(0))";
   REQUIRE(ctx.runXProgramSrc(program, "a") == 'a');
 }
 
-TEST_CASE("syscall_get_stream_255") {
+TEST_CASE("Syscall get stream 255", "[x_features]") {
   TestContext ctx;
 
   auto program = "val exit=0; val get=2; proc main() is exit(get(255))";
   REQUIRE(ctx.runXProgramSrc(program, "a") == 'a');
 }
 
-TEST_CASE("syscall_echo_multiple") {
+TEST_CASE("Syscall echo multiple", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(
@@ -154,21 +154,21 @@ proc main () is {
   REQUIRE(ctx.simOutBuffer.str() == "abc");
 }
 
-TEST_CASE("syscall_invalid_3") {
+TEST_CASE("Syscall invalid 3", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc main() is 3(0)";
   REQUIRE_THROWS_AS(ctx.runXProgramSrc(program), xcmp::InvalidSyscallError);
 }
 
-TEST_CASE("syscall_invalid_val_minus_1") {
+TEST_CASE("Syscall invalid val minus 1", "[x_features]") {
   TestContext ctx;
 
   auto program = "val x=-1; proc main() is x(0)";
   REQUIRE_THROWS_AS(ctx.runXProgramSrc(program), xcmp::InvalidSyscallError);
 }
 
-TEST_CASE("syscall_invalid_val_3") {
+TEST_CASE("Syscall invalid val 3", "[x_features]") {
   TestContext ctx;
 
   auto program = "val x=3; proc main() is x(0)";
@@ -179,7 +179,7 @@ TEST_CASE("syscall_invalid_val_3") {
 // Hello world
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("hello_world_simple") {
+TEST_CASE("Hello world simple", "[x_features]") {
   TestContext ctx;
 
   // The most basic hello world example.
@@ -203,7 +203,7 @@ proc main () is {
   REQUIRE(ctx.simOutBuffer.str() == "hello world\n");
 }
 
-TEST_CASE("hello_world_putval") {
+TEST_CASE("Hello world putval", "[x_features]") {
   TestContext ctx;
 
   // Demonstrate a syscall from within a process call.
@@ -233,7 +233,7 @@ proc main() is {
 // Constants
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("constants_min_positive_pool") {
+TEST_CASE("Constants min positive pool", "[x_features]") {
   TestContext ctx;
 
   auto program = "val x = 65536; proc main () is 0(x)";
@@ -242,7 +242,7 @@ TEST_CASE("constants_min_positive_pool") {
   REQUIRE(ctx.runXProgramSrc(program) == 65536);
 }
 
-TEST_CASE("constants_max_positive_pool") {
+TEST_CASE("Constants max positive pool", "[x_features]") {
   TestContext ctx;
 
   auto program = "val x = 2147483647; proc main () is 0(x)";
@@ -251,7 +251,7 @@ TEST_CASE("constants_max_positive_pool") {
   REQUIRE(ctx.runXProgramSrc(program) == 2147483647);
 }
 
-TEST_CASE("constants_min_negative_pool") {
+TEST_CASE("Constants min negative pool", "[x_features]") {
   TestContext ctx;
 
   auto program = "val x = -65536; proc main () is 0(x)";
@@ -260,7 +260,7 @@ TEST_CASE("constants_min_negative_pool") {
   REQUIRE(ctx.runXProgramSrc(program) == -65536);
 }
 
-TEST_CASE("constants_max_negative_pool") {
+TEST_CASE("Constants max negative pool", "[x_features]") {
   TestContext ctx;
 
   auto program = "val x = -2147483648; proc main () is 0(x)";
@@ -269,14 +269,14 @@ TEST_CASE("constants_max_negative_pool") {
   REQUIRE(ctx.runXProgramSrc(program) == -2147483648);
 }
 
-TEST_CASE("constants_hex") {
+TEST_CASE("Constants hex", "[x_features]") {
   TestContext ctx;
 
   auto program = "val x = #01000000; proc main () is 0(x)";
   REQUIRE(ctx.runXProgramSrc(program) == 16777216);
 }
 
-TEST_CASE("constants_hex_digits") {
+TEST_CASE("Constants hex digits", "[x_features]") {
   TestContext ctx;
 
   // Verify hex parsing accepts only valid hex digits (0-9, a-f, A-F).
@@ -288,7 +288,7 @@ TEST_CASE("constants_hex_digits") {
   REQUIRE(ctx.runXProgramSrc("val g = 0; proc main () is 0(#FF + g)") == 255);
 }
 
-TEST_CASE("constants_propagation_binop") {
+TEST_CASE("Constants propagation binop", "[x_features]") {
   TestContext ctx;
 
   auto program = "val x = 1; val y = 2; val z = 3; val r = (x + y) - z; proc "
@@ -296,7 +296,7 @@ TEST_CASE("constants_propagation_binop") {
   REQUIRE(ctx.runXProgramSrc(program) == 0);
 }
 
-TEST_CASE("local_val_declaration") {
+TEST_CASE("Local val declaration", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(
@@ -305,7 +305,7 @@ TEST_CASE("local_val_declaration") {
   REQUIRE(ctx.runXProgramSrc(program) == 42);
 }
 
-TEST_CASE("local_val_in_expression") {
+TEST_CASE("Local val in expression", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(
@@ -318,7 +318,7 @@ TEST_CASE("local_val_in_expression") {
 // Procedure calling
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("putval_indirect") {
+TEST_CASE("Putval indirect", "[x_features]") {
   TestContext ctx;
 
   // Demonstrate indirection of the character values through a function.
@@ -337,7 +337,7 @@ proc main() is {
   REQUIRE(ctx.simOutBuffer.str() == "xy\n");
 }
 
-TEST_CASE("putval_multiple_indirect") {
+TEST_CASE("Putval multiple indirect", "[x_features]") {
   TestContext ctx;
 
   // Demonstrate multiple indirection of the character values through a
@@ -357,7 +357,7 @@ proc main() is {
   REQUIRE(ctx.simOutBuffer.str() == "xyz\n");
 }
 
-TEST_CASE("binop_either_breg") {
+TEST_CASE("Binop either breg", "[x_features]") {
   TestContext ctx;
 
   // Materialise RHS value into breg.
@@ -375,7 +375,7 @@ proc main() is {
   REQUIRE(ctx.simOutBuffer.str() == "by\n");
 }
 
-TEST_CASE("binop_func_plus_const") {
+TEST_CASE("Binop func plus const", "[x_features]") {
   TestContext ctx;
 
   // Binop addition with a function call on LHS and RHS.
@@ -393,7 +393,7 @@ proc main() is {
   REQUIRE(ctx.simOutBuffer.str() == "bc\n");
 }
 
-TEST_CASE("binop_func_args") {
+TEST_CASE("Binop func args", "[x_features]") {
   TestContext ctx;
 
   // Nested binop additions with function calls to supply values, requiring
@@ -413,7 +413,7 @@ proc main() is {
   REQUIRE(ctx.simOutBuffer.str() == "bcdef\n");
 }
 
-TEST_CASE("binop_nested_func_args") {
+TEST_CASE("Binop nested func args", "[x_features]") {
   TestContext ctx;
 
   // Function call bar that must evaluate a binop with a function call.
@@ -431,7 +431,7 @@ proc main() is {
   REQUIRE(ctx.simOutBuffer.str() == "cz\n");
 }
 
-TEST_CASE("three_func_args") {
+TEST_CASE("Three func args", "[x_features]") {
   TestContext ctx;
 
   // Nested binop additions with function calls to supply values, requiring
@@ -444,7 +444,7 @@ proc main() is exit(foo(0, 1, 2)))";
   REQUIRE(ctx.runXProgramSrc(program) == 3);
 }
 
-TEST_CASE("ten_func_args") {
+TEST_CASE("Ten func args", "[x_features]") {
   TestContext ctx;
 
   // Nested binop additions with function calls to supply values, requiring
@@ -458,7 +458,7 @@ proc main() is exit(foo(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)))";
   REQUIRE(ctx.runXProgramSrc(program) == 45);
 }
 
-TEST_CASE("prepare_call_actuals") {
+TEST_CASE("Prepare call actuals", "[x_features]") {
   TestContext ctx;
 
   // Check that multiple actuals containing calls are allocated stack space
@@ -470,7 +470,7 @@ proc main() is 0(add3(nop(1), nop(2), nop(3))))";
   REQUIRE(ctx.runXProgramSrc(program) == 6);
 }
 
-TEST_CASE("prepare_call_actuals_nested_1") {
+TEST_CASE("Prepare call actuals nested 1", "[x_features]") {
   TestContext ctx;
 
   // As above, but this time with two levels of nesting.
@@ -481,7 +481,7 @@ proc main() is 0(add3(add3(nop(1), nop(2), nop(3)), nop(4), nop(5))))";
   REQUIRE(ctx.runXProgramSrc(program) == 15);
 }
 
-TEST_CASE("prepare_call_actuals_nested_2") {
+TEST_CASE("Prepare call actuals nested 2", "[x_features]") {
   TestContext ctx;
 
   // As above, but this time with three levels of nesting.
@@ -492,7 +492,7 @@ proc main() is 0(add3(add3(add3(nop(1), nop(2), nop(3)), nop(4), nop(5)), nop(6)
   REQUIRE(ctx.runXProgramSrc(program) == 28);
 }
 
-TEST_CASE("prepare_call_actuals_nested_3") {
+TEST_CASE("Prepare call actuals nested 3", "[x_features]") {
   TestContext ctx;
 
   // As above, but this time with the calls nested in an addition.
@@ -507,7 +507,7 @@ proc main() is 0(add3(add3(add3(nop(1)+1, nop(2)+1, nop(3)+1), nop(4)+1, nop(5)+
 // Unary operators.
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("unary_minus") {
+TEST_CASE("Unary minus", "[x_features]") {
   TestContext ctx;
 
   REQUIRE(ctx.runXProgramSrc("proc main () is 0(2(0))", "0") == '0');
@@ -520,7 +520,7 @@ TEST_CASE("unary_minus") {
   REQUIRE(ctx.runXProgramSrc("proc main () is 0(-(-(-42)))") == -42);
 }
 
-TEST_CASE("unary_not") {
+TEST_CASE("Unary not", "[x_features]") {
   TestContext ctx;
 
   REQUIRE(ctx.runXProgramSrc("proc main () is 0(2(0))", "0") == '0');
@@ -542,21 +542,21 @@ TEST_CASE("unary_not") {
 // Boolean literals
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("bool_literal_true") {
+TEST_CASE("Bool literal true", "[x_features]") {
   TestContext ctx;
 
   REQUIRE(ctx.runXProgramSrc("proc main() is if true then 0(1) else 0(2)") ==
           1);
 }
 
-TEST_CASE("bool_literal_false") {
+TEST_CASE("Bool literal false", "[x_features]") {
   TestContext ctx;
 
   REQUIRE(ctx.runXProgramSrc("proc main() is if false then 0(1) else 0(2)") ==
           2);
 }
 
-TEST_CASE("bool_literal_while_false") {
+TEST_CASE("Bool literal while false", "[x_features]") {
   TestContext ctx;
 
   // while false should never execute the body.
@@ -568,7 +568,7 @@ TEST_CASE("bool_literal_while_false") {
   REQUIRE(ctx.simOutBuffer.str() == "y");
 }
 
-TEST_CASE("bool_literal_as_func_arg") {
+TEST_CASE("Bool literal as func arg", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(
@@ -585,7 +585,7 @@ TEST_CASE("bool_literal_as_func_arg") {
 // fixed by performing the calls in separate actuals.
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("binary_plus") {
+TEST_CASE("Binary plus", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(func add(val a, val b) is return a + b
@@ -597,7 +597,7 @@ TEST_CASE("binary_plus") {
   }
 }
 
-TEST_CASE("binary_sub") {
+TEST_CASE("Binary sub", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(func sub(val a, val b) is return a - b
@@ -609,7 +609,7 @@ TEST_CASE("binary_sub") {
   }
 }
 
-TEST_CASE("binary_sub_rhs_then_lhs") {
+TEST_CASE("Binary sub rhs then lhs", "[x_features]") {
   TestContext ctx;
 
   // A test to show that binops with operatings both requiring aregs are
@@ -618,7 +618,7 @@ TEST_CASE("binary_sub_rhs_then_lhs") {
   REQUIRE(ctx.runXProgramSrc(program, {5, 9}) == (9 - 5));
 }
 
-TEST_CASE("binary_ls") {
+TEST_CASE("Binary ls", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(func ls(val a, val b) is return a < b
@@ -630,7 +630,7 @@ TEST_CASE("binary_ls") {
   }
 }
 
-TEST_CASE("binary_ls_rhs_then_lhs") {
+TEST_CASE("Binary ls rhs then lhs", "[x_features]") {
   TestContext ctx;
 
   // Similar to binary_sub_rhs_then_lhs, this was causing a segfault due to the
@@ -640,7 +640,7 @@ TEST_CASE("binary_ls_rhs_then_lhs") {
   REQUIRE((ctx.runXProgramSrc(program, {5, 9}) != 0) == (9 < 5));
 }
 
-TEST_CASE("binary_le") {
+TEST_CASE("Binary le", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(func le(val a, val b) is return a <= b
@@ -652,7 +652,7 @@ TEST_CASE("binary_le") {
   }
 }
 
-TEST_CASE("binary_gt") {
+TEST_CASE("Binary gt", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(func gt(val a, val b) is return a > b
@@ -664,7 +664,7 @@ TEST_CASE("binary_gt") {
   }
 }
 
-TEST_CASE("binary_ge") {
+TEST_CASE("Binary ge", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(func ge(val a, val b) is return a >= b
@@ -676,7 +676,7 @@ TEST_CASE("binary_ge") {
   }
 }
 
-TEST_CASE("binary_eq") {
+TEST_CASE("Binary eq", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(func eq(val a, val b) is return a = b
@@ -688,7 +688,7 @@ TEST_CASE("binary_eq") {
   }
 }
 
-TEST_CASE("binary_ne") {
+TEST_CASE("Binary ne", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(func ne(val a, val b) is return a ~= b
@@ -700,7 +700,7 @@ TEST_CASE("binary_ne") {
   }
 }
 
-TEST_CASE("binary_and") {
+TEST_CASE("Binary and", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(func and2(val a, val b) is return a and b
@@ -712,7 +712,7 @@ TEST_CASE("binary_and") {
   }
 }
 
-TEST_CASE("binary_or") {
+TEST_CASE("Binary or", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(func or2(val a, val b) is return a or b
@@ -726,7 +726,7 @@ TEST_CASE("binary_or") {
 
 // Binary operators with constant propagation.
 
-TEST_CASE("binary_add_constants") {
+TEST_CASE("Binary add constants", "[x_features]") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -737,7 +737,7 @@ TEST_CASE("binary_add_constants") {
   }
 }
 
-TEST_CASE("binary_sub_constants") {
+TEST_CASE("Binary sub constants", "[x_features]") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -748,7 +748,7 @@ TEST_CASE("binary_sub_constants") {
   }
 }
 
-TEST_CASE("binary_ls_constants") {
+TEST_CASE("Binary ls constants", "[x_features]") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -759,7 +759,7 @@ TEST_CASE("binary_ls_constants") {
   }
 }
 
-TEST_CASE("binary_le_constants") {
+TEST_CASE("Binary le constants", "[x_features]") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -770,7 +770,7 @@ TEST_CASE("binary_le_constants") {
   }
 }
 
-TEST_CASE("binary_gt_constants") {
+TEST_CASE("Binary gt constants", "[x_features]") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -781,7 +781,7 @@ TEST_CASE("binary_gt_constants") {
   }
 }
 
-TEST_CASE("binary_ge_constants") {
+TEST_CASE("Binary ge constants", "[x_features]") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -792,7 +792,7 @@ TEST_CASE("binary_ge_constants") {
   }
 }
 
-TEST_CASE("binary_eq_constants") {
+TEST_CASE("Binary eq constants", "[x_features]") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -803,7 +803,7 @@ TEST_CASE("binary_eq_constants") {
   }
 }
 
-TEST_CASE("binary_ne_constants") {
+TEST_CASE("Binary ne constants", "[x_features]") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -814,7 +814,7 @@ TEST_CASE("binary_ne_constants") {
   }
 }
 
-TEST_CASE("binary_and_constants") {
+TEST_CASE("Binary and constants", "[x_features]") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -825,7 +825,7 @@ TEST_CASE("binary_and_constants") {
   }
 }
 
-TEST_CASE("binary_or_constants") {
+TEST_CASE("Binary or constants", "[x_features]") {
   TestContext ctx;
 
   for (int a : ctx.getCharValues()) {
@@ -838,7 +838,7 @@ TEST_CASE("binary_or_constants") {
 
 // Chained associative operators.
 
-TEST_CASE("binary_associative_plus4") {
+TEST_CASE("Binary associative plus4", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(func add4(val a, val b, val c, val d) is
@@ -847,7 +847,7 @@ TEST_CASE("binary_associative_plus4") {
   REQUIRE(ctx.runXProgramSrc(program, {1, 2, 3, 4}) == 1 + 2 + 3 + 4);
 }
 
-TEST_CASE("binary_associative_and4") {
+TEST_CASE("Binary associative and4", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(func and4(val a, val b, val c, val d) is
@@ -860,7 +860,7 @@ TEST_CASE("binary_associative_and4") {
   REQUIRE(ctx.runXProgramSrc(program, {1, 1, 1, 1}) == 1);
 }
 
-TEST_CASE("binary_associative_or4") {
+TEST_CASE("Binary associative or4", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(func or4(val a, val b, val c, val d) is
@@ -878,7 +878,7 @@ TEST_CASE("binary_associative_or4") {
 // Assign statement
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("assign_statement") {
+TEST_CASE("Assign statement", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(
@@ -889,7 +889,7 @@ proc main () is var x; {
   REQUIRE(ctx.runXProgramSrc(program, "1") == '1');
 }
 
-TEST_CASE("assign_statement_chained") {
+TEST_CASE("Assign statement chained", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(
@@ -905,7 +905,7 @@ var x; var y; var z; {
 // If statement
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("if_statement") {
+TEST_CASE("If statement", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc main () is if 2(0) = 48 then 0(0) else 0(1)";
@@ -913,7 +913,7 @@ TEST_CASE("if_statement") {
   REQUIRE(ctx.runXProgramSrc(program, "1") == 1);
 }
 
-TEST_CASE("if_statement_skip_else") {
+TEST_CASE("If statement skip else", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc main () is if 2(0) = 48 then 0(1) else skip";
@@ -921,7 +921,7 @@ TEST_CASE("if_statement_skip_else") {
   REQUIRE(ctx.runXProgramSrc(program, "1") == 0);
 }
 
-TEST_CASE("if_statement_skip_then") {
+TEST_CASE("If statement skip then", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc main () is if 2(0) = 48 then skip else 0(1)";
@@ -929,7 +929,7 @@ TEST_CASE("if_statement_skip_then") {
   REQUIRE(ctx.runXProgramSrc(program, "1") == 1);
 }
 
-TEST_CASE("if_statement_chained") {
+TEST_CASE("If statement chained", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(
@@ -949,7 +949,7 @@ proc main () is foo(2(0)))";
 // While statement
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("while_statement_count") {
+TEST_CASE("While statement count", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(
@@ -962,7 +962,7 @@ proc main () is
   REQUIRE(ctx.runXProgramSrc(program) == 100);
 }
 
-TEST_CASE("while_statement_nested_count") {
+TEST_CASE("While statement nested count", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(
@@ -985,7 +985,7 @@ proc main () is
   REQUIRE(ctx.runXProgramSrc(program) == 100);
 }
 
-TEST_CASE("while_statement_count_if_exit") {
+TEST_CASE("While statement count if exit", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(
@@ -1004,7 +1004,7 @@ proc main () is
 // Global variables
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("global_var_write_read") {
+TEST_CASE("Global var write read", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(
@@ -1014,7 +1014,7 @@ TEST_CASE("global_var_write_read") {
   REQUIRE(ctx.runXProgramSrc(program) == 42);
 }
 
-TEST_CASE("global_var_multiple") {
+TEST_CASE("Global var multiple", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(
@@ -1024,7 +1024,7 @@ TEST_CASE("global_var_multiple") {
   REQUIRE(ctx.runXProgramSrc(program) == 60);
 }
 
-TEST_CASE("global_var_cross_proc") {
+TEST_CASE("Global var cross proc", "[x_features]") {
   TestContext ctx;
 
   // Global variable written in one proc, read in another.
@@ -1036,7 +1036,7 @@ TEST_CASE("global_var_cross_proc") {
   REQUIRE(ctx.runXProgramSrc(program) == 99);
 }
 
-TEST_CASE("global_var_func_read") {
+TEST_CASE("Global var func read", "[x_features]") {
   TestContext ctx;
 
   // Global variable read from a function.
@@ -1052,7 +1052,7 @@ TEST_CASE("global_var_func_read") {
 // Global arrays
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("global_array_while_printvals") {
+TEST_CASE("Global array while printvals", "[x_features]") {
   TestContext ctx;
 
   // Write the contents of an array then print it out.
@@ -1073,7 +1073,7 @@ proc main() is
   REQUIRE(ctx.simOutBuffer.str() == "0123456789");
 }
 
-TEST_CASE("global_array_copy_and_print") {
+TEST_CASE("Global array copy and print", "[x_features]") {
   TestContext ctx;
 
   // Exercise generation of array subscripts on LHS and RHS.
@@ -1114,7 +1114,7 @@ TEST_CASE("global_array_copy_and_print") {
 // Scope
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("scope_local_global_matching") {
+TEST_CASE("Scope local global matching", "[x_features]") {
   TestContext ctx;
 
   // Matching variables in local and global scopes.
@@ -1127,7 +1127,7 @@ TEST_CASE("scope_local_global_matching") {
   REQUIRE(ctx.simOutBuffer.str() == std::string({-6}));
 }
 
-TEST_CASE("scope_matching_formals") {
+TEST_CASE("Scope matching formals", "[x_features]") {
   TestContext ctx;
 
   // Matching formal variables in two local scopes, but with different stack
@@ -1141,7 +1141,7 @@ TEST_CASE("scope_matching_formals") {
   REQUIRE(ctx.simOutBuffer.str() == std::string({-6, 0}));
 }
 
-TEST_CASE("scope_matching_locals") {
+TEST_CASE("Scope matching locals", "[x_features]") {
   TestContext ctx;
 
   // Matching local variables in two local scopes, but with different stack
@@ -1167,7 +1167,7 @@ TEST_CASE("scope_matching_locals") {
 // Return statement
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("return_from_if") {
+TEST_CASE("Return from if", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(
@@ -1176,7 +1176,7 @@ TEST_CASE("return_from_if") {
   REQUIRE(ctx.runXProgramSrc(program) == 10);
 }
 
-TEST_CASE("return_from_while") {
+TEST_CASE("Return from while", "[x_features]") {
   TestContext ctx;
 
   // Return from inside a while loop.
@@ -1193,7 +1193,7 @@ TEST_CASE("return_from_while") {
   REQUIRE(ctx.runXProgramSrc(program) == 10);
 }
 
-TEST_CASE("return_from_nested_if") {
+TEST_CASE("Return from nested if", "[x_features]") {
   TestContext ctx;
 
   auto program = R"(
@@ -1209,7 +1209,7 @@ TEST_CASE("return_from_nested_if") {
 // Procs
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("proc_no_frame_return") {
+TEST_CASE("Proc no frame return", "[x_features]") {
   TestContext ctx;
 
   // Check that procs with no stack allocation return correctly.
@@ -1227,35 +1227,35 @@ TEST_CASE("proc_no_frame_return") {
 
 // Token errors
 
-TEST_CASE("token_error_char_const_escape") {
+TEST_CASE("Token error char const escape", "[x_features]") {
   TestContext ctx;
 
   auto program = "val foo = '\\x';";
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::CharConstError);
 }
 
-TEST_CASE("token_error_eq") {
+TEST_CASE("Token error eq", "[x_features]") {
   TestContext ctx;
 
   auto program = "val foo :~";
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::TokenError);
 }
 
-TEST_CASE("token_error_char_const") {
+TEST_CASE("Token error char const", "[x_features]") {
   TestContext ctx;
 
   auto program = "val foo = 'x~";
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::TokenError);
 }
 
-TEST_CASE("token_error_string") {
+TEST_CASE("Token error string", "[x_features]") {
   TestContext ctx;
 
   auto program = "val foo = \"x";
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::TokenError);
 }
 
-TEST_CASE("token_error_unexpected_char") {
+TEST_CASE("Token error unexpected char", "[x_features]") {
   TestContext ctx;
 
   auto program = "val foo = @";
@@ -1264,7 +1264,7 @@ TEST_CASE("token_error_unexpected_char") {
 
 // Unexpected token errors
 
-TEST_CASE("unexpected_token_error_elem") {
+TEST_CASE("Unexpected token error elem", "[x_features]") {
   TestContext ctx;
 
   auto program1 = "val foo = bar[100~";
@@ -1275,7 +1275,7 @@ TEST_CASE("unexpected_token_error_elem") {
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program3), xcmp::UnexpectedTokenError);
 }
 
-TEST_CASE("unexpected_token_error_val_decl") {
+TEST_CASE("Unexpected token error val decl", "[x_features]") {
   TestContext ctx;
 
   auto program1 = "val foo ~";
@@ -1284,7 +1284,7 @@ TEST_CASE("unexpected_token_error_val_decl") {
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program2), xcmp::UnexpectedTokenError);
 }
 
-TEST_CASE("unexpected_token_error_array_decl") {
+TEST_CASE("Unexpected token error array decl", "[x_features]") {
   TestContext ctx;
 
   auto program1 = "array foo~";
@@ -1295,7 +1295,7 @@ TEST_CASE("unexpected_token_error_array_decl") {
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program3), xcmp::UnexpectedTokenError);
 }
 
-TEST_CASE("unexpected_token_error_stmt_if") {
+TEST_CASE("Unexpected token error stmt if", "[x_features]") {
   TestContext ctx;
 
   auto program1 = "proc foo() is if 0 xxx";
@@ -1304,28 +1304,28 @@ TEST_CASE("unexpected_token_error_stmt_if") {
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program2), xcmp::UnexpectedTokenError);
 }
 
-TEST_CASE("unexpected_token_error_stmt_while") {
+TEST_CASE("Unexpected token error stmt while", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc foo() is while 0 xxx";
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::UnexpectedTokenError);
 }
 
-TEST_CASE("unexpected_token_error_stmt_block") {
+TEST_CASE("Unexpected token error stmt block", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc foo() is { skip ~";
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::UnexpectedTokenError);
 }
 
-TEST_CASE("unexpected_token_error_stmt_ass") {
+TEST_CASE("Unexpected token error stmt ass", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc foo() is bar ~";
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::UnexpectedTokenError);
 }
 
-TEST_CASE("unexpected_token_error_proc_decl") {
+TEST_CASE("Unexpected token error proc decl", "[x_features]") {
   TestContext ctx;
 
   auto program0 = "proc foo~";
@@ -1340,7 +1340,7 @@ TEST_CASE("unexpected_token_error_proc_decl") {
 
 // Expected name error.
 
-TEST_CASE("expected_name_error") {
+TEST_CASE("Expected name error", "[x_features]") {
   TestContext ctx;
 
   auto program0 = "proc ~";
@@ -1349,28 +1349,28 @@ TEST_CASE("expected_name_error") {
 
 // Parser token errors.
 
-TEST_CASE("parser_token_error_elem") {
+TEST_CASE("Parser token error elem", "[x_features]") {
   TestContext ctx;
 
   auto program = "val foo = +";
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::ParserTokenError);
 }
 
-TEST_CASE("parser_token_error_decl") {
+TEST_CASE("Parser token error decl", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc foo() is xxx :=";
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::ParserTokenError);
 }
 
-TEST_CASE("parser_token_error_formal") {
+TEST_CASE("Parser token error formal", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc foo(val a, foo b) is skip";
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::ParserTokenError);
 }
 
-TEST_CASE("parser_token_error_stmt_invalid") {
+TEST_CASE("Parser token error stmt invalid", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc foo() is ~";
@@ -1379,7 +1379,7 @@ TEST_CASE("parser_token_error_stmt_invalid") {
 
 // Semantic errors.
 
-TEST_CASE("var_formal_parameter") {
+TEST_CASE("Var formal parameter", "[x_features]") {
   TestContext ctx;
 
   // Verify `var` formal parameters are parsed and compiled without error.
@@ -1389,7 +1389,7 @@ proc main() is foo(42))";
   REQUIRE(ctx.runXProgramSrc(program) == 42);
 }
 
-TEST_CASE("var_formal_parameter_prev_error") {
+TEST_CASE("Var formal parameter prev error", "[x_features]") {
   TestContext ctx;
 
   // Before the fix, `var` in a formal position would throw a parser error.
@@ -1397,7 +1397,7 @@ TEST_CASE("var_formal_parameter_prev_error") {
   REQUIRE_NOTHROW(ctx.asmXProgramSrc(program));
 }
 
-TEST_CASE("var_formal_parameter_func") {
+TEST_CASE("Var formal parameter func", "[x_features]") {
   TestContext ctx;
 
   // Verify `var` formal parameters work in functions.
@@ -1407,7 +1407,7 @@ TEST_CASE("var_formal_parameter_func") {
   REQUIRE(ctx.runXProgramSrc(program) == 42);
 }
 
-TEST_CASE("string_expr_parsing") {
+TEST_CASE("String expr parsing", "[x_features]") {
   TestContext ctx;
 
   // Verify that string literals are parsed correctly and not affected by
@@ -1424,21 +1424,21 @@ proc main() is {
   REQUIRE(ctx.simOutBuffer.str() == "x");
 }
 
-TEST_CASE("unknown_symbol_error_call") {
+TEST_CASE("Unknown symbol error call", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc main() is foo(0)";
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::UnknownSymbolError);
 }
 
-TEST_CASE("unknown_symbol_error_expr") {
+TEST_CASE("Unknown symbol error expr", "[x_features]") {
   TestContext ctx;
 
   auto program = "proc main() is 0(x)";
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::UnknownSymbolError);
 }
 
-TEST_CASE("missing_main_error") {
+TEST_CASE("Missing main error", "[x_features]") {
   TestContext ctx;
 
   // A program without a main proc should fail during assembly.
@@ -1447,7 +1447,7 @@ TEST_CASE("missing_main_error") {
 }
 
 // Enable when (global) arrays are handled.
-TEST_CASE("semantics_non_const_array_length_error") {
+TEST_CASE("Semantics non const array length error", "[x_features]") {
   TestContext ctx;
 
   auto program = "var x; array foo[x]; proc main () is skip";
@@ -1459,13 +1459,13 @@ TEST_CASE("semantics_non_const_array_length_error") {
 // Message passing: chan, par, !, ? (front-end)
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("chan_par_pling_query_tokens") {
+TEST_CASE("Chan par pling query tokens", "[x_features]") {
   TestContext ctx;
   auto output = ctx.tokeniseXProgramSrc("chan par ! ?").str();
   REQUIRE(output == "chan\npar\n!\n?\nEOF\n");
 }
 
-TEST_CASE("chan_declaration_and_formal_tree") {
+TEST_CASE("Chan declaration and formal tree", "[x_features]") {
   TestContext ctx;
   auto output = ctx.treeXProgramSrc("chan c;\n"
                                     "proc main(chan d) is skip")
@@ -1474,26 +1474,26 @@ TEST_CASE("chan_declaration_and_formal_tree") {
   REQUIRE(output.find("chanformal d") != std::string::npos);
 }
 
-TEST_CASE("par_statement_tree") {
+TEST_CASE("Par statement tree", "[x_features]") {
   TestContext ctx;
-  auto output = ctx.treeXProgramSrc(
-                       "proc source(chan c) is skip\n"
-                       "proc sink(chan c) is skip\n"
-                       "proc main() is chan a; par { source(a); sink(a) }")
-                    .str();
+  auto output =
+      ctx.treeXProgramSrc("proc source(chan c) is skip\n"
+                          "proc sink(chan c) is skip\n"
+                          "proc main() is chan a; par { source(a); sink(a) }")
+          .str();
   REQUIRE(output.find("parstmt") != std::string::npos);
   REQUIRE(output.find("call source") != std::string::npos);
   REQUIRE(output.find("call sink") != std::string::npos);
 }
 
-TEST_CASE("par_branch_must_be_call_error") {
+TEST_CASE("Par branch must be call error", "[x_features]") {
   TestContext ctx;
   auto program = "proc sink(chan c) is skip\n"
                  "proc main() is chan a; par { skip; sink(a) }";
   REQUIRE_THROWS_AS(ctx.treeXProgramSrc(program), xcmp::ParserTokenError);
 }
 
-TEST_CASE("out_statement_tree") {
+TEST_CASE("Out statement tree", "[x_features]") {
   TestContext ctx;
   auto output = ctx.treeXProgramSrc("proc worker(chan c) is c ! 42\n"
                                     "proc main() is skip")
@@ -1502,7 +1502,7 @@ TEST_CASE("out_statement_tree") {
   REQUIRE(output.find("number 42") != std::string::npos);
 }
 
-TEST_CASE("in_statement_tree") {
+TEST_CASE("In statement tree", "[x_features]") {
   TestContext ctx;
   auto output = ctx.treeXProgramSrc("proc worker(chan c) is var v; c ? v\n"
                                     "proc main() is skip")
@@ -1511,7 +1511,7 @@ TEST_CASE("in_statement_tree") {
   REQUIRE(output.find("varref v") != std::string::npos);
 }
 
-TEST_CASE("in_statement_array_target_tree") {
+TEST_CASE("In statement array target tree", "[x_features]") {
   TestContext ctx;
   auto output = ctx.treeXProgramSrc("array a[4];\n"
                                     "proc worker(chan c) is c ? a[0]\n"
@@ -1521,15 +1521,14 @@ TEST_CASE("in_statement_array_target_tree") {
   REQUIRE(output.find("arraysubscript a") != std::string::npos);
 }
 
-TEST_CASE("message_passing_ring_tree") {
+TEST_CASE("Message passing ring tree", "[x_features]") {
   TestContext ctx;
   // A reused worker proc placed on a two-processor ring exercises chan
   // declarations/formals, par, ! and ? together.
-  auto output = ctx.treeXProgramSrc(
-                       "proc worker(chan in, chan out) is var v; "
-                       "{ in ? v; out ! v }\n"
-                       "proc main() is chan a; chan b; "
-                       "par { worker(a, b); worker(b, a) }")
+  auto output = ctx.treeXProgramSrc("proc worker(chan in, chan out) is var v; "
+                                    "{ in ? v; out ! v }\n"
+                                    "proc main() is chan a; chan b; "
+                                    "par { worker(a, b); worker(b, a) }")
                     .str();
   REQUIRE(output.find("parstmt") != std::string::npos);
   REQUIRE(output.find("instmt") != std::string::npos);
@@ -1540,7 +1539,7 @@ TEST_CASE("message_passing_ring_tree") {
   REQUIRE(output.find("chanformal out") != std::string::npos);
 }
 
-TEST_CASE("out_statement_codegen") {
+TEST_CASE("Out statement codegen", "[x_features]") {
   TestContext ctx;
   auto asmText = ctx.asmXProgramSrc("proc worker(chan c) is c ! 42\n"
                                     "proc main() is skip",
@@ -1549,7 +1548,7 @@ TEST_CASE("out_statement_codegen") {
   REQUIRE(asmText.find("OPR OUT") != std::string::npos);
 }
 
-TEST_CASE("in_statement_codegen") {
+TEST_CASE("In statement codegen", "[x_features]") {
   TestContext ctx;
   auto asmText = ctx.asmXProgramSrc("proc worker(chan c) is var v; c ? v\n"
                                     "proc main() is skip",
@@ -1558,7 +1557,7 @@ TEST_CASE("in_statement_codegen") {
   REQUIRE(asmText.find("OPR IN") != std::string::npos);
 }
 
-TEST_CASE("message_passing_run_pipeline") {
+TEST_CASE("Message passing run pipeline", "[x_features]") {
   TestContext ctx;
   // source sends 'A' to sink over channel c; sink writes it to simout.
   auto program = "val put = 1;\n"
@@ -1570,7 +1569,7 @@ TEST_CASE("message_passing_run_pipeline") {
   REQUIRE(ctx.simOutBuffer.str() == "A");
 }
 
-TEST_CASE("message_passing_run_relay") {
+TEST_CASE("Message passing run relay", "[x_features]") {
   TestContext ctx;
   // A 3-stage pipeline: source -> relay -> sink, sink prints the relayed char.
   auto program = "val put = 1;\n"
@@ -1585,7 +1584,7 @@ TEST_CASE("message_passing_run_relay") {
   REQUIRE(ctx.simOutBuffer.str() == "Z");
 }
 
-TEST_CASE("message_passing_run_deadlock") {
+TEST_CASE("Message passing run deadlock", "[x_features]") {
   TestContext ctx;
   // Both workers read before writing, so the ring deadlocks at runtime.
   auto program = "proc worker(chan in, chan out) is var v; "
@@ -1596,7 +1595,7 @@ TEST_CASE("message_passing_run_deadlock") {
                       Catch::Matchers::ContainsSubstring("deadlock"));
 }
 
-TEST_CASE("message_passing_channel_endpoint_error") {
+TEST_CASE("Message passing channel endpoint error", "[x_features]") {
   TestContext ctx;
   // Channel a is used by only one process.
   auto program = "proc reader(chan c) is var v; c ? v\n"
@@ -1604,7 +1603,7 @@ TEST_CASE("message_passing_channel_endpoint_error") {
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::NetworkError);
 }
 
-TEST_CASE("message_passing_channel_direction_error") {
+TEST_CASE("Message passing channel direction error", "[x_features]") {
   TestContext ctx;
   // Channel a has two readers and no writer.
   auto program = "proc reader(chan c) is var v; c ? v\n"
@@ -1612,19 +1611,19 @@ TEST_CASE("message_passing_channel_direction_error") {
   REQUIRE_THROWS_AS(ctx.asmXProgramSrc(program), xcmp::NetworkError);
 }
 
-TEST_CASE("message_passing_run_pipe_x_file") {
+TEST_CASE("Message passing run pipe x file", "[x_features]") {
   TestContext ctx;
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("pipe.x")) == 0);
   REQUIRE(ctx.simOutBuffer.str() == "P");
 }
 
-TEST_CASE("message_passing_run_pingpong_x_file") {
+TEST_CASE("Message passing run pingpong x file", "[x_features]") {
   TestContext ctx;
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("pingpong.x")) == 0);
   REQUIRE(ctx.simOutBuffer.str() == "X");
 }
 
-TEST_CASE("message_passing_run_ring_x_file") {
+TEST_CASE("Message passing run ring x file", "[x_features]") {
   TestContext ctx;
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("ring.x")) == 0);
   REQUIRE(ctx.simOutBuffer.str() == "Z");

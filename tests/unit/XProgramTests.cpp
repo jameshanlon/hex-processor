@@ -9,7 +9,7 @@
 // Unit tests for X programs.
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("mul") {
+TEST_CASE("Mul", "[x_programs]") {
   TestContext ctx;
 
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("mul.x"), {1, 1}) == 1);
@@ -17,7 +17,7 @@ TEST_CASE("mul") {
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("mul.x"), {13, 3}) == 39);
 }
 
-TEST_CASE("div") {
+TEST_CASE("Div", "[x_programs]") {
   TestContext ctx;
 
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("div.x"), {1, 1}) == 1);
@@ -25,7 +25,7 @@ TEST_CASE("div") {
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("div.x"), {3, 13}) == 0);
 }
 
-TEST_CASE("fib") {
+TEST_CASE("Fib", "[x_programs]") {
   TestContext ctx;
 
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("fib.x"), {0}) == 0);
@@ -37,7 +37,7 @@ TEST_CASE("fib") {
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("fib.x"), {6}) == 8);
 }
 
-TEST_CASE("fac") {
+TEST_CASE("Fac", "[x_programs]") {
   TestContext ctx;
 
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("fac.x"), {0}) == 1);
@@ -48,7 +48,7 @@ TEST_CASE("fac") {
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("fac.x"), {5}) == 120);
 }
 
-TEST_CASE("mul2") {
+TEST_CASE("Mul2", "[x_programs]") {
   TestContext ctx;
 
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("mul2.x"), {1, 4}) == 4);
@@ -57,7 +57,7 @@ TEST_CASE("mul2") {
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("mul2.x"), {4, 4}) == 16);
 }
 
-TEST_CASE("exp2") {
+TEST_CASE("Exp2", "[x_programs]") {
   TestContext ctx;
 
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("exp2.x"), {1}) == 2);
@@ -66,21 +66,21 @@ TEST_CASE("exp2") {
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("exp2.x"), {4}) == 16);
 }
 
-TEST_CASE("hello_putval") {
+TEST_CASE("Hello putval", "[x_programs]") {
   TestContext ctx;
 
   ctx.runXProgramFile(ctx.getXTestPath("hello_putval.x"));
   REQUIRE(ctx.simOutBuffer.str() == "hello world\n");
 }
 
-TEST_CASE("hello_prints") {
+TEST_CASE("Hello prints", "[x_programs]") {
   TestContext ctx;
 
   ctx.runXProgramFile(ctx.getXTestPath("hello_prints.x"));
   REQUIRE(ctx.simOutBuffer.str() == "hello world\n");
 }
 
-TEST_CASE("printn") {
+TEST_CASE("Printn", "[x_programs]") {
   TestContext ctx;
 
   ctx.runXProgramFile(ctx.getXTestPath("printn.x"), {0});
@@ -93,7 +93,7 @@ TEST_CASE("printn") {
   REQUIRE(ctx.simOutBuffer.str() == "127");
 }
 
-TEST_CASE("printhex") {
+TEST_CASE("Printhex", "[x_programs]") {
   TestContext ctx;
 
   ctx.runXProgramFile(ctx.getXTestPath("printhex.x"), {0});
@@ -106,39 +106,39 @@ TEST_CASE("printhex") {
   REQUIRE(ctx.simOutBuffer.str() == "7f");
 }
 
-TEST_CASE("exit") {
+TEST_CASE("Exit", "[x_programs]") {
   TestContext ctx;
 
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("exit.x")) == 0);
 }
 
-TEST_CASE("echo_char") {
+TEST_CASE("Echo char", "[x_programs]") {
   TestContext ctx;
 
   ctx.runXProgramFile(ctx.getXTestPath("echo_char.x"), "z");
   REQUIRE(ctx.simOutBuffer.str() == "z");
 }
 
-TEST_CASE("strlen") {
+TEST_CASE("Strlen", "[x_programs]") {
   TestContext ctx;
 
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("strlen.x")) == 3);
 }
 
-TEST_CASE("bubblesort") {
+TEST_CASE("Bubblesort", "[x_programs]") {
   TestContext ctx;
 
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("bubblesort.x")) == 0);
 }
 
-TEST_CASE("xhexb_tree") {
+TEST_CASE("Xhexb tree", "[x_programs]") {
   TestContext ctx;
 
   // Demonstrate the xhexb.x can be parsed into an AST.
   REQUIRE(!ctx.treeXProgramFile(ctx.getXTestPath("xhexb.x")).str().empty());
 }
 
-TEST_CASE("xhexb_hello_putval") {
+TEST_CASE("Xhexb hello putval", "[x_programs]") {
   TestContext ctx;
 
   // Compile xhexb, compile program.
@@ -149,7 +149,7 @@ TEST_CASE("xhexb_hello_putval") {
   REQUIRE(ctx.simOutBuffer.str() == "hello world\n");
 }
 
-TEST_CASE("xhexb_hello_prints") {
+TEST_CASE("Xhexb hello prints", "[x_programs]") {
   TestContext ctx;
 
   // Compile xhexb, compile program.
@@ -160,7 +160,7 @@ TEST_CASE("xhexb_hello_prints") {
   REQUIRE(ctx.simOutBuffer.str() == "hello world\n");
 }
 
-TEST_CASE("xhexb_xhexb_hello_prints") {
+TEST_CASE("Xhexb xhexb hello prints", "[x_programs]") {
   TestContext ctx;
 
   auto xhexbContents = ctx.readFile(ctx.getXTestPath("xhexb.x"));

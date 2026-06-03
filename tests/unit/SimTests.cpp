@@ -113,7 +113,7 @@ static std::string readerOnlyProgram() {
          "OPR SVC\n";
 }
 
-TEST_CASE("[sim_features] single_image_fallback") {
+TEST_CASE("Single image fallback", "[sim_features]") {
   // A plain image (no network magic) loads as a one-processor system.
   TestContext ctx;
   auto bytes = assembleToBytes(ctx.readFile(ctx.getAsmTestPath("exit0.S")),
@@ -127,7 +127,7 @@ TEST_CASE("[sim_features] single_image_fallback") {
   REQUIRE(system.run() == 0);
 }
 
-TEST_CASE("[sim_features] rendezvous_writer_first") {
+TEST_CASE("Rendezvous writer first", "[sim_features]") {
   // Processor order means the writer (proc 0) is stepped before the reader.
   TestContext ctx;
   auto sender = assembleToBytes(senderProgram(65), "sim_sender.bin");
@@ -141,7 +141,7 @@ TEST_CASE("[sim_features] rendezvous_writer_first") {
   REQUIRE(out.str() == "A");
 }
 
-TEST_CASE("[sim_features] rendezvous_reader_first") {
+TEST_CASE("Rendezvous reader first", "[sim_features]") {
   // Reader (proc 0) is stepped before the writer (proc 1): blocks then resumes.
   TestContext ctx;
   auto receiver = assembleToBytes(receiverProgram(), "sim_receiver2.bin");
@@ -155,7 +155,7 @@ TEST_CASE("[sim_features] rendezvous_reader_first") {
   REQUIRE(out.str() == "B");
 }
 
-TEST_CASE("[sim_features] deadlock_detected") {
+TEST_CASE("Deadlock detected", "[sim_features]") {
   // Two processors that both try to read: neither can ever proceed.
   TestContext ctx;
   auto r0 = assembleToBytes(readerOnlyProgram(), "sim_r0.bin");
@@ -169,7 +169,7 @@ TEST_CASE("[sim_features] deadlock_detected") {
                       Catch::Matchers::ContainsSubstring("deadlock"));
 }
 
-TEST_CASE("[sim_features] unwired_slot_runtime_error") {
+TEST_CASE("Unwired slot runtime error", "[sim_features]") {
   // A sender wired with no channel on slot 0 raises a runtime error.
   TestContext ctx;
   auto sender = assembleToBytes(senderProgram(1), "sim_unwired.bin");

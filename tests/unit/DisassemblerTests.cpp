@@ -28,7 +28,7 @@ static std::string assembleAndDisassemble(TestContext &ctx,
   return out.str();
 }
 
-TEST_CASE("[dis_features] simple_instructions") {
+TEST_CASE("Simple instructions", "[dis_features]") {
   TestContext ctx;
   // A minimal program: LDAC 5, LDBC 3, OPR ADD.
   auto output = assembleAndDisassemble(ctx, "LDAC 5\n"
@@ -39,7 +39,7 @@ TEST_CASE("[dis_features] simple_instructions") {
   REQUIRE(output.find("ADD") != std::string::npos);
 }
 
-TEST_CASE("[dis_features] all_basic_opcodes") {
+TEST_CASE("All basic opcodes", "[dis_features]") {
   TestContext ctx;
   auto output = assembleAndDisassemble(ctx, "LDAM 1\n"
                                             "LDBM 2\n"
@@ -67,7 +67,7 @@ TEST_CASE("[dis_features] all_basic_opcodes") {
   REQUIRE(output.find("BRN  0") != std::string::npos);
 }
 
-TEST_CASE("[dis_features] opr_sub_instructions") {
+TEST_CASE("Opr sub instructions", "[dis_features]") {
   TestContext ctx;
   auto output = assembleAndDisassemble(ctx, "OPR BRB\n"
                                             "OPR ADD\n"
@@ -79,7 +79,7 @@ TEST_CASE("[dis_features] opr_sub_instructions") {
   REQUIRE(output.find("SVC") != std::string::npos);
 }
 
-TEST_CASE("[dis_features] in_out_opcodes") {
+TEST_CASE("In out opcodes", "[dis_features]") {
   std::vector<uint8_t> program = {0xD4, 0xD5};
   hexdis::DebugInfo debugInfo;
   std::ostringstream out;
@@ -87,7 +87,7 @@ TEST_CASE("[dis_features] in_out_opcodes") {
   REQUIRE(out.str() == "  0x0000  d4  IN\n  0x0001  d5  OUT\n");
 }
 
-TEST_CASE("[dis_features] in_out_assemble_roundtrip") {
+TEST_CASE("In out assemble roundtrip", "[dis_features]") {
   TestContext ctx;
   auto output = assembleAndDisassemble(ctx, "OPR IN\n"
                                             "OPR OUT\n");
@@ -95,7 +95,7 @@ TEST_CASE("[dis_features] in_out_assemble_roundtrip") {
   REQUIRE(output.find("OUT") != std::string::npos);
 }
 
-TEST_CASE("[dis_features] pfix_extended_operand") {
+TEST_CASE("Pfix extended operand", "[dis_features]") {
   TestContext ctx;
   // LDAC 32 requires PFIX 2, LDAC 0 -> operand becomes 0x20 = 32.
   auto output = assembleAndDisassemble(ctx, "LDAC 32\n");
@@ -103,7 +103,7 @@ TEST_CASE("[dis_features] pfix_extended_operand") {
   REQUIRE(output.find("LDAC 32") != std::string::npos);
 }
 
-TEST_CASE("[dis_features] nfix_negative_operand") {
+TEST_CASE("Nfix negative operand", "[dis_features]") {
   TestContext ctx;
   // LDAC -1 requires NFIX then LDAC with accumulated negative operand.
   auto output = assembleAndDisassemble(ctx, "LDAC -1\n");
@@ -111,7 +111,7 @@ TEST_CASE("[dis_features] nfix_negative_operand") {
   REQUIRE(output.find("LDAC 4294967295") != std::string::npos);
 }
 
-TEST_CASE("[dis_features] multi_pfix_large_operand") {
+TEST_CASE("Multi pfix large operand", "[dis_features]") {
   TestContext ctx;
   // LDAC 256 requires PFIX 1, PFIX 0, LDAC 0 -> 0x100 = 256.
   auto output = assembleAndDisassemble(ctx, "LDAC 256\n");
@@ -119,7 +119,7 @@ TEST_CASE("[dis_features] multi_pfix_large_operand") {
   REQUIRE(output.find("LDAC 256") != std::string::npos);
 }
 
-TEST_CASE("[dis_features] byte_hex_values") {
+TEST_CASE("Byte hex values", "[dis_features]") {
   TestContext ctx;
   // Check that raw hex byte values are shown.
   auto output = assembleAndDisassemble(ctx, "LDAC 5\n");
@@ -127,7 +127,7 @@ TEST_CASE("[dis_features] byte_hex_values") {
   REQUIRE(output.find("35") != std::string::npos);
 }
 
-TEST_CASE("[dis_features] address_shown") {
+TEST_CASE("Address shown", "[dis_features]") {
   TestContext ctx;
   auto output = assembleAndDisassemble(ctx, "LDAC 1\n"
                                             "LDAC 2\n");
@@ -136,7 +136,7 @@ TEST_CASE("[dis_features] address_shown") {
   REQUIRE(output.find("0x0001") != std::string::npos);
 }
 
-TEST_CASE("[dis_features] exit0_roundtrip") {
+TEST_CASE("Exit0 roundtrip", "[dis_features]") {
   TestContext ctx;
   auto output =
       assembleAndDisassemble(ctx, ctx.readFile(ctx.getAsmTestPath("exit0.S")));
@@ -146,7 +146,7 @@ TEST_CASE("[dis_features] exit0_roundtrip") {
   REQUIRE(output.find("SVC") != std::string::npos);
 }
 
-TEST_CASE("[dis_features] hello_roundtrip") {
+TEST_CASE("Hello roundtrip", "[dis_features]") {
   TestContext ctx;
   auto output =
       assembleAndDisassemble(ctx, ctx.readFile(ctx.getAsmTestPath("hello.S")));
@@ -155,7 +155,7 @@ TEST_CASE("[dis_features] hello_roundtrip") {
   REQUIRE(output.find("SVC") != std::string::npos);
 }
 
-TEST_CASE("[dis_features] x_program_labels") {
+TEST_CASE("X program labels", "[dis_features]") {
   TestContext ctx;
   // Compile an X program (which generates debug info with labels).
   std::ostringstream driverOut;
@@ -175,7 +175,7 @@ TEST_CASE("[dis_features] x_program_labels") {
   REQUIRE(output.find("putval:") != std::string::npos);
 }
 
-TEST_CASE("[dis_features] x_program_no_labels") {
+TEST_CASE("X program no labels", "[dis_features]") {
   TestContext ctx;
   // Compile an X program and disassemble without labels.
   std::ostringstream driverOut;

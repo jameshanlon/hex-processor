@@ -5,7 +5,7 @@
 // Unit tests for X programs compiled with xhexb.S
 //===---------------------------------------------------------------------===//
 
-TEST_CASE("[asm_programs] xhexb_hello_putval") {
+TEST_CASE("Xhexb hello putval", "[asm_programs]") {
   TestContext ctx;
   // Assemble and run compilation.
   auto fileContents = ctx.readFile(ctx.getXTestPath("hello_putval.x"));
@@ -15,7 +15,7 @@ TEST_CASE("[asm_programs] xhexb_hello_putval") {
   REQUIRE(ctx.simOutBuffer.str() == "hello world\n");
 }
 
-TEST_CASE("[asm_programs] xhexb_hello_prints") {
+TEST_CASE("Xhexb hello prints", "[asm_programs]") {
   TestContext ctx;
   // Assemble and run compilation.
   auto fileContents = ctx.readFile(ctx.getXTestPath("hello_prints.x"));
@@ -25,7 +25,7 @@ TEST_CASE("[asm_programs] xhexb_hello_prints") {
   REQUIRE(ctx.simOutBuffer.str() == "hello world\n");
 }
 
-TEST_CASE("[asm_programs] xhexb_xhexb_hello_prints") {
+TEST_CASE("Xhexb xhexb hello prints", "[asm_programs]") {
   TestContext ctx;
   auto xhexbContents = ctx.readFile(ctx.getXTestPath("xhexb.x"));
   auto helloContents = ctx.readFile(ctx.getXTestPath("hello_prints.x"));
