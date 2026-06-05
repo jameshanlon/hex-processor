@@ -2,15 +2,17 @@
 
 # Hex processor
 
-This repository contains an assembler, simulator and hardware implementation of
-the Hex processor architecture, as well as a compiler for a simple programming
-language 'X' that is targeted at it. The Hex architecture is designed to be
-very simple and suitable for explaining how a computer works, whilst being
-flexible enough to execute substantial programs, and easily extensible. With
-complexities of modern computer architectures and compilers/tool chains being
-difficult to penetrate, the intention of this project is to provide a simple
-example Verilog implementation and supporting C++ tooling that can be used as
-the basis for another project or just as a curiosity in itself.
+This repository contains an assembler, disassembler, simulator and hardware
+implementation of the **Hex processor architecture**, as well as a compiler for
+a simple parallel programming language 'X' that is targeted at it.
+
+The Hex architecture is designed to be simple enough for explaining how a
+computer works, whilst being flexible enough to execute substantial programs,
+and easily extensible. With complexities of modern computer architectures and
+compilers/tool chains being difficult to penetrate, the intention of this
+project is to provide a simple example Verilog implementation and supporting C++
+tooling that can be used as the basis for another project or just as a curiosity
+in itself.
 
 ## Architecture
 
@@ -40,12 +42,32 @@ The Hex processor has four 32-bit registers and uses 8-bit instructions
 | BR       | 0x9    | Branch (PC-relative) |
 | BRZ      | 0xA    | Branch if A is zero |
 | BRN      | 0xB    | Branch if A is negative |
-| OPR      | 0xD    | Operate: BRB (0), ADD (1), SUB (2), SVC (3) |
+| OPR      | 0xD    | Operate (see sub-operations below) |
 | PFIX     | 0xE    | Prefix: shift operand left by 4 bits |
 | NFIX     | 0xF    | Negate prefix: invert and shift operand |
 
 Large immediate values are built up using PFIX/NFIX chains before the target
 instruction.
+
+The `OPR` opcode selects a register-to-register sub-operation via its operand:
+
+| Sub-op | Operand | Description |
+|--------|---------|-------------|
+| BRB    | 0x0     | Branch to address in B register |
+| ADD    | 0x1     | A = A + B |
+| SUB    | 0x2     | A = A - B |
+| SVC    | 0x3     | Supervisor call (syscall, see below) |
+| IN     | 0x4     | Receive a word from channel slot B into A (blocking) |
+| OUT    | 0x5     | Send word A to channel slot B (blocking) |
+
+### Channels
+
+`IN` and `OUT` perform a synchronous rendezvous over a point-to-point channel:
+the B register selects one of the processor's four link slots and the A register
+carries the value (received for `IN`, sent for `OUT`). The first party to arrive
+blocks until its partner is ready, at which point the value is exchanged and both
+continue. A core can be wired to up to four channels; operating on an unwired
+slot is a runtime error.
 
 ## The X language
 
@@ -71,6 +93,40 @@ Key features:
 - Variables (`var`), constants (`val`), and arrays (`array`)
 - Control flow: `if`/`then`/`else`, `while`/`do`, `{ ... }` sequences
 - Syscalls: `0(code)` for exit, `1(char, stream)` for write, `2(stream)` for read
+- Concurrency and message passing: `par`, `chan` declarations and formals, and
+  the `!` (send) and `?` (receive) channel operators
+
+### Concurrency
+
+A `par` block runs its branches on separate processors, connected by the
+channels passed to them. Each branch communicates only by sending (`!`) and
+receiving (`?`) over channels — there is no shared memory. When `main` ends in a
+top-level `par`, the compiler emits a *network container* describing the per-core
+images and how their channel slots are wired together (see Tools below).
+
+Example — a three-stage pipeline (`source -> relay -> sink`) on three
+processors connected by two channels (`tests/x/pipe.x`):
+
+```
+val put = 1;
+
+proc putval(val c) is put(c, 0)
+
+proc source(chan out) is out ! 'P'
+
+proc relay(chan in, chan out) is
+  var v;
+  { in ? v; out ! v }
+
+proc sink(chan in) is
+  var v;
+  { in ? v; putval(v) }
+
+proc main() is
+  chan a;
+  chan b;
+  par { source(a); relay(a, b); sink(b) }
+```
 
 ## Tools
 
@@ -79,19 +135,40 @@ Key features:
 | `hexasm` | Assembler: compiles `.S` assembly files to `.bin` binaries |
 | `hexdis` | Disassembler: disassembles `.bin` binaries back to readable assembly |
 | `xcmp`   | Compiler: compiles `.x` X-language programs to `.bin` binaries |
-| `hexsim` | Simulator: executes `.bin` binaries (use `-t` for instruction tracing) |
+| `hexsim` | Simulator: executes a single image or a multi-core network container (use `-t` for instruction tracing) |
 | `xrun`   | Runner: compiles and immediately executes an X program |
-| `hextb`  | Verilator testbench: runs binaries on the RTL hardware model (requires Verilator) |
+| `hextb`  | Verilator testbench: runs a single image or network container on the RTL multi-core network (requires Verilator) |
+
+A plain `.bin` holds one processor image. A program whose `main` is a `par`
+block instead produces a *network container* holding one image per core plus the
+channel wiring between their link slots; `hexsim` and `hextb` detect the magic
+and boot the whole network. `hexsim` reports the exit code of the first
+processor to halt and detects deadlock when every core is blocked on a channel.
+
+## Repository layout
+
+```
+src/      Library code: header-only implementations (*.hpp) plus hex.cpp
+tools/    CLI front-ends, one .cpp per executable (hexasm, hexdis, hexsim,
+          xcmp, xrun, hextb)
+rtl/      SystemVerilog implementation (processor core, memory, link
+          interface, router and multi-core network top)
+tests/    Unit tests (tests/unit/, Catch2), integration tests (tests/tests.py),
+          and test programs (tests/asm/*.S, tests/x/*.x)
+docs/     Sphinx documentation
+cmake/    CMake helper modules
+```
 
 ## Building and running the tests
 
 ### Dependencies
 
 This project requires:
-- CMake 3.14+
+- CMake 3.20+
 - C++20 compatible compiler
 - Python 3
-- Verilator (optional, for hardware simulation)
+- Verilator 5.0+ (optional, for hardware simulation; built automatically if not
+  installed)
 
 All other dependencies (fmt, Catch2) are fetched automatically via CMake FetchContent.
 
@@ -119,8 +196,10 @@ $ make -j8
 $ make install
 ```
 
-To build with Verilator for hardware simulation, replace `-DUSE_VERILATOR=OFF`
-with `-DVERILATOR_ROOT=<path-to-verilator-repo>`.
+To build with Verilator for hardware simulation, drop `-DUSE_VERILATOR=OFF` (it
+defaults to `ON`). A suitable system Verilator (>= 5.0) is used if found —
+honouring `-DVERILATOR_ROOT=<path>` — otherwise a pinned version is fetched and
+built automatically.
 
 ### Testing
 
@@ -131,8 +210,10 @@ $ ./UnitTests "<test name>"    # Run a single unit test
 $ python3 ../tests/tests.py    # Run Python integration tests
 ```
 
-Unit tests are in `tests/unit/` (assembly and X language features/programs).
-Integration tests in `tests/tests.py` verify end-to-end compilation and execution.
+Unit tests are in `tests/unit/`, covering the assembler, disassembler, X
+language features/programs, and the multi-core simulator (channels and
+message-passing networks). Integration tests in `tests/tests.py` verify
+end-to-end compilation and execution.
 
 ## Running a program
 
