@@ -128,6 +128,24 @@ proc main() is
   par { source(a); relay(a, b); sink(b) }
 ```
 
+### Example programs
+
+The `tests/x/` directory contains runnable example programs. Sequential
+examples include `gcd.x`, `collatz.x`, `ackermann.x`, `primes.x`, `binsearch.x`,
+`reverse.x` and `hanoi.x` (alongside `fib.x`, `fac.x`, `bubblesort.x`, etc.).
+Concurrent examples (each a network of up to four cores) include:
+
+| Program | What it shows |
+|---------|---------------|
+| `pipe.x` | Three-stage pipeline (`source -> relay -> sink`) |
+| `pingpong.x` | Two cores exchanging a value |
+| `ring.x` | Token ring reusing one process across cores |
+| `buffer.x` | Streaming a sequence through a buffer with a sentinel |
+| `sieve.x` | Concurrent prime sieve (pipeline of filters) |
+| `farm.x` | Worker farm: distributor → workers → collector (fan-out/fan-in) |
+| `reduce.x` | Parallel sum over a binary tree of cores |
+| `stencil.x` | 1D nearest-neighbour halo exchange (bidirectional channels) |
+
 ## Tools
 
 | Tool     | Description |

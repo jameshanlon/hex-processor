@@ -1628,3 +1628,33 @@ TEST_CASE("Message passing run ring x file", "[x_features]") {
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("ring.x")) == 0);
   REQUIRE(ctx.simOutBuffer.str() == "Z");
 }
+
+TEST_CASE("Message passing run buffer x file", "[x_features]") {
+  TestContext ctx;
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("buffer.x")) == 0);
+  REQUIRE(ctx.simOutBuffer.str() == "ABC");
+}
+
+TEST_CASE("Message passing run sieve x file", "[x_features]") {
+  TestContext ctx;
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("sieve.x")) == 0);
+  REQUIRE(ctx.simOutBuffer.str() == "2\n3\n5\n");
+}
+
+TEST_CASE("Message passing run farm x file", "[x_features]") {
+  TestContext ctx;
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("farm.x")) == 0);
+  REQUIRE(ctx.simOutBuffer.str() == "200\n");
+}
+
+TEST_CASE("Message passing run reduce x file", "[x_features]") {
+  TestContext ctx;
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("reduce.x")) == 0);
+  REQUIRE(ctx.simOutBuffer.str() == "10\n");
+}
+
+TEST_CASE("Message passing run stencil x file", "[x_features]") {
+  TestContext ctx;
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("stencil.x")) == 0);
+  REQUIRE(ctx.simOutBuffer.str() == "3\n6\n9\n7\n");
+}

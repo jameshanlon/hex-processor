@@ -131,6 +131,64 @@ TEST_CASE("Bubblesort", "[x_programs]") {
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("bubblesort.x")) == 0);
 }
 
+TEST_CASE("Gcd", "[x_programs]") {
+  TestContext ctx;
+
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("gcd.x"), {48, 36}) == 12);
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("gcd.x"), {17, 5}) == 1);
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("gcd.x"), {100, 60}) == 20);
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("gcd.x"), {7, 0}) == 7);
+}
+
+TEST_CASE("Collatz", "[x_programs]") {
+  TestContext ctx;
+
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("collatz.x"), {1}) == 0);
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("collatz.x"), {6}) == 8);
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("collatz.x"), {7}) == 16);
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("collatz.x"), {12}) == 9);
+}
+
+TEST_CASE("Ackermann", "[x_programs]") {
+  TestContext ctx;
+
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("ackermann.x"), {1, 1}) == 3);
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("ackermann.x"), {2, 2}) == 7);
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("ackermann.x"), {2, 3}) == 9);
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("ackermann.x"), {3, 3}) == 61);
+}
+
+TEST_CASE("Binsearch", "[x_programs]") {
+  TestContext ctx;
+
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("binsearch.x"), {2}) == 0);
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("binsearch.x"), {14}) == 6);
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("binsearch.x"), {20}) == 9);
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("binsearch.x"), {7}) == 99);
+}
+
+TEST_CASE("Reverse", "[x_programs]") {
+  TestContext ctx;
+
+  ctx.runXProgramFile(ctx.getXTestPath("reverse.x"), {5});
+  REQUIRE(ctx.simOutBuffer.str() == "43210\n");
+}
+
+TEST_CASE("Primes", "[x_programs]") {
+  TestContext ctx;
+
+  ctx.runXProgramFile(ctx.getXTestPath("primes.x"), {20});
+  REQUIRE(ctx.simOutBuffer.str() == "2\n3\n5\n7\n11\n13\n17\n19\n");
+}
+
+TEST_CASE("Hanoi", "[x_programs]") {
+  TestContext ctx;
+
+  ctx.runXProgramFile(ctx.getXTestPath("hanoi.x"), {3});
+  REQUIRE(ctx.simOutBuffer.str() ==
+          "A -> C\nA -> B\nC -> B\nA -> C\nB -> A\nB -> C\nA -> C\n");
+}
+
 TEST_CASE("Xhexb tree", "[x_programs]") {
   TestContext ctx;
 

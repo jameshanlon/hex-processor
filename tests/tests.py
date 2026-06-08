@@ -119,6 +119,21 @@ class Tests(unittest.TestCase):
     def test_message_passing_ring(self):
         self.run_message_passing("ring.x", "Z")
 
+    def test_message_passing_buffer(self):
+        self.run_message_passing("buffer.x", "ABC")
+
+    def test_message_passing_sieve(self):
+        self.run_message_passing("sieve.x", "2\n3\n5\n")
+
+    def test_message_passing_farm(self):
+        self.run_message_passing("farm.x", "200\n")
+
+    def test_message_passing_reduce(self):
+        self.run_message_passing("reduce.x", "10\n")
+
+    def test_message_passing_stencil(self):
+        self.run_message_passing("stencil.x", "3\n6\n9\n7\n")
+
 
 if __name__ == "__main__":
     unittest.main()
