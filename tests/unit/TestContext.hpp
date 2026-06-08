@@ -3,7 +3,6 @@
 
 #include <filesystem>
 
-#include "definitions.hpp"
 #include "hexasm.hpp"
 #include "hexsim.hpp"
 #include "xcmp.hpp"
