@@ -18,6 +18,7 @@
 
 #include "hex.hpp"
 #include "heximage.hpp"
+#include "lexer.hpp"
 #include "util.hpp"
 
 // An assembler for the Hex instruction set, based on xhexb.x and with
@@ -503,17 +504,9 @@ public:
   }
 };
 
-class Lexer {
+class Lexer : public hexlex::LexerBase<Token> {
 
   Table table;
-  std::unique_ptr<std::istream> file;
-  char lastChar;
-  std::string identifier;
-  unsigned value;
-  Token lastToken;
-  size_t currentLineNumber;
-  size_t currentCharNumber;
-  std::string currentLine;
 
   void declareKeywords() {
     table.insert("ADD", Token::ADD);
@@ -540,54 +533,27 @@ class Lexer {
     table.insert("SVC", Token::SVC);
   }
 
-  int readChar() {
-    file->get(lastChar);
-    currentLine += lastChar;
-    if (file->eof()) {
-      lastChar = EOF;
-    }
-    currentCharNumber++;
-    return lastChar;
-  }
-
-  Token readToken() {
-    // Skip whitespace.
-    while (std::isspace(lastChar)) {
-      if (lastChar == '\n') {
-        currentLineNumber++;
-        currentCharNumber = 0;
-        currentLine.clear();
-      }
-      readChar();
-    }
+  Token readToken() override {
+    skipWhitespace();
     // Comment.
     if (lastChar == '#') {
       do {
         readChar();
       } while (lastChar != EOF && lastChar != '\n');
       if (lastChar == '\n') {
-        currentLineNumber++;
-        currentCharNumber = 0;
-        currentLine.clear();
+        newLine();
         readChar();
       }
       return readToken();
     }
     // Identifier.
     if (std::isalpha(lastChar)) {
-      identifier = std::string(1, lastChar);
-      while (std::isalnum(readChar()) || lastChar == '_') {
-        identifier += lastChar;
-      }
+      readIdentifier();
       return table.lookup(identifier);
     }
     // Number.
     if (std::isdigit(lastChar)) {
-      std::string number(1, lastChar);
-      while (std::isdigit(readChar())) {
-        number += lastChar;
-      }
-      value = std::strtoul(number.c_str(), nullptr, 10);
+      readDecInt();
       return Token::NUMBER;
     }
     // Symbols.
@@ -597,9 +563,7 @@ class Lexer {
     }
     // End of file.
     if (lastChar == EOF) {
-      if (auto ifstream = dynamic_cast<std::ifstream *>(file.get())) {
-        ifstream->close();
-      }
+      closeIfFile();
       currentLine.clear();
       return Token::END_OF_FILE;
     }
@@ -608,28 +572,7 @@ class Lexer {
   }
 
 public:
-  Lexer() : currentLineNumber(0), currentCharNumber(0) { declareKeywords(); }
-
-  Token getNextToken() { return lastToken = readToken(); }
-
-  /// Open a file using ifstream.
-  void openFile(const char *filename) {
-    auto ifstream = std::make_unique<std::ifstream>();
-    ifstream->open(filename, std::ifstream::in);
-    if (!ifstream->is_open()) {
-      throw std::runtime_error("could not open file");
-    }
-    file.reset(ifstream.release());
-    readChar();
-  }
-
-  void openFile(const std::string &filename) { openFile(filename.c_str()); }
-
-  /// Load a string using istringstream.
-  void loadBuffer(const std::string &buffer) {
-    file = std::make_unique<std::istringstream>(buffer);
-    readChar();
-  }
+  Lexer() { declareKeywords(); }
 
   /// Tokenise the input only and report the tokens.
   void emitTokens(std::ostream &out) {
@@ -649,16 +592,6 @@ public:
         break;
       }
     }
-  }
-
-  const std::string &getIdentifier() const { return identifier; }
-  unsigned getNumber() const { return value; }
-  Token getLastToken() const { return lastToken; }
-  size_t getLineNumber() const { return currentLineNumber; }
-  bool hasLine() const { return !currentLine.empty(); }
-  const std::string &getLine() const { return currentLine; }
-  const Location getLocation() const {
-    return Location(currentLineNumber, currentCharNumber);
   }
 };
 

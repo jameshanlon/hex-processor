@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "lexer.hpp"
 #include "util.hpp"
 
 // A compiler for the X language, based on xhexb.x and with inspiration from
@@ -281,18 +282,10 @@ public:
   }
 };
 
-class Lexer {
+class Lexer : public hexlex::LexerBase<Token> {
 
   TokenTable table;
-  std::unique_ptr<std::istream> file;
-  char lastChar;
-  std::string identifier;
   std::string string;
-  unsigned value;
-  Token lastToken;
-  size_t currentLineNumber;
-  size_t currentCharNumber;
-  std::string currentLine;
 
   void declareKeywords() {
     table.insert("and", Token::AND);
@@ -315,24 +308,6 @@ class Lexer {
     table.insert("val", Token::VAL);
     table.insert("var", Token::VAR);
     table.insert("while", Token::WHILE);
-  }
-
-  int readChar() {
-    file->get(lastChar);
-    currentLine += lastChar;
-    if (file->eof()) {
-      lastChar = EOF;
-    }
-    currentCharNumber++;
-    return lastChar;
-  }
-
-  void readDecInt() {
-    std::string number(1, lastChar);
-    while (std::isdigit(readChar())) {
-      number += lastChar;
-    }
-    value = std::strtoul(number.c_str(), nullptr, 10);
   }
 
   bool isHexDigit(char c) {
@@ -389,35 +364,22 @@ class Lexer {
     }
   }
 
-  Token readToken() {
-    // Skip whitespace.
-    while (std::isspace(lastChar)) {
-      if (lastChar == '\n') {
-        currentLineNumber++;
-        currentCharNumber = 0;
-        currentLine.clear();
-      }
-      readChar();
-    }
+  Token readToken() override {
+    skipWhitespace();
     // Comment.
     if (lastChar == '|') {
       do {
         readChar();
       } while (lastChar != EOF && lastChar != '\n');
       if (lastChar == '\n') {
-        currentLineNumber++;
-        currentCharNumber = 0;
-        currentLine.clear();
+        newLine();
         readChar();
       }
       return readToken();
     }
     // Identifier.
     if (std::isalpha(lastChar)) {
-      identifier = std::string(1, lastChar);
-      while (std::isalnum(readChar()) || lastChar == '_') {
-        identifier += lastChar;
-      }
+      readIdentifier();
       return table.lookup(identifier);
     }
     // Decimal number.
@@ -535,9 +497,7 @@ class Lexer {
       readChar();
       break;
     case EOF:
-      if (auto ifstream = dynamic_cast<std::ifstream *>(file.get())) {
-        ifstream->close();
-      }
+      closeIfFile();
       token = Token::END_OF_FILE;
       readChar();
       currentLine.clear();
@@ -550,28 +510,7 @@ class Lexer {
   }
 
 public:
-  Lexer() : currentLineNumber(0), currentCharNumber(0) { declareKeywords(); }
-
-  Token getNextToken() { return lastToken = readToken(); }
-
-  /// Open a file using ifstream.
-  void openFile(const char *filename) {
-    auto ifstream = std::make_unique<std::ifstream>();
-    ifstream->open(filename, std::ifstream::in);
-    if (!ifstream->is_open()) {
-      throw std::runtime_error("could not open file");
-    }
-    file.reset(ifstream.release());
-    readChar();
-  }
-
-  void openFile(const std::string &filename) { openFile(filename.c_str()); }
-
-  /// Load a string using istringstream.
-  void loadBuffer(const std::string &buffer) {
-    file = std::make_unique<std::istringstream>(buffer);
-    readChar();
-  }
+  Lexer() { declareKeywords(); }
 
   /// Tokenise the input only and report the tokens.
   void emitTokens(std::ostream &out) {
@@ -596,17 +535,7 @@ public:
     }
   }
 
-  const std::string &getIdentifier() const { return identifier; }
-  unsigned getNumber() const { return value; }
   const std::string &getString() const { return string; }
-  Token getLastToken() const { return lastToken; }
-  size_t getLineNumber() const { return currentLineNumber; }
-  size_t getCharNumber() const { return currentCharNumber; }
-  bool hasLine() const { return !currentLine.empty(); }
-  const std::string &getLine() const { return currentLine; }
-  const Location getLocation() const {
-    return Location(currentLineNumber, currentCharNumber);
-  }
 };
 
 //===---------------------------------------------------------------------===//
