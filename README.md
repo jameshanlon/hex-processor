@@ -105,7 +105,7 @@ top-level `par`, the compiler emits a *network container* describing the per-cor
 images and how their channel slots are wired together (see Tools below).
 
 Example — a three-stage pipeline (`source -> relay -> sink`) on three
-processors connected by two channels (`tests/x/pipe.x`):
+processors connected by two channels (`examples/pipe.x`):
 
 ```
 val put = 1;
@@ -130,7 +130,7 @@ proc main() is
 
 ### Example programs
 
-The `tests/x/` directory contains runnable example programs. Sequential
+The `examples/` directory contains runnable example programs. Sequential
 examples include `gcd.x`, `collatz.x`, `ackermann.x`, `primes.x`, `binsearch.x`,
 `reverse.x` and `hanoi.x` (alongside `fib.x`, `fac.x`, `bubblesort.x`, etc.).
 Concurrent examples (each a network of up to four cores) include:
@@ -171,8 +171,9 @@ tools/    CLI front-ends, one .cpp per executable (hexasm, hexdis, hexsim,
           xcmp, xrun, hextb)
 rtl/      SystemVerilog implementation (processor core, memory, link
           interface, router and multi-core network top)
+examples/ Runnable X example programs (*.x)
 tests/    Unit tests (tests/unit/, Catch2), integration tests (tests/tests.py),
-          and test programs (tests/asm/*.S, tests/x/*.x)
+          and assembly test programs (tests/asm/*.S)
 docs/     Sphinx documentation
 cmake/    CMake helper modules
 ```
@@ -247,7 +248,7 @@ hello
 Run the 'hello' X program:
 
 ```bash
-$ xcmp tests/x/hello_putval.x -o hello.bin
+$ xcmp examples/hello_putval.x -o hello.bin
 $ hexsim hello.bin
 hello world
 ```
