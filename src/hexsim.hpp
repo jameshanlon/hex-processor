@@ -1,6 +1,7 @@
 #ifndef HEX_SIM_HPP
 #define HEX_SIM_HPP
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <exception>
@@ -79,20 +80,18 @@ class Processor {
   std::vector<std::pair<std::string, unsigned>> debugInfo;
   std::map<std::string, unsigned> debugInfoMap;
 
-  /// Lookup a symbol name given the current PC.
+  /// Lookup a symbol name given the current PC: the symbol with the greatest
+  /// offset <= lastPC. debugInfo is sorted by ascending offset.
   const char *lookupSymbol() {
-    if (lastPC < debugInfo[0].second) {
-      return nullptr;
+    auto it = std::upper_bound(
+        debugInfo.begin(), debugInfo.end(), lastPC,
+        [](uint32_t pc, const std::pair<std::string, unsigned> &entry) {
+          return pc < entry.second;
+        });
+    if (it == debugInfo.begin()) {
+      return nullptr; // lastPC is before the first symbol.
     }
-    for (size_t i = 0; i < debugInfo.size(); i++) {
-      if (i == debugInfo.size() - 1 && lastPC >= debugInfo[i].second) {
-        return debugInfo[i].first.c_str();
-      }
-      if (lastPC >= debugInfo[i].second && lastPC < debugInfo[i + 1].second) {
-        return debugInfo[i].first.c_str();
-      }
-    }
-    return nullptr;
+    return std::prev(it)->first.c_str();
   }
 
 public:
