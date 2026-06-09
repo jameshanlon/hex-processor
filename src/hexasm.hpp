@@ -312,6 +312,9 @@ static int instrLen(int labelOffset, int byteOffset) {
 
 int numNibbles(int value);
 
+class Label;
+class InstrLabel;
+
 // Base class for all directives.
 class Directive {
   Location location;
@@ -336,6 +339,12 @@ public:
   virtual size_t getSize() const = 0;
   virtual int getValue() const = 0;
   virtual std::string toString() const = 0;
+  // Safe down-casts (return nullptr when not of the requested kind), used in
+  // place of dynamic_cast for the directive type-switches.
+  virtual Label *asLabel() { return nullptr; }
+  virtual InstrLabel *asInstrLabel() { return nullptr; }
+  // True for the named labels (FUNC/PROC) that are recorded as debug symbols.
+  virtual bool isDebugSymbol() const { return false; }
 };
 
 class Data : public Directive {
@@ -371,6 +380,7 @@ public:
   int getValue() const { return labelValue; }
   const std::string &getLabel() const { return label; }
   std::string toString() const { return label; }
+  Label *asLabel() override { return this; }
 };
 
 class Func : public Label {
@@ -382,6 +392,7 @@ public:
       : Label(location, token, identifier) {}
   const std::string &getName() const { return getLabel(); }
   std::string toString() const { return "FUNC " + getLabel(); }
+  bool isDebugSymbol() const override { return true; }
 };
 
 class Proc : public Label {
@@ -393,6 +404,7 @@ public:
       : Label(location, token, identifier) {}
   const std::string &getName() const { return getLabel(); }
   std::string toString() const { return "PROC " + getLabel(); }
+  bool isDebugSymbol() const override { return true; }
 };
 
 class InstrImm : public Directive {
@@ -426,6 +438,7 @@ public:
       : Directive(location, token), label(label), relative(relative) {}
   void setLabelValue(int newValue) { labelValue = newValue; }
   bool operandIsLabel() const { return true; }
+  InstrLabel *asInstrLabel() override { return this; }
   bool isRelative() const { return relative; }
   size_t getSize() const {
     return (labelValue < 0 && numNibbles(labelValue) == 1)
@@ -707,24 +720,8 @@ class CodeGen {
   /// Create a map of label strings to label Directives.
   void createLabelMap() {
     for (auto &directive : program) {
-      switch (directive->getToken()) {
-      case Token::FUNC: {
-        auto func = dynamic_cast<Func *>(directive.get());
-        labelMap[func->getName()] = func;
-        break;
-      }
-      case Token::PROC: {
-        auto proc = dynamic_cast<Proc *>(directive.get());
-        labelMap[proc->getName()] = proc;
-        break;
-      }
-      case Token::IDENTIFIER: {
-        auto label = dynamic_cast<Label *>(directive.get());
+      if (auto *label = directive->asLabel()) {
         labelMap[label->getLabel()] = label;
-        break;
-      }
-      default:
-        break;
       }
     }
   }
@@ -747,15 +744,12 @@ class CodeGen {
           }
         }
         // Update the label value.
-        if (directive->getToken() == Token::IDENTIFIER ||
-            directive->getToken() == Token::FUNC ||
-            directive->getToken() == Token::PROC) {
-          dynamic_cast<Label *>(directive.get())->setLabelValue(byteOffset);
+        if (auto *label = directive->asLabel()) {
+          label->setLabelValue(byteOffset);
         }
         // Update the label operand value of an instruction, accounting for
         // relative and absolute references.
-        if (directive->operandIsLabel()) {
-          auto instrLabel = dynamic_cast<InstrLabel *>(directive.get());
+        if (auto *instrLabel = directive->asInstrLabel()) {
           if (labelMap.count(instrLabel->getLabel()) == 0) {
             throw UnknownLabelError(directive->getLocation(),
                                     instrLabel->getLabel());
@@ -827,16 +821,10 @@ public:
     int byteOffset = 0;
     for (auto &directive : program) {
       size_t size = directive->getSize();
-      // Func
-      if (directive->getToken() == Token::FUNC) {
-        auto funcDirective = dynamic_cast<Func *>(directive.get());
+      // Function/procedure symbols are recorded as debug info.
+      if (directive->isDebugSymbol()) {
         debugInfo.push_back(
-            std::make_pair(funcDirective->getLabel(), byteOffset));
-        // Proc
-      } else if (directive->getToken() == Token::PROC) {
-        auto procDirective = dynamic_cast<Proc *>(directive.get());
-        debugInfo.push_back(
-            std::make_pair(procDirective->getLabel(), byteOffset));
+            std::make_pair(directive->asLabel()->getLabel(), byteOffset));
         // Padding
       } else if (directive->getToken() == Token::PADDING) {
         for (size_t i = 0; i < directive->getSize(); i++) {
@@ -852,8 +840,7 @@ public:
                            paddingBytes);
           byteOffset += paddingBytes;
         }
-        auto dataDirective = dynamic_cast<Data *>(directive.get());
-        auto value = dataDirective->getValue();
+        auto value = directive->getValue();
         outputFile.write(reinterpret_cast<const char *>(&value), size);
         byteOffset += size;
         // Instruction
