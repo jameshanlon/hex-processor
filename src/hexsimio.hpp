@@ -1,6 +1,7 @@
 #ifndef HEX_SIM_IO_HPP
 #define HEX_SIM_IO_HPP
 
+#include <array>
 #include <fstream>
 #include <istream>
 #include <ostream>
