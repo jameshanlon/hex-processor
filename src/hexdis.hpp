@@ -11,6 +11,7 @@
 #include <fmt/format.h>
 
 #include "hex.hpp"
+#include "heximage.hpp"
 
 namespace hexdis {
 
@@ -22,9 +23,7 @@ struct DebugInfo {
 inline void readBinary(std::istream &file, std::streampos fileSize,
                        std::vector<uint8_t> &program, DebugInfo &debugInfo) {
   // Read program size (first 4 bytes, in words).
-  uint32_t programSizeWords;
-  file.read(reinterpret_cast<char *>(&programSizeWords), 4);
-  uint32_t programSizeBytes = programSizeWords << 2;
+  uint32_t programSizeBytes = heximage::readU32(file) << 2;
 
   // Read program bytes.
   program.resize(programSizeBytes);
@@ -34,30 +33,8 @@ inline void readBinary(std::istream &file, std::streampos fileSize,
   unsigned remainingFileSize = static_cast<unsigned>(fileSize) - 4;
   remainingFileSize = (remainingFileSize + 3U) & ~3U;
   if (remainingFileSize > programSizeBytes) {
-    // Strings.
-    uint32_t numStrings;
-    file.read(reinterpret_cast<char *>(&numStrings), sizeof(uint32_t));
-    std::vector<std::string> strings;
-    for (size_t i = 0; i < numStrings; i++) {
-      char c = file.get();
-      std::string s;
-      while (c != '\0') {
-        s += c;
-        c = file.get();
-      }
-      strings.push_back(s);
-    }
-    // Symbols.
-    uint32_t numSymbols;
-    file.read(reinterpret_cast<char *>(&numSymbols), sizeof(uint32_t));
-    for (size_t i = 0; i < numSymbols; i++) {
-      uint32_t strIndex;
-      uint32_t byteOffset;
-      file.read(reinterpret_cast<char *>(&strIndex), sizeof(uint32_t));
-      file.read(reinterpret_cast<char *>(&byteOffset), sizeof(uint32_t));
-      if (strIndex < strings.size()) {
-        debugInfo.labelMap[byteOffset] = strings[strIndex];
-      }
+    for (const auto &symbol : heximage::readSymbols(file)) {
+      debugInfo.labelMap[symbol.offset] = symbol.name;
     }
   }
 }

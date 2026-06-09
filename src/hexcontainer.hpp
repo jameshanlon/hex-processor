@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "heximage.hpp"
+
 //===---------------------------------------------------------------------===//
 // Reader for the HEXN network container format, shared by the C++ simulator
 // (hexsim) and the Verilator testbench (hextb) so they cannot drift.
@@ -36,11 +38,7 @@ struct Container {
   std::vector<std::vector<char>> images; // per-processor image bytes
 };
 
-inline uint32_t readU32(std::istream &file) {
-  uint32_t value = 0;
-  file.read(reinterpret_cast<char *>(&value), sizeof(uint32_t));
-  return value;
-}
+using heximage::readU32;
 
 /// Read a container file. If it lacks the HEXN magic, returns a single-image
 /// container (isNetwork = false, one image holding the whole file).

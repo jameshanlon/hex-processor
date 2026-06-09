@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "hex.hpp"
+#include "heximage.hpp"
 #include "util.hpp"
 
 // An assembler for the Hex instruction set, based on xhexb.x and with
@@ -952,34 +953,18 @@ public:
 
   /// Emit debug information.
   void emitDebugInfo(std::ostream &outputFile) {
-    uint32_t tableSize = debugInfo.size();
-    // Symbol string table (concatenate null-terminated strings).
-    outputFile.write(reinterpret_cast<const char *>(&tableSize),
-                     sizeof(uint32_t));
+    std::vector<heximage::Symbol> symbols;
+    symbols.reserve(debugInfo.size());
     for (const auto &pair : debugInfo) {
-      auto name = pair.first;
-      outputFile.write(name.c_str(), name.length() + 1);
+      symbols.push_back({pair.first, static_cast<uint32_t>(pair.second)});
     }
-    // Symbols -> address map (index, byte offset) in ascending offsets.
-    outputFile.write(reinterpret_cast<const char *>(&tableSize),
-                     sizeof(uint32_t));
-    uint32_t tableIndex = 0;
-    for (const auto &pair : debugInfo) {
-      uint32_t byteOffset = pair.second;
-      outputFile.write(reinterpret_cast<const char *>(&tableIndex),
-                       sizeof(uint32_t));
-      outputFile.write(reinterpret_cast<const char *>(&byteOffset),
-                       sizeof(uint32_t));
-      tableIndex++;
-    }
+    heximage::writeSymbols(outputFile, symbols);
   }
 
   /// Emit a complete image (size-word + program + debug info) to a stream.
   void emitImage(std::ostream &outputFile) {
     // The first four bytes are the remaining binary size.
-    uint32_t programSizeWords = programSizeBytes >> 2;
-    outputFile.write(reinterpret_cast<const char *>(&programSizeWords),
-                     sizeof(uint32_t));
+    heximage::writeU32(outputFile, programSizeBytes >> 2);
     // Emit the program.
     emitProgramBin(outputFile);
     emitDebugInfo(outputFile);

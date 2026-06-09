@@ -14,6 +14,7 @@
 
 #include "hex.hpp"
 #include "hexcontainer.hpp"
+#include "heximage.hpp"
 #include "hexsimio.hpp"
 
 namespace hexsim {
@@ -117,42 +118,16 @@ public:
     unsigned remainingFileSize = imageSizeBytes - 4;
     remainingFileSize =
         (remainingFileSize + 3U) & ~3U; // Round up to multiple of 4.
-    unsigned programSize;
-    file.read(reinterpret_cast<char *>(&programSize), 4);
-    programSize <<= 2;
+    unsigned programSize = heximage::readU32(file) << 2;
 
     // Read the instructions into memory.
     file.read(reinterpret_cast<char *>(memory.data()), programSize);
 
     // Read debug data (if present).
     if (remainingFileSize > programSize) {
-      // Strings.
-      uint32_t numStrings;
-      file.read(reinterpret_cast<char *>(&numStrings), sizeof(uint32_t));
-      // std::cout << std::to_string(numStrings) << " strings\n";
-      std::vector<std::string> strings;
-      for (size_t i = 0; i < numStrings; i++) {
-        char c = file.get();
-        std::string s;
-        while (c != '\0') {
-          s += c;
-          c = file.get();
-        }
-        strings.push_back(s);
-      }
-      // Symbols
-      uint32_t numSymbols;
-      file.read(reinterpret_cast<char *>(&numSymbols), sizeof(uint32_t));
-      // std::cout << std::to_string(numSymbols) << " symbols\n";
-      for (size_t i = 0; i < numSymbols; i++) {
-        uint32_t strIndex;
-        uint32_t byteOffset;
-        file.read(reinterpret_cast<char *>(&strIndex), sizeof(uint32_t));
-        file.read(reinterpret_cast<char *>(&byteOffset), sizeof(uint32_t));
-        // std::cout << "symbol " << strings[strIndex] << " " <<
-        // std::to_string(byteOffset) << "\n";
-        debugInfo.push_back(std::make_pair(strings[strIndex], byteOffset));
-        debugInfoMap[strings[strIndex]] = byteOffset;
+      for (const auto &symbol : heximage::readSymbols(file)) {
+        debugInfo.push_back(std::make_pair(symbol.name, symbol.offset));
+        debugInfoMap[symbol.name] = symbol.offset;
       }
     }
 
