@@ -42,6 +42,10 @@ const char *syscallEnumToStr(Syscall syscall);
 
 constexpr int MAX_MEMORY_SIZE_WORDS = 200000;
 
+// Number of point-to-point channel link slots per processor (matches the RTL
+// network in rtl/hex_pkg.sv).
+constexpr unsigned NUM_LINKS = 4;
+
 } // End namespace hex.
 
 #endif // HEX_HPP

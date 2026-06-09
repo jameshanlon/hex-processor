@@ -66,8 +66,9 @@ class Processor {
   // Multi-processor network state.
   unsigned id = 0;
   StepResult status = StepResult::RUNNING;
-  std::array<Channel *, 4> links{}; // link slot -> channel (null if unwired)
-  unsigned blockedSlot = 0;         // slot this processor is blocked on
+  std::array<Channel *, hex::NUM_LINKS> links{}; // slot -> channel (null if
+                                                 // unwired)
+  unsigned blockedSlot = 0; // slot this processor is blocked on
 
   // State for tracing.
   uint32_t lastPC;
