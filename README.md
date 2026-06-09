@@ -144,7 +144,10 @@ Concurrent examples (each a network of up to four cores) include:
 | `sieve.x` | Concurrent prime sieve (pipeline of filters) |
 | `farm.x` | Worker farm: distributor → workers → collector (fan-out/fan-in) |
 | `reduce.x` | Parallel sum over a binary tree of cores |
+| `scan.x` | Parallel prefix sum (scan) along a line of cores |
 | `stencil.x` | 1D nearest-neighbour halo exchange (bidirectional channels) |
+| `mergesort.x` | Divide-and-conquer parallel sort with a stream merge |
+| `horner.x` | Systolic polynomial evaluation (multiply-accumulate pipeline) |
 
 ## Tools
 

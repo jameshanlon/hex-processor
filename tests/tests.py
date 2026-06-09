@@ -134,6 +134,15 @@ class Tests(unittest.TestCase):
     def test_message_passing_stencil(self):
         self.run_message_passing("stencil.x", "3\n6\n9\n7\n")
 
+    def test_message_passing_mergesort(self):
+        self.run_message_passing("mergesort.x", "1\n2\n3\n4\n")
+
+    def test_message_passing_scan(self):
+        self.run_message_passing("scan.x", "1\n3\n6\n10\n")
+
+    def test_message_passing_horner(self):
+        self.run_message_passing("horner.x", "26\n")
+
 
 if __name__ == "__main__":
     unittest.main()

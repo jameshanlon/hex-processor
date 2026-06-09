@@ -1658,3 +1658,21 @@ TEST_CASE("Message passing run stencil x file", "[x_features]") {
   REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("stencil.x")) == 0);
   REQUIRE(ctx.simOutBuffer.str() == "3\n6\n9\n7\n");
 }
+
+TEST_CASE("Message passing run mergesort x file", "[x_features]") {
+  TestContext ctx;
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("mergesort.x")) == 0);
+  REQUIRE(ctx.simOutBuffer.str() == "1\n2\n3\n4\n");
+}
+
+TEST_CASE("Message passing run scan x file", "[x_features]") {
+  TestContext ctx;
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("scan.x")) == 0);
+  REQUIRE(ctx.simOutBuffer.str() == "1\n3\n6\n10\n");
+}
+
+TEST_CASE("Message passing run horner x file", "[x_features]") {
+  TestContext ctx;
+  REQUIRE(ctx.runXProgramFile(ctx.getXTestPath("horner.x")) == 0);
+  REQUIRE(ctx.simOutBuffer.str() == "26\n");
+}
