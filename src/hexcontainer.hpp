@@ -24,7 +24,7 @@
 
 namespace hexcontainer {
 
-const uint32_t MAGIC = 0x4E584548; // "HEXN"
+constexpr uint32_t MAGIC = 0x4E584548; // "HEXN"
 
 struct Edge {
   uint32_t procA, slotA, procB, slotB;

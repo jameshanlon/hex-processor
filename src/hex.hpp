@@ -25,7 +25,14 @@ enum Instr {
   NFIX = 0xF,
 };
 
-enum OprInstr { BRB = 0x0, ADD = 0x1, SUB = 0x2, SVC = 0x3, IN = 0x4, OUT = 0x5 };
+enum OprInstr {
+  BRB = 0x0,
+  ADD = 0x1,
+  SUB = 0x2,
+  SVC = 0x3,
+  IN = 0x4,
+  OUT = 0x5
+};
 
 enum class Syscall { EXIT = 0, WRITE = 1, READ = 2, NUM_VALUES };
 
@@ -33,7 +40,7 @@ const char *instrEnumToStr(Instr instr);
 const char *oprInstrEnumToStr(OprInstr oprInstr);
 const char *syscallEnumToStr(Syscall syscall);
 
-const int MAX_MEMORY_SIZE_WORDS = 200000;
+constexpr int MAX_MEMORY_SIZE_WORDS = 200000;
 
 } // End namespace hex.
 
