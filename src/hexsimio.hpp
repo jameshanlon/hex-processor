@@ -22,7 +22,7 @@ class HexSimIO {
   std::istream &in;
   std::ostream &out;
   std::array<std::fstream, NUM_IO_STREAMS> fileIO;
-  std::array<bool, NUM_IO_STREAMS> connected;
+  std::array<bool, NUM_IO_STREAMS> connected{};
 
   /// Extract the file index encoded in a (file-backed) stream id.
   static size_t fileIndex(int stream) {
@@ -30,9 +30,7 @@ class HexSimIO {
   }
 
 public:
-  HexSimIO(std::istream &in, std::ostream &out)
-      : in(in), out(out),
-        connected({false, false, false, false, false, false, false, false}) {}
+  HexSimIO(std::istream &in, std::ostream &out) : in(in), out(out) {}
 
   /// Output a character to ostream or a file.
   void output(char value, int stream) {
