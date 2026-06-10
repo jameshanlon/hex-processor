@@ -33,19 +33,26 @@ option(BUILD_DOCS "Create and install HTML documentation" OFF)
 # Verilator. Prefer a sufficiently recent system install; otherwise fetch and
 # build a pinned version from source (needs host tools: autoconf, flex, bison).
 if(USE_VERILATOR)
-  set(VERILATOR_GIT_TAG "v5.048"
-      CACHE STRING "Verilator version to fetch/build when no system install is suitable")
-  set(VERILATOR_MIN_VERSION "5.0"
+  set(VERILATOR_GIT_TAG
+      "v5.048"
+      CACHE
+        STRING
+        "Verilator version to fetch/build when no system install is suitable")
+  set(VERILATOR_MIN_VERSION
+      "5.0"
       CACHE STRING "Minimum acceptable system Verilator version")
 
   # First try a system install (honouring VERILATOR_ROOT). The version floor
   # rejects too-old installs (e.g. 4.x lacks the VerilatedContext API hextb
   # uses), so the source build below takes over.
-  find_package(verilator ${VERILATOR_MIN_VERSION} QUIET
-               HINTS $ENV{VERILATOR_ROOT} ${VERILATOR_ROOT})
+  find_package(verilator ${VERILATOR_MIN_VERSION} QUIET HINTS
+               $ENV{VERILATOR_ROOT} ${VERILATOR_ROOT})
 
   if(verilator_FOUND)
-    message(STATUS "Using system Verilator ${verilator_VERSION} (>= ${VERILATOR_MIN_VERSION})")
+    message(
+      STATUS
+        "Using system Verilator ${verilator_VERSION} (>= ${VERILATOR_MIN_VERSION})"
+    )
   else()
     set(VERILATOR_INSTALL_DIR "${CMAKE_BINARY_DIR}/verilator")
     set(VERILATOR_ROOT "${VERILATOR_INSTALL_DIR}/share/verilator")
@@ -73,34 +80,39 @@ if(USE_VERILATOR)
 
       # Verilator uses an autoconf build; a git checkout has no generated
       # configure, so run autoconf first.
-      execute_process(COMMAND autoconf
-                      WORKING_DIRECTORY ${verilator_SOURCE_DIR}
-                      RESULT_VARIABLE VL_AUTOCONF)
+      execute_process(
+        COMMAND autoconf
+        WORKING_DIRECTORY ${verilator_SOURCE_DIR}
+        RESULT_VARIABLE VL_AUTOCONF)
       if(VL_AUTOCONF)
-        message(FATAL_ERROR
-          "Could not run 'autoconf' to build Verilator. Install the host build "
-          "tools first: autoconf, flex, bison (e.g. "
-          "'apt-get install autoconf flex bison'), then reconfigure.")
+        message(
+          FATAL_ERROR
+            "Could not run 'autoconf' to build Verilator. Install the host build "
+            "tools first: autoconf, flex, bison (e.g. "
+            "'apt-get install autoconf flex bison'), then reconfigure.")
       endif()
-      execute_process(COMMAND ${verilator_SOURCE_DIR}/configure
-                              --prefix=${VERILATOR_INSTALL_DIR}
-                      WORKING_DIRECTORY ${verilator_SOURCE_DIR}
-                      RESULT_VARIABLE VL_CONFIGURE)
+      execute_process(
+        COMMAND ${verilator_SOURCE_DIR}/configure
+                --prefix=${VERILATOR_INSTALL_DIR}
+        WORKING_DIRECTORY ${verilator_SOURCE_DIR}
+        RESULT_VARIABLE VL_CONFIGURE)
       if(VL_CONFIGURE)
-        message(FATAL_ERROR "Verilator ./configure failed (need flex and bison).")
+        message(
+          FATAL_ERROR "Verilator ./configure failed (need flex and bison).")
       endif()
       # Build only the binaries (verilator_exe) and install without man pages,
       # so help2man is not required.
-      execute_process(COMMAND make -j${NPROC} verilator_exe
-                      WORKING_DIRECTORY ${verilator_SOURCE_DIR}
-                      RESULT_VARIABLE VL_MAKE)
+      execute_process(
+        COMMAND make -j${NPROC} verilator_exe
+        WORKING_DIRECTORY ${verilator_SOURCE_DIR}
+        RESULT_VARIABLE VL_MAKE)
       if(VL_MAKE)
         message(FATAL_ERROR "Verilator build (make) failed.")
       endif()
-      execute_process(COMMAND make installbin installredirect installdata
-                              install-msg
-                      WORKING_DIRECTORY ${verilator_SOURCE_DIR}
-                      RESULT_VARIABLE VL_INSTALL)
+      execute_process(
+        COMMAND make installbin installredirect installdata install-msg
+        WORKING_DIRECTORY ${verilator_SOURCE_DIR}
+        RESULT_VARIABLE VL_INSTALL)
       if(VL_INSTALL)
         message(FATAL_ERROR "Verilator install failed.")
       endif()
@@ -110,7 +122,9 @@ if(USE_VERILATOR)
     # config resolves verilator_bin against the fetched install.
     unset(VERILATOR_BIN CACHE)
     find_package(verilator REQUIRED HINTS ${VERILATOR_ROOT})
-    message(STATUS "Using fetched Verilator ${VERILATOR_GIT_TAG} from ${VERILATOR_ROOT}")
+    message(
+      STATUS
+        "Using fetched Verilator ${VERILATOR_GIT_TAG} from ${VERILATOR_ROOT}")
   endif()
 endif()
 
@@ -123,39 +137,47 @@ add_compile_options(-Wall -pedantic)
 # Library headers (header-only modules + shared hex.cpp) live in src/.
 include_directories(${PROJECT_SOURCE_DIR}/src)
 
+# Shared library code, compiled once and linked into every tool and the tests.
+add_library(hexcommon STATIC src/hex.cpp)
+
 # Simulator
-add_executable(hexsim src/hex.cpp tools/hexsim.cpp)
-target_link_libraries(hexsim fmt::fmt)
+add_executable(hexsim tools/hexsim.cpp)
+target_link_libraries(hexsim hexcommon fmt::fmt)
 
 # Assembler
-add_executable(hexasm src/hex.cpp tools/hexasm.cpp)
-target_link_libraries(hexasm fmt::fmt)
+add_executable(hexasm tools/hexasm.cpp)
+target_link_libraries(hexasm hexcommon fmt::fmt)
 
 # Compiler
-add_executable(xcmp src/hex.cpp tools/xcmp.cpp)
-target_link_libraries(xcmp fmt::fmt)
+add_executable(xcmp tools/xcmp.cpp)
+target_link_libraries(xcmp hexcommon fmt::fmt)
 
 # Disassembler
-add_executable(hexdis src/hex.cpp tools/hexdis.cpp)
-target_link_libraries(hexdis fmt::fmt)
+add_executable(hexdis tools/hexdis.cpp)
+target_link_libraries(hexdis hexcommon fmt::fmt)
 
 # Compile and run
-add_executable(xrun src/hex.cpp tools/xrun.cpp)
-target_link_libraries(xrun fmt::fmt)
+add_executable(xrun tools/xrun.cpp)
+target_link_libraries(xrun hexcommon fmt::fmt)
 
 install(TARGETS hexasm xcmp xrun hexsim hexdis
         DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # Verilator
 if(USE_VERILATOR)
-  add_executable(hextb src/hex.cpp tools/hextb.cpp)
-  target_link_libraries(hextb PUBLIC fmt::fmt)
+  add_executable(hextb tools/hextb.cpp)
+  target_link_libraries(hextb PUBLIC hexcommon fmt::fmt)
 
   verilate(
     hextb
-    PREFIX Vntb
-    TOP_MODULE network_top
-    VERILATOR_ARGS -Wall -Wno-UNUSEDPARAM -Wno-UNUSEDSIGNAL
+    PREFIX
+    Vntb
+    TOP_MODULE
+    network_top
+    VERILATOR_ARGS
+    -Wall
+    -Wno-UNUSEDPARAM
+    -Wno-UNUSEDSIGNAL
     SOURCES
     rtl/hex_pkg.sv
     rtl/memory.sv
@@ -168,19 +190,51 @@ if(USE_VERILATOR)
   install(TARGETS hextb DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   add_executable(router_tb tests/rtl/router_tb.cpp)
-  verilate(router_tb PREFIX Vrouter SOURCES rtl/hex_pkg.sv rtl/router.sv
-           TOP_MODULE router VERILATOR_ARGS -Wall -Wno-UNUSEDPARAM)
+  verilate(
+    router_tb
+    PREFIX
+    Vrouter
+    SOURCES
+    rtl/hex_pkg.sv
+    rtl/router.sv
+    TOP_MODULE
+    router
+    VERILATOR_ARGS
+    -Wall
+    -Wno-UNUSEDPARAM)
 
   add_executable(liu_tb tests/rtl/liu_tb.cpp)
-  verilate(liu_tb SOURCES rtl/hex_pkg.sv rtl/link_interface.sv
-           PREFIX Vlink_interface TOP_MODULE link_interface
-           VERILATOR_ARGS -Wall -Wno-UNUSEDPARAM -Wno-UNUSEDSIGNAL)
+  verilate(
+    liu_tb
+    SOURCES
+    rtl/hex_pkg.sv
+    rtl/link_interface.sv
+    PREFIX
+    Vlink_interface
+    TOP_MODULE
+    link_interface
+    VERILATOR_ARGS
+    -Wall
+    -Wno-UNUSEDPARAM
+    -Wno-UNUSEDSIGNAL)
 
   add_executable(core_tb tests/rtl/core_tb.cpp)
-  verilate(core_tb SOURCES rtl/hex_pkg.sv rtl/memory.sv
-           rtl/processor.sv rtl/link_interface.sv rtl/core.sv
-           PREFIX Vcore TOP_MODULE core
-           VERILATOR_ARGS -Wall -Wno-UNUSEDPARAM -Wno-UNUSEDSIGNAL)
+  verilate(
+    core_tb
+    SOURCES
+    rtl/hex_pkg.sv
+    rtl/memory.sv
+    rtl/processor.sv
+    rtl/link_interface.sv
+    rtl/core.sv
+    PREFIX
+    Vcore
+    TOP_MODULE
+    core
+    VERILATOR_ARGS
+    -Wall
+    -Wno-UNUSEDPARAM
+    -Wno-UNUSEDSIGNAL)
 endif()
 
 enable_testing()
