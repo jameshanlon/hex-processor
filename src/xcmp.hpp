@@ -674,6 +674,16 @@ public:
   virtual void visitPost(InStatement &) {}
 };
 
+// Forward declarations for the safe down-cast accessors below.
+class VarRefExpr;
+class ArraySubscriptExpr;
+class CallExpr;
+class StringExpr;
+class ValDecl;
+class CallStatement;
+class SkipStatement;
+class ParStatement;
+
 /// AST node base class.
 class AstNode {
   Location location;
@@ -683,6 +693,16 @@ public:
   AstNode(Location location) : location(location) {}
   virtual ~AstNode() = default;
   virtual void accept(AstVisitor *visitor) = 0;
+  // Safe down-casts (return nullptr when not of the requested kind), used in
+  // place of dynamic_cast for ad-hoc node-type queries in the passes below.
+  virtual VarRefExpr *asVarRefExpr() { return nullptr; }
+  virtual ArraySubscriptExpr *asArraySubscriptExpr() { return nullptr; }
+  virtual CallExpr *asCallExpr() { return nullptr; }
+  virtual StringExpr *asStringExpr() { return nullptr; }
+  virtual ValDecl *asValDecl() { return nullptr; }
+  virtual CallStatement *asCallStatement() { return nullptr; }
+  virtual SkipStatement *asSkipStatement() { return nullptr; }
+  virtual ParStatement *asParStatement() { return nullptr; }
   const Location &getLocation() const { return location; }
   void replaceExpr(std::unique_ptr<Expr> &expr, AstVisitor *visitor) {
     // If the visitor wishes to replace the expression, it will have created a
@@ -714,6 +734,7 @@ class VarRefExpr : public Expr {
 public:
   VarRefExpr(Location location, std::string name)
       : Expr(location), name(name) {}
+  VarRefExpr *asVarRefExpr() override { return this; }
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -729,6 +750,7 @@ public:
   ArraySubscriptExpr(Location location, std::string name,
                      std::unique_ptr<Expr> expr)
       : Expr(location), name(name), expr(std::move(expr)) {}
+  ArraySubscriptExpr *asArraySubscriptExpr() override { return this; }
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     expr->accept(visitor);
@@ -755,6 +777,7 @@ public:
   CallExpr(Location location, std::string name,
            std::vector<std::unique_ptr<Expr>> args)
       : Expr(location), sysCallId(-1), name(name), args(std::move(args)) {}
+  CallExpr *asCallExpr() override { return this; }
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     if (visitor->shouldRecurseCalls()) {
@@ -803,6 +826,7 @@ class StringExpr : public Expr {
 public:
   StringExpr(Location location, std::string value)
       : Expr(location), value(value) {}
+  StringExpr *asStringExpr() override { return this; }
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -871,6 +895,7 @@ class ValDecl : public Decl {
 public:
   ValDecl(Location location, std::string name, std::unique_ptr<Expr> expr)
       : Decl(location, name), expr(std::move(expr)) {}
+  ValDecl *asValDecl() override { return this; }
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     expr->accept(visitor);
@@ -993,6 +1018,7 @@ struct Statement : public AstNode {
 class SkipStatement : public Statement {
 public:
   SkipStatement(Location location) : Statement(location) {}
+  SkipStatement *asSkipStatement() override { return this; }
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     visitor->visitPost(*this);
@@ -1094,6 +1120,7 @@ class CallStatement : public Statement {
 public:
   CallStatement(Location location, std::unique_ptr<CallExpr> call)
       : Statement(location), call(std::move(call)) {}
+  CallStatement *asCallStatement() override { return this; }
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     if (visitor->shouldRecurseStmts()) {
@@ -1133,6 +1160,7 @@ public:
   ParStatement(Location location,
                std::vector<std::unique_ptr<Statement>> branches)
       : Statement(location), branches(std::move(branches)) {}
+  ParStatement *asParStatement() override { return this; }
   virtual void accept(AstVisitor *visitor) override {
     visitor->visitPre(*this);
     for (auto &branch : branches) {
@@ -1832,7 +1860,7 @@ class Parser {
       // Each par branch must be a procedure call (the entry process for one
       // processor).
       for (auto &branch : branches) {
-        if (!dynamic_cast<CallStatement *>(branch.get())) {
+        if (!branch->asCallStatement()) {
           throw ParserTokenError(branch->getLocation(),
                                  "par branch must be a procedure call",
                                  lexer.getLastToken());
@@ -1843,7 +1871,7 @@ class Parser {
     case Token::IDENTIFIER: {
       auto element = parseElement();
       // Procedure call
-      if (dynamic_cast<CallExpr *>(element.get())) {
+      if (element->asCallExpr()) {
         auto callExpr = std::unique_ptr<CallExpr>(
             static_cast<CallExpr *>(element.release()));
         return std::make_unique<CallStatement>(location, std::move(callExpr));
@@ -1868,7 +1896,7 @@ class Parser {
     case Token::NUMBER: {
       auto element = parseElement();
       // System call
-      if (dynamic_cast<CallExpr *>(element.get())) {
+      if (element->asCallExpr()) {
         auto callExpr = std::unique_ptr<CallExpr>(
             static_cast<CallExpr *>(element.release()));
         return std::make_unique<CallStatement>(location, std::move(callExpr));
@@ -2194,7 +2222,7 @@ public:
       auto symbol =
           symbolTable.lookup(std::make_pair(getCurrentScope(), expr.getName()),
                              expr.getLocation());
-      if (auto symbolExpr = dynamic_cast<const ValDecl *>(symbol->getNode())) {
+      if (auto *symbolExpr = symbol->getNode()->asValDecl()) {
         expr.setSysCallId(symbolExpr->getValue());
       } else {
         return;
@@ -2211,7 +2239,7 @@ public:
     // Propagate constant values to variable references.
     auto symbol = symbolTable.lookup(
         std::make_pair(getCurrentScope(), expr.getName()), expr.getLocation());
-    if (auto symbolExpr = dynamic_cast<const ValDecl *>(symbol->getNode())) {
+    if (auto *symbolExpr = symbol->getNode()->asValDecl()) {
       expr.setValue(symbolExpr->getValue());
     }
   }
@@ -2530,8 +2558,7 @@ public:
           currentScope(currentScope), reg(reg) {}
     /// Return true if the expr needs to be materialised in an A register.
     bool needsAReg(std::unique_ptr<Expr> &expr) {
-      return !(expr->isConst() || dynamic_cast<StringExpr *>(expr.get()) ||
-               dynamic_cast<VarRefExpr *>(expr.get()));
+      return !(expr->isConst() || expr->asStringExpr() || expr->asVarRefExpr());
     }
     void genBinopOperands(BinaryOpExpr &expr) {
       // For ADD and SUB binary operations:
@@ -2747,8 +2774,8 @@ public:
     }
 
     void visitPost(IfStatement &stmt) {
-      bool skipThen = dynamic_cast<SkipStatement *>(stmt.getThenStmt().get());
-      bool skipElse = dynamic_cast<SkipStatement *>(stmt.getElseStmt().get());
+      bool skipThen = stmt.getThenStmt()->asSkipStatement() != nullptr;
+      bool skipElse = stmt.getElseStmt()->asSkipStatement() != nullptr;
       if (skipThen && skipElse) {
         // Do nothing.
       } else if (skipElse) {
@@ -2807,7 +2834,7 @@ public:
     }
 
     void visitPost(AssStatement &expr) {
-      if (auto *varRefLHS = dynamic_cast<VarRefExpr *>(expr.getLHS().get())) {
+      if (auto *varRefLHS = expr.getLHS()->asVarRefExpr()) {
         // Generate RHS value into areg.
         cb.genExpr(expr.getRHS(), currentScope);
         // LHS variable reference.
@@ -2822,8 +2849,7 @@ public:
           cb.genLDBM(SP_OFFSET);
           cb.genSTAI_FB(cb.getCurrentFrame(), symbol->getStackOffset());
         }
-      } else if (auto *arraySubLHS =
-                     dynamic_cast<ArraySubscriptExpr *>(expr.getLHS().get())) {
+      } else if (auto *arraySubLHS = expr.getLHS()->asArraySubscriptExpr()) {
         // Handle LHS subscript.
         // Note that arrays are always global.
         // Generate the array element address and save it to the stack.
@@ -2858,7 +2884,7 @@ public:
     }
 
     void visitPost(InStatement &stmt) {
-      if (auto *varRef = dynamic_cast<VarRefExpr *>(stmt.getTarget().get())) {
+      if (auto *varRef = stmt.getTarget()->asVarRefExpr()) {
         // Channel input c ? v: load the channel slot in breg, OPR IN leaves the
         // received word in areg, then store it to the target variable.
         cb.genExpr(stmt.getChannel(), currentScope, Reg::B);
@@ -2871,8 +2897,7 @@ public:
           cb.genLDBM(SP_OFFSET);
           cb.genSTAI_FB(cb.getCurrentFrame(), symbol->getStackOffset());
         }
-      } else if (auto *arraySub = dynamic_cast<ArraySubscriptExpr *>(
-                     stmt.getTarget().get())) {
+      } else if (auto *arraySub = stmt.getTarget()->asArraySubscriptExpr()) {
         // Channel input into an array element c ? a[i]: compute the element
         // address and stash it, perform the input, then store areg there.
         cb.genExpr(arraySub->getExpr(), currentScope);
@@ -3318,7 +3343,8 @@ public:
         break;
       }
       case hexasm::Token::PROLOGUE: {
-        auto prologue = dynamic_cast<Prologue *>(instr.get());
+        // The PROLOGUE token guarantees the concrete type.
+        auto *prologue = static_cast<Prologue *>(instr.get());
         auto name = prologue->getSymbol()->getName();
         if (prologue->getSymbol()->getType() == SymbolType::FUNC) {
           cb.genFunc(name);
@@ -3338,7 +3364,8 @@ public:
         break;
       }
       case hexasm::Token::EPILOGUE: {
-        auto epilogue = dynamic_cast<Epilogue *>(instr.get());
+        // The EPILOGUE token guarantees the concrete type.
+        auto *epilogue = static_cast<Epilogue *>(instr.get());
         auto frameSize = epilogue->getFrame()->getSize();
         cb.genLabel(epilogue->getFrame()->getExitLabel());
         // Function
@@ -3378,7 +3405,8 @@ public:
       case hexasm::Token::LDAI_FB:
       case hexasm::Token::LDBI_FB:
       case hexasm::Token::STAI_FB: {
-        auto oldInstr = dynamic_cast<InstrStackOffset *>(instr.get());
+        // The LDAI_FB/LDBI_FB/STAI_FB tokens guarantee the concrete type.
+        auto *oldInstr = static_cast<InstrStackOffset *>(instr.get());
         // Calculate the new offset from the SP: frame size plus frame-base
         // offset (negative to access current frame, positive to access
         // previous frame).
@@ -3431,8 +3459,8 @@ class OptimiseDirectives {
   bool matchBranchZero(size_t index) {
     if (instrs[index + 0]->getToken() == hexasm::Token::BR &&
         instrs[index + 1]->getToken() == hexasm::Token::IDENTIFIER) {
-      auto branch = dynamic_cast<hexasm::InstrLabel *>(instrs[index].get());
-      auto label = dynamic_cast<hexasm::Label *>(instrs[index + 1].get());
+      auto *branch = instrs[index]->asInstrLabel();
+      auto *label = instrs[index + 1]->asLabel();
       return branch != nullptr && label != nullptr &&
              branch->getLabel() == label->getLabel();
     }
@@ -3549,8 +3577,7 @@ public:
       : AstVisitor(false, false, false), st(symbolTable),
         directives(directives), outs(outs) {}
   void visitPre(Program &program) {
-    auto stackPointer =
-        dynamic_cast<hexasm::Data *>(directives[1].get())->getValue();
+    auto stackPointer = directives[1]->getValue();
     outs << fmt::format("Memory range 0x{:x} - 0x{:x}\n", 0, MAX_ADDRESS);
     outs << fmt::format("Stack pointer initialised to 0x{:x}\n", stackPointer);
     outs << fmt::format("Arrays allocated 0x{:x} - 0x{:x}\n", stackPointer + 1,
@@ -3606,12 +3633,12 @@ public:
   std::set<std::string> writers;
   std::set<std::string> readers;
   void visitPre(OutStatement &stmt) override {
-    if (auto *vr = dynamic_cast<VarRefExpr *>(stmt.getChannel().get())) {
+    if (auto *vr = stmt.getChannel()->asVarRefExpr()) {
       writers.insert(vr->getName());
     }
   }
   void visitPre(InStatement &stmt) override {
-    if (auto *vr = dynamic_cast<VarRefExpr *>(stmt.getChannel().get())) {
+    if (auto *vr = stmt.getChannel()->asVarRefExpr()) {
       readers.insert(vr->getName());
     }
   }
@@ -3633,7 +3660,7 @@ inline ParStatement *getTopLevelPar(Program &program) {
   if (!mainProc) {
     return nullptr;
   }
-  return dynamic_cast<ParStatement *>(mainProc->getStatement().get());
+  return mainProc->getStatement()->asParStatement();
 }
 
 /// Analyse the static network described by main's par: one processor per
@@ -3669,7 +3696,7 @@ inline Network analyseNetwork(Program &program, ParStatement &par) {
                       call->getName()));
     }
     for (unsigned argIdx = 0; argIdx < args.size(); argIdx++) {
-      auto *vr = dynamic_cast<VarRefExpr *>(args[argIdx].get());
+      auto *vr = args[argIdx]->asVarRefExpr();
       if (!vr) {
         throw NetworkError(call->getLocation(),
                            "par branch arguments must be channels");
