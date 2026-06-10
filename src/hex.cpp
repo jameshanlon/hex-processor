@@ -1,6 +1,7 @@
 #include "hex.hpp"
 
 const char *hex::instrEnumToStr(Instr instr) {
+  using enum Instr;
   switch (instr) {
   case LDAM:
     return "LDAM";
@@ -38,6 +39,7 @@ const char *hex::instrEnumToStr(Instr instr) {
 }
 
 const char *hex::oprInstrEnumToStr(OprInstr oprInstr) {
+  using enum OprInstr;
   switch (oprInstr) {
   case BRB:
     return "BRB";

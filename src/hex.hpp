@@ -1,13 +1,15 @@
 #ifndef HEX_HPP
 #define HEX_HPP
 
+#include <cstdint>
+
 //===---------------------------------------------------------------------===//
 // Hex enumeration definitions and conversion functions.
 //===---------------------------------------------------------------------===//
 
 namespace hex {
 
-enum Instr {
+enum class Instr : uint8_t {
   LDAM = 0x0,
   LDBM = 0x1,
   STAM = 0x2,
@@ -25,7 +27,7 @@ enum Instr {
   NFIX = 0xF,
 };
 
-enum OprInstr {
+enum class OprInstr : uint8_t {
   BRB = 0x0,
   ADD = 0x1,
   SUB = 0x2,
