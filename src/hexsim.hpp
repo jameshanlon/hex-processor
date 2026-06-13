@@ -250,6 +250,10 @@ public:
         out << fmt::format("SUB areg = areg ({}) - breg ({}) ({})\n", areg,
                            breg, (areg - breg));
         break;
+      case hex::OprInstr::IN:
+        break;
+      case hex::OprInstr::OUT:
+        break;
       case hex::OprInstr::SVC:
         break;
       };
