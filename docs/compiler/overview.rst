@@ -66,3 +66,15 @@ command-line options of ``tools/xcmp.cpp`` (``--tokens``, ``--tree``,
 
 When ``main`` is a top-level ``par``, the binary stage instead emits a
 *network container* with one image per processor; see :doc:`networks`.
+
+.. toctree::
+   :hidden:
+
+   lexical-analyser
+   syntax-analyser
+   translator
+   codebuffer
+   memory-and-calling
+   codegen-idioms
+   bootstrapping
+   networks

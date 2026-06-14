@@ -51,44 +51,11 @@ guide for building and running programs.
    :caption: Contents:
 
    architecture/overview
-   architecture/registers
-   architecture/instruction-encoding
-   architecture/instruction-set
-   architecture/execution
-   architecture/channels
-   architecture/syscalls
-   architecture/simulator-model
    language/overview
-   language/lexical
-   language/program-structure
-   language/statements
-   language/procedures-functions
-   language/expressions
-   language/concurrency
-   language/examples
-   language/grammar
    compiler/overview
-   compiler/lexical-analyser
-   compiler/syntax-analyser
-   compiler/translator
-   compiler/codebuffer
-   compiler/memory-and-calling
-   compiler/codegen-idioms
-   compiler/bootstrapping
-   compiler/networks
    hardware/overview
-   hardware/core
-   hardware/memory-and-links
-   hardware/network
-   hardware/testbench
    tools/index
-   tools/formats
-   tools/building
-   tools/testing
-   reference/instruction-quick-ref
-   reference/syscall-reference
-   reference/primary-sources
-   reference/further-reading
+   reference/index
 
 
 Indices and tables

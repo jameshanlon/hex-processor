@@ -69,3 +69,15 @@ The remaining pages document each part of the language in detail:
 * :doc:`concurrency` — ``par``, ``chan`` and message passing.
 * :doc:`examples` — a tour of the programs in ``examples/``.
 * :doc:`grammar` — the consolidated grammar.
+
+.. toctree::
+   :hidden:
+
+   lexical
+   program-structure
+   statements
+   procedures-functions
+   expressions
+   concurrency
+   examples
+   grammar

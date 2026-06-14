@@ -67,3 +67,14 @@ See also
 * :doc:`registers` — the machine state and the role of each register.
 * :doc:`instruction-set` — the full instruction set, grouped by function.
 * :doc:`execution` — the fetch–increment–execute cycle and the datapath.
+
+.. toctree::
+   :hidden:
+
+   registers
+   instruction-encoding
+   instruction-set
+   execution
+   channels
+   syscalls
+   simulator-model

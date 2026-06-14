@@ -105,3 +105,11 @@ The remaining hardware pages follow the datapath outwards:
 * :doc:`memory-and-links` — the memory model and the per-core link interface.
 * :doc:`network` — the router and the multi-core network.
 * :doc:`testbench` — the Verilator testbench and the RTL unit tests.
+
+.. toctree::
+   :hidden:
+
+   core
+   memory-and-links
+   network
+   testbench

@@ -244,3 +244,10 @@ instruction trace.
 
    :doc:`formats` for the binary and container layouts these tools read and
    write, and :doc:`building` for how to compile the tools themselves.
+
+.. toctree::
+   :hidden:
+
+   formats
+   building
+   testing
