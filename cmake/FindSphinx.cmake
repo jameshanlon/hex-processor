@@ -1,7 +1,10 @@
-# Look for an executable called sphinx-build
+# Look for an executable called sphinx-build. Prefer the project-local
+# virtualenv (docs/_venv, created from docs/requirements.txt) if present, so the
+# pinned Sphinx is used; otherwise fall back to one on PATH.
 find_program(
   SPHINX_EXECUTABLE
   NAMES sphinx-build
+  HINTS ${CMAKE_SOURCE_DIR}/docs/_venv/bin
   DOC "Path to sphinx-build executable")
 
 include(FindPackageHandleStandardArgs)
