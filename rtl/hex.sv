@@ -7,28 +7,21 @@ module hex
     output hex_pkg::syscall_t  o_syscall
   );
 
-  // Memory instruction fetch interface
-  logic             req_f_valid;
-  hex_pkg::iaddr_t  req_f_addr;
-  hex_pkg::instr_t  res_f_data;
-  // Memory data read/write interface
-  logic             req_d_valid;
-  logic             req_d_we;
-  hex_pkg::waddr_t  req_d_addr;
-  hex_pkg::data_t   req_d_data;
-  hex_pkg::data_t   res_d_data;
+  // Shared single memory port.
+  logic             mem_valid;
+  logic             mem_we;
+  hex_pkg::waddr_t  mem_addr;
+  hex_pkg::data_t   mem_wdata;
+  hex_pkg::data_t   mem_rdata;
 
   processor u_processor (
     .i_rst           (i_rst),
     .i_clk           (i_clk),
-    .o_f_valid       (req_f_valid),
-    .o_f_addr        (req_f_addr),
-    .i_f_data        (res_f_data),
-    .o_d_valid       (req_d_valid),
-    .o_d_we          (req_d_we),
-    .o_d_addr        (req_d_addr),
-    .o_d_data        (req_d_data),
-    .i_d_data        (res_d_data),
+    .o_mem_valid     (mem_valid),
+    .o_mem_we        (mem_we),
+    .o_mem_addr      (mem_addr),
+    .o_mem_wdata     (mem_wdata),
+    .i_mem_rdata     (mem_rdata),
     .o_syscall_valid (o_syscall_valid),
     .o_syscall       (o_syscall),
     // No channels in the single-core top: never stall, no received word.
@@ -41,16 +34,12 @@ module hex
   );
 
   memory u_memory (
-    .i_rst     (i_rst),
-    .i_clk     (i_clk),
-    .i_f_valid (req_f_valid),
-    .i_f_addr  (req_f_addr),
-    .o_f_data  (res_f_data),
-    .i_d_valid (req_d_valid),
-    .i_d_addr  (req_d_addr),
-    .i_d_we    (req_d_we),
-    .i_d_data  (req_d_data),
-    .o_d_data  (res_d_data)
+    .i_clk   (i_clk),
+    .i_valid (mem_valid),
+    .i_we    (mem_we),
+    .i_addr  (mem_addr),
+    .i_wdata (mem_wdata),
+    .o_rdata (mem_rdata)
   );
 
   initial begin
