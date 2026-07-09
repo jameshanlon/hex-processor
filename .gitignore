@@ -14,3 +14,6 @@ a.out
 simout*
 simin*
 logs/
+
+docs/_build/
+docs/_venv/
